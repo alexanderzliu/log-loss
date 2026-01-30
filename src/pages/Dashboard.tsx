@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { RefreshCw, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import { formatCurrency, formatPercent, formatQuantity } from '../utils/format';
+import { formatCurrency, formatPercent, formatQuantity, calculatePnl } from '../utils/format';
 
 export default function Dashboard() {
   const {
@@ -26,10 +26,8 @@ export default function Dashboard() {
   const unrealizedPnl = openPositions.reduce((total, trade) => {
     const priceKey = `${trade.symbol}-${trade.assetType}`;
     const currentPrice = prices[priceKey]?.price;
-    if (currentPrice) {
-      return total + (currentPrice - trade.entryPrice) * trade.quantity;
-    }
-    return total;
+    const { pnl } = calculatePnl(trade.entryPrice, currentPrice, trade.quantity);
+    return total + (pnl ?? 0);
   }, 0);
 
   const totalInvested = openPositions.reduce(

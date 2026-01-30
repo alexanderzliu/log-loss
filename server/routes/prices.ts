@@ -3,6 +3,60 @@ import { db } from '../database';
 
 const router = Router();
 
+const CACHE_EXPIRY_MINUTES = 5;
+
+interface PriceData {
+  price: number;
+  change24h: number;
+  changePercent24h: number;
+  high24h: number;
+  low24h: number;
+  volume24h: number;
+}
+
+// Cache helper functions
+function getCachedPrice(symbol: string, assetType: string): Record<string, unknown> | undefined {
+  return db.prepare(`
+    SELECT * FROM price_cache
+    WHERE symbol = ? AND asset_type = ?
+    AND datetime(last_updated) > datetime('now', '-${CACHE_EXPIRY_MINUTES} minutes')
+  `).get(symbol, assetType) as Record<string, unknown> | undefined;
+}
+
+function cachePrice(symbol: string, assetType: string, priceData: PriceData): string {
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT OR REPLACE INTO price_cache
+    (symbol, asset_type, price, change_24h, change_percent_24h, high_24h, low_24h, volume_24h, last_updated)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    symbol,
+    assetType,
+    priceData.price,
+    priceData.change24h,
+    priceData.changePercent24h,
+    priceData.high24h,
+    priceData.low24h,
+    priceData.volume24h,
+    now
+  );
+  return now;
+}
+
+function formatCachedPrice(cached: Record<string, unknown>, symbol: string, assetType: string) {
+  return {
+    symbol,
+    assetType,
+    price: cached.price as number,
+    change24h: cached.change_24h as number,
+    changePercent24h: cached.change_percent_24h as number,
+    high24h: cached.high_24h as number,
+    low24h: cached.low_24h as number,
+    volume24h: cached.volume_24h as number,
+    lastUpdated: cached.last_updated as string,
+  };
+}
+
 // Common crypto symbol to CoinGecko ID mapping
 const cryptoIdMap: Record<string, string> = {
   BTC: 'bitcoin',
@@ -108,25 +162,10 @@ router.get('/:assetType/:symbol', async (req, res) => {
     const { assetType, symbol } = req.params;
     const upperSymbol = symbol.toUpperCase();
 
-    // Check cache first (5 minute expiry)
-    const cached = db.prepare(`
-      SELECT * FROM price_cache
-      WHERE symbol = ? AND asset_type = ?
-      AND datetime(last_updated) > datetime('now', '-5 minutes')
-    `).get(upperSymbol, assetType) as Record<string, unknown> | undefined;
-
+    // Check cache first
+    const cached = getCachedPrice(upperSymbol, assetType);
     if (cached) {
-      return res.json({
-        symbol: upperSymbol,
-        assetType,
-        price: cached.price,
-        change24h: cached.change_24h,
-        changePercent24h: cached.change_percent_24h,
-        high24h: cached.high_24h,
-        low24h: cached.low_24h,
-        volume24h: cached.volume_24h,
-        lastUpdated: cached.last_updated,
-      });
+      return res.json(formatCachedPrice(cached, upperSymbol, assetType));
     }
 
     // Fetch fresh data
@@ -138,30 +177,13 @@ router.get('/:assetType/:symbol', async (req, res) => {
       return res.status(404).json({ error: 'Price data not found' });
     }
 
-    const now = new Date().toISOString();
-
-    // Update cache
-    db.prepare(`
-      INSERT OR REPLACE INTO price_cache
-      (symbol, asset_type, price, change_24h, change_percent_24h, high_24h, low_24h, volume_24h, last_updated)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      upperSymbol,
-      assetType,
-      priceData.price,
-      priceData.change24h,
-      priceData.changePercent24h,
-      priceData.high24h,
-      priceData.low24h,
-      priceData.volume24h,
-      now
-    );
+    const lastUpdated = cachePrice(upperSymbol, assetType, priceData);
 
     res.json({
       symbol: upperSymbol,
       assetType,
       ...priceData,
-      lastUpdated: now,
+      lastUpdated,
     });
   } catch (error) {
     console.error('Error fetching price:', error);
@@ -187,24 +209,9 @@ router.post('/batch', async (req, res) => {
         const upperSymbol = symbol.toUpperCase();
 
         // Check cache first
-        const cached = db.prepare(`
-          SELECT * FROM price_cache
-          WHERE symbol = ? AND asset_type = ?
-          AND datetime(last_updated) > datetime('now', '-5 minutes')
-        `).get(upperSymbol, assetType) as Record<string, unknown> | undefined;
-
+        const cached = getCachedPrice(upperSymbol, assetType);
         if (cached) {
-          return {
-            symbol: upperSymbol,
-            assetType,
-            price: cached.price as number,
-            change24h: cached.change_24h as number,
-            changePercent24h: cached.change_percent_24h as number,
-            high24h: cached.high_24h as number,
-            low24h: cached.low_24h as number,
-            volume24h: cached.volume_24h as number,
-            lastUpdated: cached.last_updated as string,
-          };
+          return formatCachedPrice(cached, upperSymbol, assetType);
         }
 
         // Fetch fresh data
@@ -213,37 +220,16 @@ router.post('/batch', async (req, res) => {
           : await fetchStockPrice(upperSymbol);
 
         if (!priceData) {
-          return {
-            symbol: upperSymbol,
-            assetType,
-            error: 'Price not found',
-          };
+          return { symbol: upperSymbol, assetType, error: 'Price not found' };
         }
 
-        const now = new Date().toISOString();
-
-        // Update cache
-        db.prepare(`
-          INSERT OR REPLACE INTO price_cache
-          (symbol, asset_type, price, change_24h, change_percent_24h, high_24h, low_24h, volume_24h, last_updated)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          upperSymbol,
-          assetType,
-          priceData.price,
-          priceData.change24h,
-          priceData.changePercent24h,
-          priceData.high24h,
-          priceData.low24h,
-          priceData.volume24h,
-          now
-        );
+        const lastUpdated = cachePrice(upperSymbol, assetType, priceData);
 
         return {
           symbol: upperSymbol,
           assetType,
           ...priceData,
-          lastUpdated: now,
+          lastUpdated,
         };
       })
     );

@@ -1,6 +1,6 @@
-import { Bitcoin, TrendingUp, TrendingDown, ArrowUp } from 'lucide-react';
+import { Bitcoin, ArrowUp, ArrowDown, LineChart, TrendingUp, TrendingDown } from 'lucide-react';
 import type { Trade } from '../../types';
-import { formatCurrency, formatPercent, formatQuantity } from '../../utils/format';
+import { formatCurrency, formatPercent, formatQuantity, calculatePnl } from '../../utils/format';
 
 interface PositionCardProps {
   trade: Trade;
@@ -10,18 +10,14 @@ interface PositionCardProps {
 
 export default function PositionCard({ trade, currentPrice, priceChange }: PositionCardProps) {
   const invested = trade.entryPrice * trade.quantity;
-
-  // Calculate unrealized P&L
-  const unrealizedPnl = currentPrice
-    ? (currentPrice - trade.entryPrice) * trade.quantity
-    : null;
-  const unrealizedPnlPercent = currentPrice
-    ? ((currentPrice - trade.entryPrice) / trade.entryPrice) * 100
-    : null;
-
+  const { pnl: unrealizedPnl, pnlPercent: unrealizedPnlPercent } = calculatePnl(
+    trade.entryPrice,
+    currentPrice,
+    trade.quantity
+  );
   const currentValue = currentPrice ? currentPrice * trade.quantity : null;
+  const isProfit = unrealizedPnl !== null && unrealizedPnl >= 0;
 
-  // Calculate distance to stop loss and take profit
   const distanceToStop = trade.stopLoss
     ? ((trade.entryPrice - trade.stopLoss) / trade.entryPrice) * 100
     : null;
@@ -30,120 +26,144 @@ export default function PositionCard({ trade, currentPrice, priceChange }: Posit
     : null;
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+    <div className="card card-hover p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
+      <div className="flex items-start justify-between mb-6">
+        <div className="flex items-center gap-4">
           <div
-            className={`w-10 h-10 rounded-full flex items-center justify-center ${
-              trade.assetType === 'crypto' ? 'bg-orange-100' : 'bg-blue-100'
+            className={`w-14 h-14 rounded-xl flex items-center justify-center ${
+              trade.assetType === 'crypto'
+                ? 'bg-gradient-to-br from-amber-500/20 to-orange-600/20 border border-amber-500/30'
+                : 'bg-gradient-to-br from-blue-500/20 to-indigo-600/20 border border-blue-500/30'
             }`}
           >
             {trade.assetType === 'crypto' ? (
-              <Bitcoin size={20} className="text-orange-600" />
+              <Bitcoin size={26} className="text-amber-400" />
             ) : (
-              <TrendingUp size={20} className="text-blue-600" />
+              <LineChart size={26} className="text-blue-400" />
             )}
           </div>
           <div>
-            <div className="font-semibold text-gray-900">{trade.symbol}</div>
-            <div className="text-xs text-gray-500 capitalize">{trade.assetType}</div>
+            <h3 className="text-xl font-semibold text-[hsl(var(--text-primary))]">{trade.symbol}</h3>
+            <p className="text-sm text-[hsl(var(--text-muted))] font-mono uppercase tracking-wider">{trade.assetType}</p>
           </div>
         </div>
         {priceChange !== undefined && (
-          <span
-            className={`text-xs px-2 py-1 rounded ${
-              priceChange >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-            }`}
-          >
-            {formatPercent(priceChange)} 24h
-          </span>
-        )}
-      </div>
-
-      {/* Price Info */}
-      <div className="space-y-2 mb-3">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-500">Entry Price</span>
-          <span className="font-mono">{formatCurrency(trade.entryPrice)}</span>
-        </div>
-        {currentPrice && (
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Current Price</span>
-            <span className="font-mono">{formatCurrency(currentPrice)}</span>
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${
+            priceChange >= 0
+              ? 'bg-[hsla(150,85%,45%,0.1)] text-[hsl(var(--profit))]'
+              : 'bg-[hsla(0,85%,55%,0.1)] text-[hsl(var(--loss))]'
+          }`}>
+            {priceChange >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+            <span className="font-mono text-sm font-medium">
+              {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
+            </span>
+            <span className="text-xs opacity-70">24h</span>
           </div>
         )}
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-500">Quantity</span>
-          <span className="font-mono">{formatQuantity(trade.quantity)}</span>
-        </div>
       </div>
 
-      {/* P&L */}
-      <div className="pt-3 border-t border-gray-100">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-sm text-gray-500">Unrealized P&L</span>
-          {unrealizedPnl !== null ? (
-            <div className="text-right">
-              <div
-                className={`font-semibold ${
-                  unrealizedPnl >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}
-              >
-                {unrealizedPnl >= 0 ? '+' : ''}{formatCurrency(unrealizedPnl)}
-              </div>
-              <div
-                className={`text-xs ${
-                  unrealizedPnlPercent! >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}
-              >
-                {formatPercent(unrealizedPnlPercent!)}
-              </div>
-            </div>
+      {/* Price Grid */}
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="p-4 rounded-xl bg-[hsl(var(--bg-tertiary))]">
+          <p className="text-xs text-[hsl(var(--text-muted))] mb-1">Entry Price</p>
+          <p className="text-lg font-mono font-medium text-[hsl(var(--text-primary))]">
+            {formatCurrency(trade.entryPrice)}
+          </p>
+        </div>
+        <div className="p-4 rounded-xl bg-[hsl(var(--bg-tertiary))]">
+          <p className="text-xs text-[hsl(var(--text-muted))] mb-1">Current Price</p>
+          {currentPrice ? (
+            <p className={`text-lg font-mono font-medium ${isProfit ? 'text-[hsl(var(--profit))]' : 'text-[hsl(var(--loss))]'}`}>
+              {formatCurrency(currentPrice)}
+            </p>
           ) : (
-            <span className="text-gray-400 text-sm">Loading...</span>
+            <div className="shimmer h-6 w-24 rounded mt-1"></div>
           )}
         </div>
-
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-500">Position Value</span>
-          <span className="font-medium">
+        <div className="p-4 rounded-xl bg-[hsl(var(--bg-tertiary))]">
+          <p className="text-xs text-[hsl(var(--text-muted))] mb-1">Quantity</p>
+          <p className="text-lg font-mono font-medium text-[hsl(var(--text-primary))]">
+            {formatQuantity(trade.quantity)}
+          </p>
+        </div>
+        <div className="p-4 rounded-xl bg-[hsl(var(--bg-tertiary))]">
+          <p className="text-xs text-[hsl(var(--text-muted))] mb-1">Position Value</p>
+          <p className="text-lg font-mono font-medium text-[hsl(var(--text-primary))]">
             {currentValue ? formatCurrency(currentValue) : formatCurrency(invested)}
-          </span>
+          </p>
         </div>
       </div>
 
-      {/* Stop Loss / Take Profit Indicators */}
-      {(trade.stopLoss || trade.takeProfit) && (
-        <div className="mt-3 pt-3 border-t border-gray-100 flex gap-3">
-          {trade.stopLoss && (
-            <div className="flex-1 text-xs">
-              <div className="text-gray-500 mb-1">Stop Loss</div>
-              <div className="flex items-center gap-1">
-                <TrendingDown size={12} className="text-red-500" />
-                <span className="font-mono">{formatCurrency(trade.stopLoss)}</span>
-                <span className="text-red-500">(-{distanceToStop?.toFixed(1)}%)</span>
+      {/* P&L Section */}
+      <div className={`p-5 rounded-xl border ${
+        isProfit
+          ? 'bg-[hsla(150,85%,45%,0.05)] border-[hsla(150,85%,45%,0.2)]'
+          : unrealizedPnl === null
+            ? 'bg-[hsl(var(--bg-tertiary))] border-[hsl(var(--border-subtle))]'
+            : 'bg-[hsla(0,85%,55%,0.05)] border-[hsla(0,85%,55%,0.2)]'
+      }`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-[hsl(var(--text-muted))] mb-1">Unrealized P&L</p>
+            {unrealizedPnl !== null ? (
+              <div className="flex items-baseline gap-3">
+                <span className={`text-2xl font-semibold font-mono ${isProfit ? 'text-[hsl(var(--profit))]' : 'text-[hsl(var(--loss))]'}`}>
+                  {isProfit ? '+' : ''}{formatCurrency(unrealizedPnl)}
+                </span>
+                <span className={`text-sm font-mono ${isProfit ? 'text-[hsl(var(--profit))]' : 'text-[hsl(var(--loss))]'}`}>
+                  {formatPercent(unrealizedPnlPercent!)}
+                </span>
               </div>
+            ) : (
+              <div className="shimmer h-8 w-32 rounded"></div>
+            )}
+          </div>
+          {unrealizedPnl !== null && (
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+              isProfit ? 'bg-[hsla(150,85%,45%,0.15)]' : 'bg-[hsla(0,85%,55%,0.15)]'
+            }`}>
+              {isProfit ? (
+                <TrendingUp size={24} className="text-[hsl(var(--profit))]" />
+              ) : (
+                <TrendingDown size={24} className="text-[hsl(var(--loss))]" />
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Stop Loss / Take Profit */}
+      {(trade.stopLoss || trade.takeProfit) && (
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          {trade.stopLoss && (
+            <div className="p-3 rounded-xl bg-[hsla(0,85%,55%,0.05)] border border-[hsla(0,85%,55%,0.15)]">
+              <div className="flex items-center gap-2 mb-2">
+                <ArrowDown size={14} className="text-[hsl(var(--loss))]" />
+                <span className="text-xs text-[hsl(var(--text-muted))]">Stop Loss</span>
+              </div>
+              <p className="font-mono text-sm text-[hsl(var(--text-secondary))]">{formatCurrency(trade.stopLoss)}</p>
+              <p className="text-xs font-mono text-[hsl(var(--loss))]">-{distanceToStop?.toFixed(1)}%</p>
             </div>
           )}
           {trade.takeProfit && (
-            <div className="flex-1 text-xs">
-              <div className="text-gray-500 mb-1">Take Profit</div>
-              <div className="flex items-center gap-1">
-                <ArrowUp size={12} className="text-green-500" />
-                <span className="font-mono">{formatCurrency(trade.takeProfit)}</span>
-                <span className="text-green-500">(+{distanceToTarget?.toFixed(1)}%)</span>
+            <div className="p-3 rounded-xl bg-[hsla(150,85%,45%,0.05)] border border-[hsla(150,85%,45%,0.15)]">
+              <div className="flex items-center gap-2 mb-2">
+                <ArrowUp size={14} className="text-[hsl(var(--profit))]" />
+                <span className="text-xs text-[hsl(var(--text-muted))]">Take Profit</span>
               </div>
+              <p className="font-mono text-sm text-[hsl(var(--text-secondary))]">{formatCurrency(trade.takeProfit)}</p>
+              <p className="text-xs font-mono text-[hsl(var(--profit))]">+{distanceToTarget?.toFixed(1)}%</p>
             </div>
           )}
         </div>
       )}
 
-      {/* Hypothesis Preview */}
+      {/* Thesis */}
       {trade.hypothesis && (
-        <div className="mt-3 pt-3 border-t border-gray-100">
-          <div className="text-xs text-gray-500 mb-1">Thesis</div>
-          <p className="text-sm text-gray-700 line-clamp-2">{trade.hypothesis}</p>
+        <div className="mt-4 pt-4 border-t border-[hsl(var(--border-subtle))]">
+          <p className="text-xs text-[hsl(var(--text-muted))] uppercase tracking-wider mb-2">Trade Thesis</p>
+          <p className="text-sm text-[hsl(var(--text-secondary))] leading-relaxed">{trade.hypothesis}</p>
         </div>
       )}
     </div>

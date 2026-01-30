@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Trade } from '../../types';
 import { useStore } from '../../store/useStore';
-import { formatCurrency, formatQuantity, formatDate } from '../../utils/format';
+import { formatCurrency, formatQuantity, formatDate, calculatePnl } from '../../utils/format';
 import { MoreVertical, Edit2, Trash2, X, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 interface TradeListProps {
@@ -57,9 +57,10 @@ export default function TradeList({ trades, onEdit, onClosePosition }: TradeList
             let displayPnl = trade.pnl;
             let displayPnlPercent = trade.pnlPercent;
 
-            if (isOpen && currentPrice) {
-              displayPnl = (currentPrice - trade.entryPrice) * trade.quantity;
-              displayPnlPercent = ((currentPrice - trade.entryPrice) / trade.entryPrice) * 100;
+            if (isOpen) {
+              const { pnl, pnlPercent } = calculatePnl(trade.entryPrice, currentPrice, trade.quantity);
+              displayPnl = pnl ?? trade.pnl;
+              displayPnlPercent = pnlPercent ?? trade.pnlPercent;
             }
 
             const value = trade.entryPrice * trade.quantity;
