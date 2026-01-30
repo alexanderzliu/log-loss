@@ -83,7 +83,7 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
     : 'New Trade';
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{ background: 'var(--overlay-bg)' }}>
       <div className="card w-full max-w-lg max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: 'var(--border)' }}>

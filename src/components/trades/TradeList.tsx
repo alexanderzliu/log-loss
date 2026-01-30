@@ -34,7 +34,7 @@ export default function TradeList({ trades, onEdit, onClosePosition }: TradeList
   }
 
   return (
-    <div className="card" style={{ overflow: 'hidden' }}>
+    <div className="card">
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ borderBottom: '1px solid var(--border)' }}>
@@ -165,13 +165,13 @@ export default function TradeList({ trades, onEdit, onClosePosition }: TradeList
                           right: 0,
                           marginTop: '4px',
                           width: '170px',
-                          background: 'rgba(18, 18, 26, 0.95)',
+                          background: 'var(--dropdown-bg)',
                           backdropFilter: 'blur(12px)',
                           border: '1px solid var(--border-light)',
                           borderRadius: '12px',
                           zIndex: 20,
                           padding: '6px',
-                          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
+                          boxShadow: 'var(--dropdown-shadow)'
                         }}>
                           <button
                             onClick={() => { onEdit(trade); setMenuOpen(null); }}
@@ -209,7 +209,8 @@ export default function TradeList({ trades, onEdit, onClosePosition }: TradeList
         <div style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(0,0,0,0.75)',
+          background: 'var(--overlay-bg)',
+          backdropFilter: 'blur(4px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
