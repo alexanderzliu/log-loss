@@ -8,57 +8,89 @@ import './index.css';
 function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-[hsl(var(--background))]">
-        {/* Navigation */}
-        <nav className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <h1 className="text-xl font-bold text-gray-900">Trading Journal</h1>
-            <div className="flex gap-1">
-              <NavLink
-                to="/"
-                className={({ isActive }) =>
-                  `flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                    isActive
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`
-                }
-              >
-                <LayoutDashboard size={18} />
-                Dashboard
-              </NavLink>
-              <NavLink
-                to="/journal"
-                className={({ isActive }) =>
-                  `flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                    isActive
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`
-                }
-              >
-                <BookOpen size={18} />
-                Journal
-              </NavLink>
-              <NavLink
-                to="/analytics"
-                className={({ isActive }) =>
-                  `flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                    isActive
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`
-                }
-              >
-                <TrendingUp size={18} />
-                Analytics
-              </NavLink>
-            </div>
+      <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-base)' }}>
+        {/* Sidebar */}
+        <aside style={{
+          width: '200px',
+          background: 'linear-gradient(180deg, rgba(18, 18, 26, 0.95) 0%, rgba(12, 12, 18, 0.98) 100%)',
+          borderRight: '1px solid var(--border)',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          bottom: 0,
+          backdropFilter: 'blur(20px)',
+        }}>
+          {/* Logo */}
+          <div style={{ padding: '24px', borderBottom: '1px solid var(--border)' }}>
+            <h1 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Trading Journal
+            </h1>
           </div>
-        </nav>
+
+          {/* Nav */}
+          <nav style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <NavLink
+              to="/"
+              end
+              style={({ isActive }) => ({
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: 500,
+                textDecoration: 'none',
+                color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                background: isActive ? 'var(--bg-elevated)' : 'transparent',
+              })}
+            >
+              <LayoutDashboard size={18} />
+              Dashboard
+            </NavLink>
+            <NavLink
+              to="/journal"
+              style={({ isActive }) => ({
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: 500,
+                textDecoration: 'none',
+                color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                background: isActive ? 'var(--bg-elevated)' : 'transparent',
+              })}
+            >
+              <BookOpen size={18} />
+              Journal
+            </NavLink>
+            <NavLink
+              to="/analytics"
+              style={({ isActive }) => ({
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: 500,
+                textDecoration: 'none',
+                color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                background: isActive ? 'var(--bg-elevated)' : 'transparent',
+              })}
+            >
+              <TrendingUp size={18} />
+              Analytics
+            </NavLink>
+          </nav>
+        </aside>
 
         {/* Main Content */}
-        <main className="max-w-7xl mx-auto px-6 py-8">
+        <main style={{ marginLeft: '200px', flex: 1, padding: '40px 48px' }}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/journal" element={<Journal />} />

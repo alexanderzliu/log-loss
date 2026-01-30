@@ -83,29 +83,32 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
     : 'New Trade';
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="card w-full max-w-lg max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: 'var(--border)' }}>
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</h2>
           <button
             onClick={onClose}
-            className="p-1 rounded hover:bg-gray-100"
+            className="p-2 rounded-lg transition-colors"
+            style={{ background: 'transparent' }}
+            onMouseOver={(e) => e.currentTarget.style.background = 'var(--bg-hover)'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
           >
-            <X size={20} className="text-gray-500" />
+            <X size={20} style={{ color: 'var(--text-muted)' }} />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-5">
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+            <div className="p-3 rounded-lg text-sm" style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: 'var(--loss)' }}>
               {error}
             </div>
           )}
 
           {isClosing && (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm">
+            <div className="p-3 rounded-lg text-sm" style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)', color: '#60a5fa' }}>
               Creating a sell order to close your {formData.symbol} position.
             </div>
           )}
@@ -113,7 +116,7 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
           {/* Asset Type & Symbol */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
                 Asset Type
               </label>
               <select
@@ -121,14 +124,14 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
                 value={formData.assetType}
                 onChange={handleChange}
                 disabled={isClosing}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                className="w-full disabled:opacity-50"
               >
                 <option value="crypto">Crypto</option>
                 <option value="stock">Stock</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
                 Symbol
               </label>
               <input
@@ -138,7 +141,7 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
                 onChange={handleChange}
                 disabled={isClosing}
                 placeholder="e.g., BTC, AAPL"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 uppercase"
+                className="w-full uppercase disabled:opacity-50"
                 required
               />
             </div>
@@ -147,7 +150,7 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
           {/* Side & Date */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
                 Side
               </label>
               <div className="flex gap-2">
@@ -155,11 +158,19 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
                   type="button"
                   onClick={() => !isClosing && setFormData((prev) => ({ ...prev, side: 'buy' }))}
                   disabled={isClosing}
-                  className={`flex-1 py-2 rounded-lg font-medium transition-colors ${
-                    formData.side === 'buy'
-                      ? 'bg-green-100 text-green-700 border-2 border-green-500'
-                      : 'bg-gray-100 text-gray-600 border-2 border-transparent'
-                  } ${isClosing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    borderRadius: '10px',
+                    fontWeight: 500,
+                    fontSize: '14px',
+                    border: formData.side === 'buy' ? '2px solid var(--profit)' : '2px solid transparent',
+                    background: formData.side === 'buy' ? 'rgba(16, 185, 129, 0.15)' : 'var(--bg-elevated)',
+                    color: formData.side === 'buy' ? 'var(--profit)' : 'var(--text-muted)',
+                    cursor: isClosing ? 'not-allowed' : 'pointer',
+                    opacity: isClosing ? 0.5 : 1,
+                    transition: 'all 0.2s ease',
+                  }}
                 >
                   Buy
                 </button>
@@ -167,18 +178,25 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
                   type="button"
                   onClick={() => !isClosing && setFormData((prev) => ({ ...prev, side: 'sell' }))}
                   disabled={isClosing && formData.side === 'buy'}
-                  className={`flex-1 py-2 rounded-lg font-medium transition-colors ${
-                    formData.side === 'sell'
-                      ? 'bg-red-100 text-red-700 border-2 border-red-500'
-                      : 'bg-gray-100 text-gray-600 border-2 border-transparent'
-                  }`}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    borderRadius: '10px',
+                    fontWeight: 500,
+                    fontSize: '14px',
+                    border: formData.side === 'sell' ? '2px solid var(--loss)' : '2px solid transparent',
+                    background: formData.side === 'sell' ? 'rgba(239, 68, 68, 0.15)' : 'var(--bg-elevated)',
+                    color: formData.side === 'sell' ? 'var(--loss)' : 'var(--text-muted)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
                 >
                   Sell
                 </button>
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
                 {isClosing ? 'Exit Date' : 'Entry Date'}
               </label>
               <input
@@ -186,7 +204,7 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
                 name="entryDate"
                 value={formData.entryDate}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full"
                 required
               />
             </div>
@@ -195,11 +213,11 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
           {/* Price & Quantity */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
                 {isClosing ? 'Exit Price' : 'Entry Price'}
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}>$</span>
                 <input
                   type="number"
                   name="entryPrice"
@@ -208,13 +226,14 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
                   step="any"
                   min="0"
                   placeholder="0.00"
-                  className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full"
+                  style={{ paddingLeft: '28px' }}
                   required
                 />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
                 Quantity
               </label>
               <input
@@ -225,7 +244,7 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
                 step="any"
                 min="0"
                 placeholder="0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full"
                 required
               />
             </div>
@@ -235,11 +254,11 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
           {formData.side === 'buy' && !isClosing && (
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
                   Stop Loss (optional)
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}>$</span>
                   <input
                     type="number"
                     name="stopLoss"
@@ -248,16 +267,17 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
                     step="any"
                     min="0"
                     placeholder="0.00"
-                    className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full"
+                    style={{ paddingLeft: '28px' }}
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
                   Take Profit (optional)
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}>$</span>
                   <input
                     type="number"
                     name="takeProfit"
@@ -266,7 +286,8 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
                     step="any"
                     min="0"
                     placeholder="0.00"
-                    className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full"
+                    style={{ paddingLeft: '28px' }}
                   />
                 </div>
               </div>
@@ -276,7 +297,7 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
           {/* Hypothesis */}
           {!isClosing && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
                 Hypothesis / Trade Thesis
               </label>
               <textarea
@@ -285,14 +306,14 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
                 onChange={handleChange}
                 rows={3}
                 placeholder="Why are you making this trade? What's your thesis?"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                className="w-full resize-none"
               />
             </div>
           )}
 
           {/* Notes */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
               Notes
             </label>
             <textarea
@@ -301,16 +322,16 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
               onChange={handleChange}
               rows={2}
               placeholder="Additional notes..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className="w-full resize-none"
             />
           </div>
 
           {/* Total Value Preview */}
           {formData.entryPrice > 0 && formData.quantity > 0 && (
-            <div className="p-3 bg-gray-50 rounded-lg">
+            <div className="p-4 rounded-xl" style={{ background: 'var(--bg-elevated)' }}>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Total Value</span>
-                <span className="font-medium text-gray-900">
+                <span style={{ color: 'var(--text-muted)' }}>Total Value</span>
+                <span className="font-semibold" style={{ color: 'var(--text-primary)', fontFamily: "'DM Mono', monospace" }}>
                   ${(formData.entryPrice * formData.quantity).toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
@@ -321,22 +342,19 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
           )}
 
           {/* Actions */}
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3 pt-3">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              className="btn-ghost flex-1"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className={`flex-1 px-4 py-2 rounded-lg text-white font-medium ${
-                isClosing
-                  ? 'bg-red-600 hover:bg-red-700'
-                  : 'bg-blue-600 hover:bg-blue-700'
-              } disabled:opacity-50`}
+              className="btn-primary flex-1"
+              style={isClosing ? { background: 'linear-gradient(135deg, var(--loss) 0%, #dc2626 100%)', boxShadow: '0 2px 12px rgba(239, 68, 68, 0.2)' } : {}}
             >
               {loading ? 'Saving...' : isClosing ? 'Close Position' : trade ? 'Update Trade' : 'Add Trade'}
             </button>

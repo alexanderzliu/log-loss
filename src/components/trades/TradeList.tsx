@@ -2,16 +2,7 @@ import { useState } from 'react';
 import type { Trade } from '../../types';
 import { useStore } from '../../store/useStore';
 import { formatCurrency, formatPercent, formatQuantity, formatDate } from '../../utils/format';
-import {
-  ArrowUpRight,
-  ArrowDownRight,
-  MoreVertical,
-  Edit2,
-  Trash2,
-  X,
-  Bitcoin,
-  TrendingUp,
-} from 'lucide-react';
+import { MoreVertical, Edit2, Trash2, X, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 interface TradeListProps {
   trades: Trade[];
@@ -32,37 +23,37 @@ export default function TradeList({ trades, onEdit, onClosePosition }: TradeList
 
   if (trades.length === 0) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-        <TrendingUp className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No trades yet</h3>
-        <p className="text-gray-500">Click "New Trade" to record your first trade.</p>
+      <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>No trades yet</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+          Click "New Trade" to record your first trade
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      <table className="w-full">
-        <thead className="bg-gray-50 border-b border-gray-200">
-          <tr>
-            <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Asset</th>
-            <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Side</th>
-            <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Date</th>
-            <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">Entry Price</th>
-            <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">Quantity</th>
-            <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">Value</th>
-            <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">P&L</th>
-            <th className="text-center px-4 py-3 text-sm font-medium text-gray-500">Status</th>
-            <th className="px-4 py-3 text-sm font-medium text-gray-500"></th>
+    <div className="card" style={{ overflow: 'hidden' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ borderBottom: '1px solid var(--border)' }}>
+            <th style={thStyle}>Asset</th>
+            <th style={thStyle}>Type</th>
+            <th style={thStyle}>Date</th>
+            <th style={{ ...thStyle, textAlign: 'right' }}>Price</th>
+            <th style={{ ...thStyle, textAlign: 'right' }}>Quantity</th>
+            <th style={{ ...thStyle, textAlign: 'right' }}>Value</th>
+            <th style={{ ...thStyle, textAlign: 'right' }}>P&L</th>
+            <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
+            <th style={{ ...thStyle, width: '40px' }}></th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-200">
+        <tbody>
           {trades.map((trade) => {
             const priceKey = `${trade.symbol}-${trade.assetType}`;
             const currentPrice = prices[priceKey]?.price;
             const isOpen = trade.status === 'open' && trade.side === 'buy';
 
-            // Calculate unrealized P&L for open positions
             let displayPnl = trade.pnl;
             let displayPnlPercent = trade.pnlPercent;
 
@@ -74,135 +65,131 @@ export default function TradeList({ trades, onEdit, onClosePosition }: TradeList
             const value = trade.entryPrice * trade.quantity;
 
             return (
-              <tr key={trade.id} className="hover:bg-gray-50">
-                <td className="px-4 py-4">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        trade.assetType === 'crypto' ? 'bg-orange-100' : 'bg-blue-100'
-                      }`}
-                    >
-                      {trade.assetType === 'crypto' ? (
-                        <Bitcoin size={16} className="text-orange-600" />
-                      ) : (
-                        <TrendingUp size={16} className="text-blue-600" />
-                      )}
+              <tr key={trade.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                <td style={tdStyle}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      background: 'var(--bg-elevated)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 600,
+                      fontSize: '12px',
+                      color: 'var(--text-primary)'
+                    }}>
+                      {trade.symbol.slice(0, 2)}
                     </div>
                     <div>
-                      <div className="font-medium text-gray-900">{trade.symbol}</div>
-                      <div className="text-xs text-gray-500 capitalize">{trade.assetType}</div>
+                      <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{trade.symbol}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                        {trade.assetType}
+                      </div>
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-4">
-                  <span
-                    className={`inline-flex items-center gap-1 px-2 py-1 rounded text-sm font-medium ${
-                      trade.side === 'buy'
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-red-100 text-red-700'
-                    }`}
-                  >
-                    {trade.side === 'buy' ? (
-                      <ArrowUpRight size={14} />
-                    ) : (
-                      <ArrowDownRight size={14} />
-                    )}
+                <td style={tdStyle}>
+                  <span className={`badge ${trade.side === 'buy' ? 'badge-profit' : 'badge-loss'}`}>
+                    {trade.side === 'buy' ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
                     {trade.side.toUpperCase()}
                   </span>
                 </td>
-                <td className="px-4 py-4 text-sm text-gray-600">{formatDate(trade.entryDate)}</td>
-                <td className="px-4 py-4 text-sm text-gray-900 text-right font-mono">
+                <td style={tdStyle}>
+                  {formatDate(trade.entryDate)}
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace" }}>
                   {formatCurrency(trade.entryPrice)}
                 </td>
-                <td className="px-4 py-4 text-sm text-gray-900 text-right font-mono">
+                <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace" }}>
                   {formatQuantity(trade.quantity)}
                 </td>
-                <td className="px-4 py-4 text-sm text-gray-900 text-right font-mono">
+                <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontWeight: 500 }}>
                   {formatCurrency(value)}
                 </td>
-                <td className="px-4 py-4 text-right">
+                <td style={{ ...tdStyle, textAlign: 'right' }}>
                   {displayPnl !== null ? (
                     <div>
-                      <div
-                        className={`font-medium font-mono ${
-                          displayPnl >= 0 ? 'text-green-600' : 'text-red-600'
-                        }`}
-                      >
-                        {formatCurrency(displayPnl)}
+                      <div style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontWeight: 500,
+                        color: displayPnl >= 0 ? 'var(--profit)' : 'var(--loss)'
+                      }}>
+                        {displayPnl >= 0 ? '+' : ''}{formatCurrency(displayPnl)}
                       </div>
                       {displayPnlPercent !== null && (
-                        <div
-                          className={`text-xs ${
-                            displayPnlPercent >= 0 ? 'text-green-600' : 'text-red-600'
-                          }`}
-                        >
-                          {formatPercent(displayPnlPercent)}
+                        <div style={{
+                          fontSize: '12px',
+                          color: displayPnlPercent >= 0 ? 'var(--profit)' : 'var(--loss)'
+                        }}>
+                          {displayPnlPercent >= 0 ? '+' : ''}{displayPnlPercent.toFixed(2)}%
                         </div>
                       )}
                     </div>
                   ) : (
-                    <span className="text-gray-400">-</span>
+                    <span style={{ color: 'var(--text-muted)' }}>—</span>
                   )}
                 </td>
-                <td className="px-4 py-4 text-center">
-                  <span
-                    className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                      trade.status === 'open'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-gray-100 text-gray-600'
-                    }`}
-                  >
+                <td style={{ ...tdStyle, textAlign: 'center' }}>
+                  <span className="badge badge-neutral">
                     {trade.status.toUpperCase()}
                   </span>
                 </td>
-                <td className="px-4 py-4">
-                  <div className="relative">
+                <td style={tdStyle}>
+                  <div style={{ position: 'relative' }}>
                     <button
                       onClick={() => setMenuOpen(menuOpen === trade.id ? null : trade.id)}
-                      className="p-1 rounded hover:bg-gray-100"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        padding: '6px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        color: 'var(--text-muted)'
+                      }}
                     >
-                      <MoreVertical size={16} className="text-gray-400" />
+                      <MoreVertical size={16} />
                     </button>
 
                     {menuOpen === trade.id && (
                       <>
                         <div
-                          className="fixed inset-0 z-10"
+                          style={{ position: 'fixed', inset: 0, zIndex: 10 }}
                           onClick={() => setMenuOpen(null)}
                         />
-                        <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20 py-1">
+                        <div style={{
+                          position: 'absolute',
+                          right: 0,
+                          marginTop: '4px',
+                          width: '170px',
+                          background: 'rgba(18, 18, 26, 0.95)',
+                          backdropFilter: 'blur(12px)',
+                          border: '1px solid var(--border-light)',
+                          borderRadius: '12px',
+                          zIndex: 20,
+                          padding: '6px',
+                          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
+                        }}>
                           <button
-                            onClick={() => {
-                              onEdit(trade);
-                              setMenuOpen(null);
-                            }}
-                            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                            onClick={() => { onEdit(trade); setMenuOpen(null); }}
+                            style={menuItemStyle}
                           >
-                            <Edit2 size={14} />
-                            Edit Trade
+                            <Edit2 size={14} /> Edit
                           </button>
                           {isOpen && (
                             <button
-                              onClick={() => {
-                                onClosePosition(trade);
-                                setMenuOpen(null);
-                              }}
-                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                              onClick={() => { onClosePosition(trade); setMenuOpen(null); }}
+                              style={menuItemStyle}
                             >
-                              <X size={14} />
-                              Close Position
+                              <X size={14} /> Close Position
                             </button>
                           )}
-                          <hr className="my-1" />
                           <button
-                            onClick={() => {
-                              setDeleteConfirm(trade.id);
-                              setMenuOpen(null);
-                            }}
-                            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                            onClick={() => { setDeleteConfirm(trade.id); setMenuOpen(null); }}
+                            style={{ ...menuItemStyle, color: 'var(--loss)' }}
                           >
-                            <Trash2 size={14} />
-                            Delete Trade
+                            <Trash2 size={14} /> Delete
                           </button>
                         </div>
                       </>
@@ -215,24 +202,40 @@ export default function TradeList({ trades, onEdit, onClosePosition }: TradeList
         </tbody>
       </table>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Trade?</h3>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to delete this trade? This action cannot be undone.
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.75)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 50
+        }}>
+          <div className="card" style={{ padding: '24px', maxWidth: '400px', width: '100%', margin: '16px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>
+              Delete Trade?
+            </h3>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', fontSize: '14px' }}>
+              This action cannot be undone.
             </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
-              >
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setDeleteConfirm(null)} className="btn-ghost">
                 Cancel
               </button>
               <button
                 onClick={() => handleDelete(deleteConfirm)}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'var(--loss)',
+                  color: '#fff',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit'
+                }}
               >
                 Delete
               </button>
@@ -243,3 +246,36 @@ export default function TradeList({ trades, onEdit, onClosePosition }: TradeList
     </div>
   );
 }
+
+const thStyle: React.CSSProperties = {
+  padding: '18px 20px',
+  textAlign: 'left',
+  fontSize: '11px',
+  fontWeight: 600,
+  color: 'var(--text-muted)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.8px',
+};
+
+const tdStyle: React.CSSProperties = {
+  padding: '18px 20px',
+  color: 'var(--text-secondary)',
+  fontSize: '14px',
+};
+
+const menuItemStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '10px',
+  width: '100%',
+  padding: '10px 14px',
+  background: 'transparent',
+  border: 'none',
+  borderRadius: '8px',
+  color: 'var(--text-secondary)',
+  fontSize: '14px',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  textAlign: 'left',
+  transition: 'background 0.15s ease',
+};

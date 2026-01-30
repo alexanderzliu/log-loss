@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
-import { Plus, Filter } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import TradeList from '../components/trades/TradeList';
 import TradeForm from '../components/trades/TradeForm';
 import type { Trade, TradeFormData } from '../types';
@@ -11,7 +11,6 @@ export default function Journal() {
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [closingTrade, setClosingTrade] = useState<Trade | null>(null);
   const [filter, setFilter] = useState<'all' | 'open' | 'closed'>('all');
-  const [assetFilter, setAssetFilter] = useState<'all' | 'crypto' | 'stock'>('all');
 
   useEffect(() => {
     fetchTrades();
@@ -20,7 +19,6 @@ export default function Journal() {
   const filteredTrades = trades.filter((trade) => {
     if (filter === 'open' && trade.status !== 'open') return false;
     if (filter === 'closed' && trade.status !== 'closed') return false;
-    if (assetFilter !== 'all' && trade.assetType !== assetFilter) return false;
     return true;
   });
 
@@ -61,65 +59,60 @@ export default function Journal() {
     return undefined;
   };
 
+  const openCount = trades.filter(t => t.status === 'open').length;
+  const closedCount = trades.filter(t => t.status === 'closed').length;
+
   return (
-    <div className="space-y-6">
+    <div style={{ maxWidth: '1200px' }}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Trade Journal</h1>
-          <p className="text-gray-500 mt-1">Track and manage your trades</p>
+          <h1 style={{ fontSize: '28px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+            Journal
+          </h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+            Track and manage your trades
+          </p>
         </div>
-        <button
-          onClick={handleNewTrade}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
+        <button onClick={handleNewTrade} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Plus size={18} />
           New Trade
         </button>
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Filter size={16} className="text-gray-400" />
-          <span className="text-sm text-gray-500">Filter:</span>
-        </div>
-        <div className="flex gap-2">
-          {(['all', 'open', 'closed'] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                filter === f
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
-        </div>
-        <div className="h-6 w-px bg-gray-200" />
-        <div className="flex gap-2">
-          {(['all', 'crypto', 'stock'] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setAssetFilter(f)}
-              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                assetFilter === f
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {f === 'all' ? 'All Assets' : f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
-        </div>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '28px' }}>
+        {[
+          { key: 'all', label: 'All', count: trades.length },
+          { key: 'open', label: 'Open', count: openCount },
+          { key: 'closed', label: 'Closed', count: closedCount },
+        ].map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key as typeof filter)}
+            style={{
+              padding: '10px 18px',
+              borderRadius: '10px',
+              border: filter === f.key ? '1px solid var(--border-light)' : '1px solid transparent',
+              background: filter === f.key ? 'rgba(255, 255, 255, 0.06)' : 'transparent',
+              color: filter === f.key ? 'var(--text-primary)' : 'var(--text-muted)',
+              fontSize: '14px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {f.label} <span style={{ opacity: 0.6, marginLeft: '4px' }}>{f.count}</span>
+          </button>
+        ))}
       </div>
 
       {/* Trade List */}
       {tradesLoading ? (
-        <div className="text-center py-12 text-gray-500">Loading trades...</div>
+        <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
+          <p style={{ color: 'var(--text-muted)' }}>Loading...</p>
+        </div>
       ) : (
         <TradeList
           trades={filteredTrades}
