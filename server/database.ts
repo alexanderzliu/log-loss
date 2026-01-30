@@ -18,6 +18,7 @@ export function initDatabase() {
       entry_date TEXT NOT NULL,
       entry_price REAL NOT NULL,
       quantity REAL NOT NULL,
+      remaining_quantity REAL,
       stop_loss REAL,
       take_profit REAL,
       hypothesis TEXT DEFAULT '',
@@ -33,6 +34,9 @@ export function initDatabase() {
       FOREIGN KEY (linked_trade_id) REFERENCES trades(id)
     )
   `);
+
+  // Migration: Initialize remaining_quantity for existing buy trades that don't have it set
+  db.exec(`UPDATE trades SET remaining_quantity = quantity WHERE side = 'buy' AND remaining_quantity IS NULL`);
 
   // Create price cache table
   db.exec(`

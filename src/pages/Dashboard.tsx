@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
-import { RefreshCw, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { RefreshCw, ArrowUpRight, ArrowDownRight, ChevronDown, ChevronRight } from 'lucide-react';
 import { formatCurrency, formatPercent, formatQuantity, calculatePnl } from '../utils/format';
 import { tableHeaderStyle, tableCellStyle } from '../utils/styles';
+import { aggregatePositions, calculateAggregatedPnl } from '../utils/aggregatePositions';
 
 export default function Dashboard() {
   const {
@@ -15,6 +16,8 @@ export default function Dashboard() {
     refreshPrices,
   } = useStore();
 
+  const [expandedPositions, setExpandedPositions] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     fetchTrades();
     fetchPortfolioSummary();
@@ -23,6 +26,19 @@ export default function Dashboard() {
   }, [fetchTrades, fetchPortfolioSummary, refreshPrices]);
 
   const openPositions = trades.filter((t) => t.status === 'open' && t.side === 'buy');
+  const aggregatedPositions = aggregatePositions(trades);
+
+  const toggleExpanded = (key: string) => {
+    setExpandedPositions((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   const unrealizedPnl = openPositions.reduce((total, trade) => {
     const priceKey = `${trade.symbol}-${trade.assetType}`;
@@ -129,7 +145,7 @@ export default function Dashboard() {
           <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
             <p style={{ color: 'var(--text-muted)' }}>Loading...</p>
           </div>
-        ) : openPositions.length === 0 ? (
+        ) : aggregatedPositions.length === 0 ? (
           <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>No open positions</p>
             <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
@@ -142,88 +158,190 @@ export default function Dashboard() {
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
                   <th style={thStyle}>Asset</th>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>Price</th>
+                  <th style={{ ...thStyle, textAlign: 'right' }}>Avg Entry</th>
+                  <th style={{ ...thStyle, textAlign: 'right' }}>Current</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>Quantity</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>Value</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>P&L</th>
                 </tr>
               </thead>
               <tbody>
-                {openPositions.map((trade) => {
-                  const priceKey = `${trade.symbol}-${trade.assetType}`;
+                {aggregatedPositions.map((position) => {
+                  const priceKey = `${position.symbol}-${position.assetType}`;
                   const currentPrice = prices[priceKey]?.price;
                   const priceChange = prices[priceKey]?.changePercent24h;
-                  const pnl = currentPrice ? (currentPrice - trade.entryPrice) * trade.quantity : null;
-                  const pnlPercent = currentPrice ? ((currentPrice - trade.entryPrice) / trade.entryPrice) * 100 : null;
-                  const value = currentPrice ? currentPrice * trade.quantity : trade.entryPrice * trade.quantity;
+                  const { pnl, pnlPercent } = calculateAggregatedPnl(position, currentPrice);
+                  const value = currentPrice
+                    ? currentPrice * position.totalQuantity
+                    : position.totalCostBasis;
+                  const positionKey = `${position.symbol}-${position.assetType}`;
+                  const isExpanded = expandedPositions.has(positionKey);
 
                   return (
-                    <tr key={trade.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={tdStyle}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '10px',
-                            background: 'var(--bg-elevated)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 600,
-                            fontSize: '14px',
-                            color: 'var(--text-primary)'
-                          }}>
-                            {trade.symbol.slice(0, 2)}
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{trade.symbol}</div>
-                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
-                              {trade.assetType}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{ ...tdStyle, textAlign: 'right' }}>
-                        <div style={{ fontFamily: "'DM Mono', monospace", color: 'var(--text-primary)' }}>
-                          {currentPrice ? formatCurrency(currentPrice) : '—'}
-                        </div>
-                        {priceChange !== undefined && (
-                          <div style={{
-                            fontSize: '12px',
-                            color: priceChange >= 0 ? 'var(--profit)' : 'var(--loss)'
-                          }}>
-                            {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace" }}>
-                        {formatQuantity(trade.quantity)}
-                      </td>
-                      <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontWeight: 500 }}>
-                        {formatCurrency(value)}
-                      </td>
-                      <td style={{ ...tdStyle, textAlign: 'right' }}>
-                        {pnl !== null ? (
-                          <div>
+                    <Fragment key={positionKey}>
+                      <tr
+                        style={{
+                          borderBottom: isExpanded ? 'none' : '1px solid var(--border)',
+                          cursor: position.lotCount > 1 ? 'pointer' : 'default',
+                        }}
+                        onClick={() => position.lotCount > 1 && toggleExpanded(positionKey)}
+                      >
+                        <td style={tdStyle}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            {position.lotCount > 1 && (
+                              <div style={{ color: 'var(--text-muted)', width: '16px' }}>
+                                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                              </div>
+                            )}
                             <div style={{
-                              fontFamily: "'DM Mono', monospace",
-                              fontWeight: 500,
-                              color: pnl >= 0 ? 'var(--profit)' : 'var(--loss)'
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '10px',
+                              background: 'var(--bg-elevated)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 600,
+                              fontSize: '14px',
+                              color: 'var(--text-primary)'
                             }}>
-                              {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
+                              {position.symbol.slice(0, 2)}
                             </div>
+                            <div>
+                              <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                                {position.symbol}
+                              </div>
+                              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                {position.lotCount > 1
+                                  ? `${position.lotCount} lots`
+                                  : position.assetType}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace" }}>
+                          {formatCurrency(position.avgEntryPrice)}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>
+                          <div style={{ fontFamily: "'DM Mono', monospace", color: 'var(--text-primary)' }}>
+                            {currentPrice ? formatCurrency(currentPrice) : '—'}
+                          </div>
+                          {priceChange !== undefined && (
                             <div style={{
                               fontSize: '12px',
-                              color: pnl >= 0 ? 'var(--profit)' : 'var(--loss)'
+                              color: priceChange >= 0 ? 'var(--profit)' : 'var(--loss)'
                             }}>
-                              {pnlPercent! >= 0 ? '+' : ''}{pnlPercent!.toFixed(2)}%
+                              {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
                             </div>
-                          </div>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
-                        )}
-                      </td>
-                    </tr>
+                          )}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace" }}>
+                          {formatQuantity(position.totalQuantity)}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontWeight: 500 }}>
+                          {formatCurrency(value)}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>
+                          {pnl !== null ? (
+                            <div>
+                              <div style={{
+                                fontFamily: "'DM Mono', monospace",
+                                fontWeight: 500,
+                                color: pnl >= 0 ? 'var(--profit)' : 'var(--loss)'
+                              }}>
+                                {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
+                              </div>
+                              <div style={{
+                                fontSize: '12px',
+                                color: pnl >= 0 ? 'var(--profit)' : 'var(--loss)'
+                              }}>
+                                {pnlPercent! >= 0 ? '+' : ''}{pnlPercent!.toFixed(2)}%
+                              </div>
+                            </div>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </td>
+                      </tr>
+                      {/* Expanded lot details */}
+                      {isExpanded && position.lots.map((lot, idx) => {
+                        // Use remainingQuantity if available, fallback to quantity
+                        const lotQty = lot.remainingQuantity ?? lot.quantity;
+                        const hasPartialExit = lot.remainingQuantity !== null && lot.remainingQuantity < lot.quantity;
+                        const lotPnl = currentPrice
+                          ? (currentPrice - lot.entryPrice) * lotQty
+                          : null;
+                        const lotPnlPercent = currentPrice
+                          ? ((currentPrice - lot.entryPrice) / lot.entryPrice) * 100
+                          : null;
+                        const lotValue = currentPrice
+                          ? currentPrice * lotQty
+                          : lot.entryPrice * lotQty;
+                        const isLast = idx === position.lots.length - 1;
+
+                        return (
+                          <tr
+                            key={lot.id}
+                            style={{
+                              borderBottom: isLast ? '1px solid var(--border)' : 'none',
+                              background: 'var(--bg-tertiary)',
+                            }}
+                          >
+                            <td style={{ ...tdStyle, paddingLeft: '72px' }}>
+                              <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                Lot {idx + 1}
+                                {hasPartialExit && (
+                                  <span style={{ color: 'var(--text-muted)', fontSize: '11px', marginLeft: '6px' }}>
+                                    (partial exit)
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                {new Date(lot.entryDate).toLocaleDateString()}
+                              </div>
+                            </td>
+                            <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontSize: '13px', color: 'var(--text-secondary)' }}>
+                              {formatCurrency(lot.entryPrice)}
+                            </td>
+                            <td style={{ ...tdStyle, textAlign: 'right' }}>
+                              {/* Empty for lots */}
+                            </td>
+                            <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontSize: '13px', color: 'var(--text-secondary)' }}>
+                              {formatQuantity(lotQty)}
+                              {hasPartialExit && (
+                                <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                                  of {formatQuantity(lot.quantity)}
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontSize: '13px', color: 'var(--text-secondary)' }}>
+                              {formatCurrency(lotValue)}
+                            </td>
+                            <td style={{ ...tdStyle, textAlign: 'right' }}>
+                              {lotPnl !== null ? (
+                                <div>
+                                  <div style={{
+                                    fontFamily: "'DM Mono', monospace",
+                                    fontSize: '13px',
+                                    color: lotPnl >= 0 ? 'var(--profit)' : 'var(--loss)'
+                                  }}>
+                                    {lotPnl >= 0 ? '+' : ''}{formatCurrency(lotPnl)}
+                                  </div>
+                                  <div style={{
+                                    fontSize: '11px',
+                                    color: lotPnl >= 0 ? 'var(--profit)' : 'var(--loss)'
+                                  }}>
+                                    {lotPnlPercent! >= 0 ? '+' : ''}{lotPnlPercent!.toFixed(2)}%
+                                  </div>
+                                </div>
+                              ) : (
+                                <span style={{ color: 'var(--text-muted)' }}>—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </Fragment>
                   );
                 })}
               </tbody>

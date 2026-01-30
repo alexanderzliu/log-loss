@@ -15,6 +15,7 @@ function rowToTrade(row: Record<string, unknown>): Trade {
     entryDate: row.entry_date as string,
     entryPrice: row.entry_price as number,
     quantity: row.quantity as number,
+    remainingQuantity: row.remaining_quantity as number | null,
     stopLoss: row.stop_loss as number | null,
     takeProfit: row.take_profit as number | null,
     hypothesis: row.hypothesis as string,
@@ -178,29 +179,42 @@ router.post('/', (req, res) => {
       const linkedTrade = db.prepare('SELECT * FROM trades WHERE id = ?').get(linkedTradeId) as Record<string, unknown> | undefined;
       if (linkedTrade) {
         const buyPrice = linkedTrade.entry_price as number;
-        const buyQuantity = linkedTrade.quantity as number;
-        const sellQuantity = Math.min(quantity, buyQuantity);
+        const buyRemainingQty = (linkedTrade.remaining_quantity as number) ?? (linkedTrade.quantity as number);
+        const sellQuantity = Math.min(quantity, buyRemainingQty);
 
         pnl = (entryPrice - buyPrice) * sellQuantity;
         pnlPercent = buyPrice > 0 ? ((entryPrice - buyPrice) / buyPrice) * 100 : 0;
         status = 'closed';
 
-        // If full position closed, mark the buy as closed too
-        if (sellQuantity >= buyQuantity) {
+        // Calculate new remaining quantity
+        const newRemainingQty = buyRemainingQty - sellQuantity;
+
+        // If full position closed, mark the buy as closed
+        if (newRemainingQty <= 0) {
           db.prepare(`
             UPDATE trades
-            SET status = 'closed', exit_date = ?, exit_price = ?, pnl = ?, pnl_percent = ?, updated_at = datetime('now')
+            SET status = 'closed', remaining_quantity = 0, exit_date = ?, exit_price = ?, pnl = ?, pnl_percent = ?, updated_at = datetime('now')
             WHERE id = ?
           `).run(entryDate, entryPrice, pnl, pnlPercent, linkedTradeId);
+        } else {
+          // Partial exit: update remaining quantity but keep open
+          db.prepare(`
+            UPDATE trades
+            SET remaining_quantity = ?, updated_at = datetime('now')
+            WHERE id = ?
+          `).run(newRemainingQty, linkedTradeId);
         }
       }
     }
 
+    // For buy trades, set remaining_quantity equal to quantity
+    const remainingQuantity = side === 'buy' ? quantity : null;
+
     const stmt = db.prepare(`
       INSERT INTO trades (
-        id, asset_type, symbol, side, entry_date, entry_price, quantity,
+        id, asset_type, symbol, side, entry_date, entry_price, quantity, remaining_quantity,
         stop_loss, take_profit, hypothesis, status, pnl, pnl_percent, notes, linked_trade_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -211,6 +225,7 @@ router.post('/', (req, res) => {
       entryDate,
       entryPrice,
       quantity,
+      remainingQuantity,
       stopLoss || null,
       takeProfit || null,
       hypothesis || '',

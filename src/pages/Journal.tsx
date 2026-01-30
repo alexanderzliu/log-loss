@@ -48,11 +48,13 @@ export default function Journal() {
 
   const getInitialFormData = (): Partial<TradeFormData> | undefined => {
     if (closingTrade) {
+      // Use remainingQuantity if available (for partial exits)
+      const availableQty = closingTrade.remainingQuantity ?? closingTrade.quantity;
       return {
         assetType: closingTrade.assetType,
         symbol: closingTrade.symbol,
         side: 'sell',
-        quantity: closingTrade.quantity,
+        quantity: availableQty,
         linkedTradeId: closingTrade.id,
       };
     }

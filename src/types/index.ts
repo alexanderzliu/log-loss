@@ -10,6 +10,7 @@ export interface Trade {
   entryDate: string;
   entryPrice: number;
   quantity: number;
+  remainingQuantity: number | null; // For buy trades: remaining after partial exits
   stopLoss: number | null;
   takeProfit: number | null;
   hypothesis: string;
