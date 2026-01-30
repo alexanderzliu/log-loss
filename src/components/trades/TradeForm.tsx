@@ -83,24 +83,54 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
     : 'New Trade';
 
   return (
-    <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{ background: 'var(--overlay-bg)' }}>
-      <div className="card w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 flex items-center justify-center z-50 p-6"
+      style={{
+        background: 'rgba(0, 0, 0, 0.6)',
+      }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        className="w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col"
+        style={{
+          background: 'var(--bg-surface)',
+          borderRadius: '20px',
+          border: '1px solid var(--border-light)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+        }}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: 'var(--border)' }}>
-          <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</h2>
+        <div
+          className="flex items-center justify-between"
+          style={{
+            padding: '20px 28px',
+            borderBottom: '1px solid var(--border)',
+            background: 'linear-gradient(180deg, var(--bg-elevated) 0%, transparent 100%)',
+          }}
+        >
+          <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</h2>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg transition-colors"
-            style={{ background: 'transparent' }}
-            onMouseOver={(e) => e.currentTarget.style.background = 'var(--bg-hover)'}
-            onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+            className="p-2 rounded-full transition-all duration-200"
+            style={{
+              background: 'var(--bg-hover)',
+              border: '1px solid var(--border)',
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = 'var(--bg-elevated)';
+              e.currentTarget.style.transform = 'scale(1.05)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'var(--bg-hover)';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
           >
-            <X size={20} style={{ color: 'var(--text-muted)' }} />
+            <X size={18} style={{ color: 'var(--text-secondary)' }} />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5 overflow-y-auto flex-1" style={{ padding: '24px 28px' }}>
           {error && (
             <div className="p-3 rounded-lg text-sm" style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: 'var(--loss)' }}>
               {error}
@@ -342,7 +372,10 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
           )}
 
           {/* Actions */}
-          <div className="flex gap-3 pt-3">
+          <div
+            className="flex gap-3 pt-5 mt-2"
+            style={{ borderTop: '1px solid var(--border)' }}
+          >
             <button
               type="button"
               onClick={onClose}
