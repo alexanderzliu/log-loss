@@ -1,9 +1,25 @@
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
+import type { CSSProperties } from 'react';
 import { BookOpen, LayoutDashboard, TrendingUp } from 'lucide-react';
 import Journal from './pages/Journal';
 import Dashboard from './pages/Dashboard';
 import Analytics from './pages/Analytics';
 import './index.css';
+
+function navLinkStyle({ isActive }: { isActive: boolean }): CSSProperties {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '12px 16px',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: 500,
+    textDecoration: 'none',
+    color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+    background: isActive ? 'var(--bg-elevated)' : 'transparent',
+  };
+}
 
 function App() {
   return (
@@ -31,58 +47,15 @@ function App() {
 
           {/* Nav */}
           <nav style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <NavLink
-              to="/"
-              end
-              style={({ isActive }) => ({
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: 500,
-                textDecoration: 'none',
-                color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-                background: isActive ? 'var(--bg-elevated)' : 'transparent',
-              })}
-            >
+            <NavLink to="/" end style={navLinkStyle}>
               <LayoutDashboard size={18} />
               Dashboard
             </NavLink>
-            <NavLink
-              to="/journal"
-              style={({ isActive }) => ({
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: 500,
-                textDecoration: 'none',
-                color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-                background: isActive ? 'var(--bg-elevated)' : 'transparent',
-              })}
-            >
+            <NavLink to="/journal" style={navLinkStyle}>
               <BookOpen size={18} />
               Journal
             </NavLink>
-            <NavLink
-              to="/analytics"
-              style={({ isActive }) => ({
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: 500,
-                textDecoration: 'none',
-                color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-                background: isActive ? 'var(--bg-elevated)' : 'transparent',
-              })}
-            >
+            <NavLink to="/analytics" style={navLinkStyle}>
               <TrendingUp size={18} />
               Analytics
             </NavLink>

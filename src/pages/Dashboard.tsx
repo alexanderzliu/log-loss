@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { RefreshCw, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { formatCurrency, formatPercent, formatQuantity, calculatePnl } from '../utils/format';
+import { tableHeaderStyle, tableCellStyle } from '../utils/styles';
 
 export default function Dashboard() {
   const {
@@ -234,21 +235,8 @@ export default function Dashboard() {
   );
 }
 
-const thStyle: React.CSSProperties = {
-  padding: '18px 24px',
-  textAlign: 'left',
-  fontSize: '11px',
-  fontWeight: 600,
-  color: 'var(--text-muted)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.8px',
-};
-
-const tdStyle: React.CSSProperties = {
-  padding: '20px 24px',
-  color: 'var(--text-secondary)',
-  fontSize: '14px',
-};
+const thStyle = { ...tableHeaderStyle, padding: '18px 24px' };
+const tdStyle = { ...tableCellStyle, padding: '20px 24px' };
 
 function StatCard({
   label,

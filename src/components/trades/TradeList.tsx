@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Trade } from '../../types';
 import { useStore } from '../../store/useStore';
 import { formatCurrency, formatQuantity, formatDate, calculatePnl } from '../../utils/format';
+import { tableHeaderStyle, tableCellStyle } from '../../utils/styles';
 import { MoreVertical, Edit2, Trash2, X, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 interface TradeListProps {
@@ -248,21 +249,8 @@ export default function TradeList({ trades, onEdit, onClosePosition }: TradeList
   );
 }
 
-const thStyle: React.CSSProperties = {
-  padding: '18px 20px',
-  textAlign: 'left',
-  fontSize: '11px',
-  fontWeight: 600,
-  color: 'var(--text-muted)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.8px',
-};
-
-const tdStyle: React.CSSProperties = {
-  padding: '18px 20px',
-  color: 'var(--text-secondary)',
-  fontSize: '14px',
-};
+const thStyle = tableHeaderStyle;
+const tdStyle = tableCellStyle;
 
 const menuItemStyle: React.CSSProperties = {
   display: 'flex',

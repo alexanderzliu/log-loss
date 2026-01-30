@@ -156,35 +156,57 @@ async function fetchStockPrice(symbol: string): Promise<{
   }
 }
 
+// Get or fetch price for a single asset (used by both single and batch endpoints)
+async function getPrice(symbol: string, assetType: string): Promise<{
+  symbol: string;
+  assetType: string;
+  price?: number;
+  change24h?: number;
+  changePercent24h?: number;
+  high24h?: number;
+  low24h?: number;
+  volume24h?: number;
+  lastUpdated?: string;
+  error?: string;
+}> {
+  const upperSymbol = symbol.toUpperCase();
+
+  // Check cache first
+  const cached = getCachedPrice(upperSymbol, assetType);
+  if (cached) {
+    return formatCachedPrice(cached, upperSymbol, assetType);
+  }
+
+  // Fetch fresh data
+  const priceData = assetType === 'crypto'
+    ? await fetchCryptoPrice(upperSymbol)
+    : await fetchStockPrice(upperSymbol);
+
+  if (!priceData) {
+    return { symbol: upperSymbol, assetType, error: 'Price not found' };
+  }
+
+  const lastUpdated = cachePrice(upperSymbol, assetType, priceData);
+
+  return {
+    symbol: upperSymbol,
+    assetType,
+    ...priceData,
+    lastUpdated,
+  };
+}
+
 // Get price for a single asset
 router.get('/:assetType/:symbol', async (req, res) => {
   try {
     const { assetType, symbol } = req.params;
-    const upperSymbol = symbol.toUpperCase();
+    const result = await getPrice(symbol, assetType);
 
-    // Check cache first
-    const cached = getCachedPrice(upperSymbol, assetType);
-    if (cached) {
-      return res.json(formatCachedPrice(cached, upperSymbol, assetType));
+    if (result.error) {
+      return res.status(404).json({ error: result.error });
     }
 
-    // Fetch fresh data
-    const priceData = assetType === 'crypto'
-      ? await fetchCryptoPrice(upperSymbol)
-      : await fetchStockPrice(upperSymbol);
-
-    if (!priceData) {
-      return res.status(404).json({ error: 'Price data not found' });
-    }
-
-    const lastUpdated = cachePrice(upperSymbol, assetType, priceData);
-
-    res.json({
-      symbol: upperSymbol,
-      assetType,
-      ...priceData,
-      lastUpdated,
-    });
+    res.json(result);
   } catch (error) {
     console.error('Error fetching price:', error);
     res.status(500).json({ error: 'Failed to fetch price' });
@@ -196,7 +218,6 @@ router.post('/batch', async (req, res) => {
   try {
     const { assets } = req.body as { assets: { symbol: string; assetType: string }[] };
 
-    // Validate assets array
     if (!assets || !Array.isArray(assets)) {
       return res.status(400).json({ error: 'Assets array is required' });
     }
@@ -205,33 +226,7 @@ router.post('/batch', async (req, res) => {
     }
 
     const results = await Promise.all(
-      assets.map(async ({ symbol, assetType }) => {
-        const upperSymbol = symbol.toUpperCase();
-
-        // Check cache first
-        const cached = getCachedPrice(upperSymbol, assetType);
-        if (cached) {
-          return formatCachedPrice(cached, upperSymbol, assetType);
-        }
-
-        // Fetch fresh data
-        const priceData = assetType === 'crypto'
-          ? await fetchCryptoPrice(upperSymbol)
-          : await fetchStockPrice(upperSymbol);
-
-        if (!priceData) {
-          return { symbol: upperSymbol, assetType, error: 'Price not found' };
-        }
-
-        const lastUpdated = cachePrice(upperSymbol, assetType, priceData);
-
-        return {
-          symbol: upperSymbol,
-          assetType,
-          ...priceData,
-          lastUpdated,
-        };
-      })
+      assets.map(({ symbol, assetType }) => getPrice(symbol, assetType))
     );
 
     res.json(results);

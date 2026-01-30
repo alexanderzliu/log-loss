@@ -1,7 +1,16 @@
 import { create } from 'zustand';
-import type { Trade, PriceData, PortfolioSummary } from '../types';
+import type { Trade, PriceData, PortfolioSummary, AssetType } from '../types';
 import * as tradesApi from '../api/trades';
 import * as pricesApi from '../api/prices';
+
+// Extract unique assets from open buy positions
+function getUniqueOpenAssets(trades: Trade[]): { symbol: string; assetType: AssetType }[] {
+  const openBuys = trades.filter((t) => t.status === 'open' && t.side === 'buy');
+  const assets = openBuys.map((t) => ({ symbol: t.symbol, assetType: t.assetType }));
+  return Array.from(
+    new Map(assets.map((a) => [`${a.symbol}-${a.assetType}`, a])).values()
+  );
+}
 
 interface StoreState {
   // Trades
@@ -47,13 +56,8 @@ export const useStore = create<StoreState>((set, get) => ({
       set({ trades, tradesLoading: false });
 
       // Auto-fetch prices for open positions
-      const openTrades = trades.filter((t) => t.status === 'open' && t.side === 'buy');
-      if (openTrades.length > 0) {
-        const assets = openTrades.map((t) => ({ symbol: t.symbol, assetType: t.assetType }));
-        // Deduplicate
-        const uniqueAssets = Array.from(
-          new Map(assets.map((a) => [`${a.symbol}-${a.assetType}`, a])).values()
-        );
+      const uniqueAssets = getUniqueOpenAssets(trades);
+      if (uniqueAssets.length > 0) {
         get().fetchPrices(uniqueAssets);
       }
     } catch (error) {
@@ -123,13 +127,8 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   refreshPrices: async () => {
-    const { trades } = get();
-    const openTrades = trades.filter((t) => t.status === 'open' && t.side === 'buy');
-    if (openTrades.length > 0) {
-      const assets = openTrades.map((t) => ({ symbol: t.symbol, assetType: t.assetType }));
-      const uniqueAssets = Array.from(
-        new Map(assets.map((a) => [`${a.symbol}-${a.assetType}`, a])).values()
-      );
+    const uniqueAssets = getUniqueOpenAssets(get().trades);
+    if (uniqueAssets.length > 0) {
       await get().fetchPrices(uniqueAssets);
     }
   },
