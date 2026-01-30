@@ -79,9 +79,9 @@ router.get('/stats/summary', (req, res) => {
       WHERE status = 'closed' AND pnl IS NOT NULL
     `).get() as { total_pnl: number; wins: number; losses: number };
 
-    // Cost basis of currently open positions
+    // Cost basis of currently open positions (using remaining_quantity for partial exits)
     const openPositionsCost = db.prepare(`
-      SELECT COALESCE(SUM(entry_price * quantity), 0) as total
+      SELECT COALESCE(SUM(entry_price * COALESCE(remaining_quantity, quantity)), 0) as total
       FROM trades
       WHERE side = 'buy' AND status = 'open'
     `).get() as { total: number };

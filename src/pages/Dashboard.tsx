@@ -48,7 +48,7 @@ export default function Dashboard() {
   }, 0);
 
   const totalInvested = openPositions.reduce(
-    (total, trade) => total + trade.entryPrice * trade.quantity,
+    (total, trade) => total + trade.entryPrice * (trade.remainingQuantity ?? trade.quantity),
     0
   );
 
