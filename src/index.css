@@ -32,6 +32,32 @@
   --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.5);
 }
 
+/* Light mode */
+:root.light {
+  --bg-base: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f1f5f9;
+  --bg-hover: #e2e8f0;
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+
+  --accent: #059669;
+  --accent-dim: #047857;
+  --accent-glow: rgba(5, 150, 105, 0.15);
+
+  --profit: #059669;
+  --loss: #dc2626;
+
+  --border: rgba(0, 0, 0, 0.08);
+  --border-light: rgba(0, 0, 0, 0.12);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -42,6 +68,10 @@ html, body, #root {
   background: linear-gradient(135deg, #0a0a0f 0%, #0f0f18 50%, #0a0a0f 100%);
   background-attachment: fixed;
   min-height: 100vh;
+}
+
+:root.light, :root.light body, :root.light #root {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #f8fafc 100%);
 }
 
 body {
@@ -80,6 +110,10 @@ body {
   border-radius: 16px;
   box-shadow: var(--shadow-md);
   transition: all 0.2s ease;
+}
+
+:root.light .card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(241, 245, 249, 0.9));
 }
 
 .card:hover {
@@ -161,6 +195,12 @@ input, select, textarea {
   font-size: 14px;
   transition: all 0.2s ease;
 }
+
+:root.light input, :root.light select, :root.light textarea {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--accent);
@@ -176,4 +216,13 @@ input:focus, select:focus, textarea:focus {
 @keyframes shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+/* Sidebar */
+.sidebar {
+  background: linear-gradient(180deg, rgba(18, 18, 26, 0.95) 0%, rgba(12, 12, 18, 0.98) 100%);
+}
+
+:root.light .sidebar {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.98) 100%);
 }
