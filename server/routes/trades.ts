@@ -311,7 +311,13 @@ router.put('/:id', (req, res) => {
 // Delete trade
 router.delete('/:id', (req, res) => {
   try {
-    const result = db.prepare('DELETE FROM trades WHERE id = ?').run(req.params.id);
+    const { id } = req.params;
+
+    // First delete any trades that link to this one (e.g., sell trades linked to a buy)
+    db.prepare('DELETE FROM trades WHERE linked_trade_id = ?').run(id);
+
+    // Then delete the trade itself
+    const result = db.prepare('DELETE FROM trades WHERE id = ?').run(id);
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Trade not found' });
     }

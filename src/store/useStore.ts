@@ -93,7 +93,8 @@ export const useStore = create<StoreState>((set, get) => ({
   deleteTrade: async (id) => {
     await tradesApi.deleteTrade(id);
     set((state) => ({
-      trades: state.trades.filter((t) => t.id !== id),
+      // Remove the trade and any trades linked to it (backend deletes both)
+      trades: state.trades.filter((t) => t.id !== id && t.linkedTradeId !== id),
     }));
     get().fetchPortfolioSummary();
   },
