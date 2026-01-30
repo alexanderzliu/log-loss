@@ -78,21 +78,33 @@ router.get('/stats/summary', (req, res) => {
       WHERE status = 'closed' AND pnl IS NOT NULL
     `).get() as { total_pnl: number; wins: number; losses: number };
 
-    const totalInvested = db.prepare(`
+    // Cost basis of currently open positions
+    const openPositionsCost = db.prepare(`
       SELECT COALESCE(SUM(entry_price * quantity), 0) as total
       FROM trades
       WHERE side = 'buy' AND status = 'open'
+    `).get() as { total: number };
+
+    // Cost basis of closed positions (for accurate P&L percentage)
+    const closedPositionsCost = db.prepare(`
+      SELECT COALESCE(SUM(entry_price * quantity), 0) as total
+      FROM trades
+      WHERE side = 'buy' AND status = 'closed'
     `).get() as { total: number };
 
     const winRate = pnlStats.wins + pnlStats.losses > 0
       ? (pnlStats.wins / (pnlStats.wins + pnlStats.losses)) * 100
       : 0;
 
+    // Calculate realized P&L percentage based on closed positions cost basis
+    const realizedPnlPercent = closedPositionsCost.total > 0
+      ? (pnlStats.total_pnl / closedPositionsCost.total) * 100
+      : 0;
+
     res.json({
-      totalValue: totalInvested.total + pnlStats.total_pnl,
-      totalInvested: totalInvested.total,
-      totalPnl: pnlStats.total_pnl,
-      totalPnlPercent: totalInvested.total > 0 ? (pnlStats.total_pnl / totalInvested.total) * 100 : 0,
+      openPositionsCost: openPositionsCost.total,
+      realizedPnl: pnlStats.total_pnl,
+      realizedPnlPercent,
       openPositions: openPositions.count,
       closedPositions: closedPositions.count,
       winRate,
@@ -210,7 +222,17 @@ router.post('/', (req, res) => {
     );
 
     const newTrade = db.prepare('SELECT * FROM trades WHERE id = ?').get(id) as Record<string, unknown>;
-    res.status(201).json(rowToTrade(newTrade));
+
+    // If we closed a position, also return the updated linked trade
+    if (side === 'sell' && linkedTradeId) {
+      const updatedLinkedTrade = db.prepare('SELECT * FROM trades WHERE id = ?').get(linkedTradeId) as Record<string, unknown>;
+      return res.status(201).json({
+        trade: rowToTrade(newTrade),
+        linkedTrade: updatedLinkedTrade ? rowToTrade(updatedLinkedTrade) : null,
+      });
+    }
+
+    res.status(201).json({ trade: rowToTrade(newTrade), linkedTrade: null });
   } catch (error) {
     console.error('Error creating trade:', error);
     res.status(500).json({ error: 'Failed to create trade' });

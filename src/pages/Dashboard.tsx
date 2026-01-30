@@ -38,7 +38,7 @@ export default function Dashboard() {
   );
 
   const unrealizedPnlPercent = totalInvested > 0 ? (unrealizedPnl / totalInvested) * 100 : 0;
-  const totalPnl = (portfolioSummary?.totalPnl || 0) + unrealizedPnl;
+  const totalPnl = (portfolioSummary?.realizedPnl || 0) + unrealizedPnl;
 
   return (
     <div style={{ maxWidth: '1200px' }}>
@@ -99,8 +99,8 @@ export default function Dashboard() {
         />
         <StatCard
           label="Realized P&L"
-          value={formatCurrency(portfolioSummary?.totalPnl || 0)}
-          positive={(portfolioSummary?.totalPnl || 0) >= 0}
+          value={formatCurrency(portfolioSummary?.realizedPnl || 0)}
+          positive={(portfolioSummary?.realizedPnl || 0) >= 0}
         />
         <StatCard
           label="Win Rate"

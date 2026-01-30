@@ -62,8 +62,17 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   createTrade: async (data) => {
-    const trade = await tradesApi.createTrade(data);
-    set((state) => ({ trades: [trade, ...state.trades] }));
+    const { trade, linkedTrade } = await tradesApi.createTrade(data);
+    set((state) => {
+      let updatedTrades = [trade, ...state.trades];
+      // If we closed a position, update the linked trade in the list
+      if (linkedTrade) {
+        updatedTrades = updatedTrades.map((t) =>
+          t.id === linkedTrade.id ? linkedTrade : t
+        );
+      }
+      return { trades: updatedTrades };
+    });
     get().fetchPortfolioSummary();
     return trade;
   },

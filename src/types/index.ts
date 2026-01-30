@@ -56,10 +56,9 @@ export interface PriceHistory {
 }
 
 export interface PortfolioSummary {
-  totalValue: number;
-  totalInvested: number;
-  totalPnl: number;
-  totalPnlPercent: number;
+  openPositionsCost: number;
+  realizedPnl: number;
+  realizedPnlPercent: number;
   openPositions: number;
   closedPositions: number;
   winRate: number;

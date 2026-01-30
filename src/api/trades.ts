@@ -24,7 +24,7 @@ export async function fetchTrade(id: string): Promise<Trade> {
   return response.json();
 }
 
-export async function createTrade(data: TradeFormData): Promise<Trade> {
+export async function createTrade(data: TradeFormData): Promise<{ trade: Trade; linkedTrade: Trade | null }> {
   const response = await fetch(API_BASE, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
