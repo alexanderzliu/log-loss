@@ -62,6 +62,48 @@ router.get('/', (req, res) => {
   }
 });
 
+// Get portfolio summary (must be before /:id to avoid matching "stats" as an id)
+router.get('/stats/summary', (req, res) => {
+  try {
+    const openPositions = db.prepare("SELECT COUNT(*) as count FROM trades WHERE status = 'open' AND side = 'buy'").get() as { count: number };
+    const closedPositions = db.prepare("SELECT COUNT(*) as count FROM trades WHERE status = 'closed' AND side = 'buy'").get() as { count: number };
+    const totalTrades = db.prepare('SELECT COUNT(*) as count FROM trades').get() as { count: number };
+
+    const pnlStats = db.prepare(`
+      SELECT
+        COALESCE(SUM(pnl), 0) as total_pnl,
+        COUNT(CASE WHEN pnl > 0 THEN 1 END) as wins,
+        COUNT(CASE WHEN pnl < 0 THEN 1 END) as losses
+      FROM trades
+      WHERE status = 'closed' AND pnl IS NOT NULL
+    `).get() as { total_pnl: number; wins: number; losses: number };
+
+    const totalInvested = db.prepare(`
+      SELECT COALESCE(SUM(entry_price * quantity), 0) as total
+      FROM trades
+      WHERE side = 'buy' AND status = 'open'
+    `).get() as { total: number };
+
+    const winRate = pnlStats.wins + pnlStats.losses > 0
+      ? (pnlStats.wins / (pnlStats.wins + pnlStats.losses)) * 100
+      : 0;
+
+    res.json({
+      totalValue: totalInvested.total + pnlStats.total_pnl,
+      totalInvested: totalInvested.total,
+      totalPnl: pnlStats.total_pnl,
+      totalPnlPercent: totalInvested.total > 0 ? (pnlStats.total_pnl / totalInvested.total) * 100 : 0,
+      openPositions: openPositions.count,
+      closedPositions: closedPositions.count,
+      winRate,
+      totalTrades: totalTrades.count,
+    });
+  } catch (error) {
+    console.error('Error fetching summary:', error);
+    res.status(500).json({ error: 'Failed to fetch summary' });
+  }
+});
+
 // Get single trade
 router.get('/:id', (req, res) => {
   try {
@@ -234,48 +276,6 @@ router.delete('/:id', (req, res) => {
   } catch (error) {
     console.error('Error deleting trade:', error);
     res.status(500).json({ error: 'Failed to delete trade' });
-  }
-});
-
-// Get portfolio summary
-router.get('/stats/summary', (req, res) => {
-  try {
-    const openPositions = db.prepare("SELECT COUNT(*) as count FROM trades WHERE status = 'open' AND side = 'buy'").get() as { count: number };
-    const closedPositions = db.prepare("SELECT COUNT(*) as count FROM trades WHERE status = 'closed' AND side = 'buy'").get() as { count: number };
-    const totalTrades = db.prepare('SELECT COUNT(*) as count FROM trades').get() as { count: number };
-
-    const pnlStats = db.prepare(`
-      SELECT
-        COALESCE(SUM(pnl), 0) as total_pnl,
-        COUNT(CASE WHEN pnl > 0 THEN 1 END) as wins,
-        COUNT(CASE WHEN pnl < 0 THEN 1 END) as losses
-      FROM trades
-      WHERE status = 'closed' AND pnl IS NOT NULL
-    `).get() as { total_pnl: number; wins: number; losses: number };
-
-    const totalInvested = db.prepare(`
-      SELECT COALESCE(SUM(entry_price * quantity), 0) as total
-      FROM trades
-      WHERE side = 'buy' AND status = 'open'
-    `).get() as { total: number };
-
-    const winRate = pnlStats.wins + pnlStats.losses > 0
-      ? (pnlStats.wins / (pnlStats.wins + pnlStats.losses)) * 100
-      : 0;
-
-    res.json({
-      totalValue: totalInvested.total + pnlStats.total_pnl,
-      totalInvested: totalInvested.total,
-      totalPnl: pnlStats.total_pnl,
-      totalPnlPercent: totalInvested.total > 0 ? (pnlStats.total_pnl / totalInvested.total) * 100 : 0,
-      openPositions: openPositions.count,
-      closedPositions: closedPositions.count,
-      winRate,
-      totalTrades: totalTrades.count,
-    });
-  } catch (error) {
-    console.error('Error fetching summary:', error);
-    res.status(500).json({ error: 'Failed to fetch summary' });
   }
 });
 
