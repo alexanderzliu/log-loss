@@ -121,7 +121,6 @@ router.get('/:id', (req, res) => {
 // Create trade
 router.post('/', (req, res) => {
   try {
-    const id = uuidv4();
     const {
       assetType,
       symbol,
@@ -136,6 +135,28 @@ router.post('/', (req, res) => {
       linkedTradeId,
     } = req.body;
 
+    // Validate required fields
+    if (!symbol || typeof symbol !== 'string') {
+      return res.status(400).json({ error: 'Symbol is required' });
+    }
+    if (!assetType || !['crypto', 'stock'].includes(assetType)) {
+      return res.status(400).json({ error: 'Asset type must be "crypto" or "stock"' });
+    }
+    if (!side || !['buy', 'sell'].includes(side)) {
+      return res.status(400).json({ error: 'Side must be "buy" or "sell"' });
+    }
+    if (typeof entryPrice !== 'number' || entryPrice <= 0) {
+      return res.status(400).json({ error: 'Entry price must be a positive number' });
+    }
+    if (typeof quantity !== 'number' || quantity <= 0) {
+      return res.status(400).json({ error: 'Quantity must be a positive number' });
+    }
+    if (!entryDate) {
+      return res.status(400).json({ error: 'Entry date is required' });
+    }
+
+    const id = uuidv4();
+
     // Calculate P&L if this is a sell linked to a buy
     let pnl = null;
     let pnlPercent = null;
@@ -149,7 +170,7 @@ router.post('/', (req, res) => {
         const sellQuantity = Math.min(quantity, buyQuantity);
 
         pnl = (entryPrice - buyPrice) * sellQuantity;
-        pnlPercent = ((entryPrice - buyPrice) / buyPrice) * 100;
+        pnlPercent = buyPrice > 0 ? ((entryPrice - buyPrice) / buyPrice) * 100 : 0;
         status = 'closed';
 
         // If full position closed, mark the buy as closed too
@@ -222,7 +243,7 @@ router.put('/:id', (req, res) => {
 
     if (status === 'closed' && exitPrice && side === 'buy') {
       pnl = (exitPrice - entryPrice) * quantity;
-      pnlPercent = ((exitPrice - entryPrice) / entryPrice) * 100;
+      pnlPercent = entryPrice > 0 ? ((exitPrice - entryPrice) / entryPrice) * 100 : 0;
     }
 
     const stmt = db.prepare(`

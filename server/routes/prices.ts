@@ -174,6 +174,14 @@ router.post('/batch', async (req, res) => {
   try {
     const { assets } = req.body as { assets: { symbol: string; assetType: string }[] };
 
+    // Validate assets array
+    if (!assets || !Array.isArray(assets)) {
+      return res.status(400).json({ error: 'Assets array is required' });
+    }
+    if (assets.length === 0) {
+      return res.json([]);
+    }
+
     const results = await Promise.all(
       assets.map(async ({ symbol, assetType }) => {
         const upperSymbol = symbol.toUpperCase();
@@ -251,8 +259,14 @@ router.post('/batch', async (req, res) => {
 router.get('/history/:assetType/:symbol', async (req, res) => {
   try {
     const { assetType, symbol } = req.params;
-    const { days = '30' } = req.query;
+    const { days: daysParam = '30' } = req.query;
     const upperSymbol = symbol.toUpperCase();
+
+    // Validate days parameter
+    const days = parseInt(String(daysParam), 10);
+    if (isNaN(days) || days < 1 || days > 365) {
+      return res.status(400).json({ error: 'Days must be a number between 1 and 365' });
+    }
 
     if (assetType === 'crypto') {
       const coinId = cryptoIdMap[upperSymbol] || upperSymbol.toLowerCase();
@@ -273,7 +287,7 @@ router.get('/history/:assetType/:symbol', async (req, res) => {
       return res.json({ symbol: upperSymbol, assetType, history });
     } else {
       // Stock price history
-      const interval = Number(days) <= 7 ? '1h' : '1d';
+      const interval = days <= 7 ? '1h' : '1d';
       const response = await fetch(
         `https://query1.finance.yahoo.com/v8/finance/chart/${upperSymbol}?interval=${interval}&range=${days}d`
       );

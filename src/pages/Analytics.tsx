@@ -38,12 +38,14 @@ export default function Analytics() {
     if (trackedAssets.length > 0) {
       fetchPrices(trackedAssets);
     }
-  }, [trades]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trades, fetchPrices]);
 
   useEffect(() => {
     if (selectedSymbol && selectedAssetType) {
       loadPriceHistory();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSymbol, selectedAssetType, timeRange]);
 
   const loadPriceHistory = async () => {

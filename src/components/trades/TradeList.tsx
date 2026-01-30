@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Trade } from '../../types';
 import { useStore } from '../../store/useStore';
-import { formatCurrency, formatPercent, formatQuantity, formatDate } from '../../utils/format';
+import { formatCurrency, formatQuantity, formatDate } from '../../utils/format';
 import { MoreVertical, Edit2, Trash2, X, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 interface TradeListProps {

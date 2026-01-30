@@ -12,6 +12,7 @@ interface StoreState {
   // Prices
   prices: Record<string, PriceData>;
   pricesLoading: boolean;
+  pricesError: string | null;
 
   // Portfolio
   portfolioSummary: PortfolioSummary | null;
@@ -34,6 +35,7 @@ export const useStore = create<StoreState>((set, get) => ({
   tradesError: null,
   prices: {},
   pricesLoading: false,
+  pricesError: null,
   portfolioSummary: null,
   portfolioLoading: false,
 
@@ -96,7 +98,7 @@ export const useStore = create<StoreState>((set, get) => ({
   // Prices actions
   fetchPrices: async (assets) => {
     if (assets.length === 0) return;
-    set({ pricesLoading: true });
+    set({ pricesLoading: true, pricesError: null });
     try {
       const priceData = await pricesApi.fetchPricesBatch(assets);
       const pricesMap = { ...get().prices };
@@ -106,8 +108,8 @@ export const useStore = create<StoreState>((set, get) => ({
         }
       });
       set({ prices: pricesMap, pricesLoading: false });
-    } catch {
-      set({ pricesLoading: false });
+    } catch (error) {
+      set({ pricesLoading: false, pricesError: (error as Error).message });
     }
   },
 

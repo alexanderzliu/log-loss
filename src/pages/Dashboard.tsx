@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { RefreshCw, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import { formatCurrency, formatPercent, formatQuantity, formatDate } from '../utils/format';
+import { RefreshCw, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { formatCurrency, formatPercent, formatQuantity } from '../utils/format';
 
 export default function Dashboard() {
   const {
