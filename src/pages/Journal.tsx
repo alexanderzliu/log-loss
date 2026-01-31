@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
-import { Plus } from 'lucide-react';
+import { Plus, List, LayoutGrid } from 'lucide-react';
 import TradeList from '../components/trades/TradeList';
+import GroupedTradeList from '../components/trades/GroupedTradeList';
 import TradeForm from '../components/trades/TradeForm';
+import { groupTradesByAsset } from '../utils/aggregatePositions';
 import type { Trade, TradeFormData } from '../types';
 
 export default function Journal() {
@@ -11,6 +13,7 @@ export default function Journal() {
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [closingTrade, setClosingTrade] = useState<Trade | null>(null);
   const [filter, setFilter] = useState<'all' | 'open' | 'closed'>('all');
+  const [viewMode, setViewMode] = useState<'list' | 'grouped'>('list');
 
   useEffect(() => {
     fetchTrades();
@@ -82,32 +85,82 @@ export default function Journal() {
         </button>
       </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '28px' }}>
-        {[
-          { key: 'all', label: 'All', count: trades.length },
-          { key: 'open', label: 'Open', count: openCount },
-          { key: 'closed', label: 'Closed', count: closedCount },
-        ].map((f) => (
+      {/* Filters and View Toggle */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {[
+            { key: 'all', label: 'All', count: trades.length },
+            { key: 'open', label: 'Open', count: openCount },
+            { key: 'closed', label: 'Closed', count: closedCount },
+          ].map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key as typeof filter)}
+              style={{
+                padding: '10px 18px',
+                borderRadius: '10px',
+                border: filter === f.key ? '1px solid var(--border-light)' : '1px solid transparent',
+                background: filter === f.key ? 'rgba(255, 255, 255, 0.06)' : 'transparent',
+                color: filter === f.key ? 'var(--text-primary)' : 'var(--text-muted)',
+                fontSize: '14px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              {f.label} <span style={{ opacity: 0.6, marginLeft: '4px' }}>{f.count}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* View Toggle */}
+        <div style={{
+          display: 'flex',
+          background: 'var(--bg-tertiary)',
+          borderRadius: '10px',
+          padding: '4px',
+          gap: '4px',
+        }}>
           <button
-            key={f.key}
-            onClick={() => setFilter(f.key as typeof filter)}
+            onClick={() => setViewMode('list')}
+            title="Chronological view"
             style={{
-              padding: '10px 18px',
-              borderRadius: '10px',
-              border: filter === f.key ? '1px solid var(--border-light)' : '1px solid transparent',
-              background: filter === f.key ? 'rgba(255, 255, 255, 0.06)' : 'transparent',
-              color: filter === f.key ? 'var(--text-primary)' : 'var(--text-muted)',
-              fontSize: '14px',
-              fontWeight: 500,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '36px',
+              height: '32px',
+              borderRadius: '8px',
+              border: 'none',
+              background: viewMode === 'list' ? 'var(--bg-elevated)' : 'transparent',
+              color: viewMode === 'list' ? 'var(--text-primary)' : 'var(--text-muted)',
               cursor: 'pointer',
-              fontFamily: 'inherit',
               transition: 'all 0.2s ease',
             }}
           >
-            {f.label} <span style={{ opacity: 0.6, marginLeft: '4px' }}>{f.count}</span>
+            <List size={16} />
           </button>
-        ))}
+          <button
+            onClick={() => setViewMode('grouped')}
+            title="Grouped by asset"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '36px',
+              height: '32px',
+              borderRadius: '8px',
+              border: 'none',
+              background: viewMode === 'grouped' ? 'var(--bg-elevated)' : 'transparent',
+              color: viewMode === 'grouped' ? 'var(--text-primary)' : 'var(--text-muted)',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <LayoutGrid size={16} />
+          </button>
+        </div>
       </div>
 
       {/* Trade List */}
@@ -115,6 +168,12 @@ export default function Journal() {
         <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
           <p style={{ color: 'var(--text-muted)' }}>Loading...</p>
         </div>
+      ) : viewMode === 'grouped' ? (
+        <GroupedTradeList
+          groups={groupTradesByAsset(filteredTrades)}
+          onEdit={handleEditTrade}
+          onClosePosition={handleClosePosition}
+        />
       ) : (
         <TradeList
           trades={filteredTrades}

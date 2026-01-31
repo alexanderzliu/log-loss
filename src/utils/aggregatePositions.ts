@@ -81,3 +81,66 @@ export function calculateAggregatedPnl(
 
   return { pnl, pnlPercent };
 }
+
+export interface GroupedTrades {
+  symbol: string;
+  assetType: AssetType;
+  trades: Trade[];
+  openCount: number;
+  closedCount: number;
+  totalValue: number;
+  totalPnl: number | null;
+}
+
+/**
+ * Group all trades by symbol + assetType for Journal grouped view.
+ * Unlike aggregatePositions, this includes all trades (open, closed, buy, sell).
+ */
+export function groupTradesByAsset(trades: Trade[]): GroupedTrades[] {
+  const grouped = new Map<string, Trade[]>();
+
+  for (const trade of trades) {
+    const key = `${trade.symbol}-${trade.assetType}`;
+    const existing = grouped.get(key) || [];
+    existing.push(trade);
+    grouped.set(key, existing);
+  }
+
+  const result: GroupedTrades[] = [];
+  for (const [, groupTrades] of grouped) {
+    const first = groupTrades[0];
+
+    // Sort by entry date descending (most recent first)
+    const sortedTrades = groupTrades.sort(
+      (a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime()
+    );
+
+    const openCount = groupTrades.filter(t => t.status === 'open').length;
+    const closedCount = groupTrades.filter(t => t.status === 'closed').length;
+
+    // Calculate total value (entry price * quantity for all trades)
+    const totalValue = groupTrades.reduce(
+      (sum, t) => sum + t.entryPrice * t.quantity,
+      0
+    );
+
+    // Sum up realized P&L from closed trades
+    const closedTrades = groupTrades.filter(t => t.status === 'closed' && t.pnl !== null);
+    const totalPnl = closedTrades.length > 0
+      ? closedTrades.reduce((sum, t) => sum + (t.pnl ?? 0), 0)
+      : null;
+
+    result.push({
+      symbol: first.symbol,
+      assetType: first.assetType,
+      trades: sortedTrades,
+      openCount,
+      closedCount,
+      totalValue,
+      totalPnl,
+    });
+  }
+
+  // Sort by total value descending
+  return result.sort((a, b) => b.totalValue - a.totalValue);
+}
