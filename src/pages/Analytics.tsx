@@ -57,7 +57,6 @@ export default function Analytics() {
       setPriceHistory(data.history);
     } catch (error) {
       console.error('Failed to load price history:', error);
-      setPriceHistory([]);
     } finally {
       setLoading(false);
     }
