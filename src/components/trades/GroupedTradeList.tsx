@@ -68,7 +68,7 @@ export default function GroupedTradeList({ groups, onEdit, onClosePosition }: Gr
           </tr>
         </thead>
         <tbody>
-          {groups.map((group) => {
+          {groups.map((group, groupIdx) => {
             const groupKey = `${group.symbol}-${group.assetType}`;
             const isExpanded = expandedGroups.has(groupKey);
             const priceKey = groupKey;
@@ -81,6 +81,7 @@ export default function GroupedTradeList({ groups, onEdit, onClosePosition }: Gr
                   style={{
                     borderBottom: isExpanded ? 'none' : '1px solid var(--border)',
                     cursor: 'pointer',
+                    animation: `slideUp 0.35s ease-out ${groupIdx * 0.04}s both`,
                   }}
                   onClick={() => toggleExpanded(groupKey)}
                 >
@@ -165,6 +166,7 @@ export default function GroupedTradeList({ groups, onEdit, onClosePosition }: Gr
                       style={{
                         borderBottom: isLast ? '1px solid var(--border)' : 'none',
                         background: 'var(--bg-tertiary)',
+                        animation: `slideUp 0.25s ease-out ${idx * 0.03}s both`,
                       }}
                     >
                       <td style={{ ...tdStyle, paddingLeft: '72px' }}>
@@ -295,9 +297,10 @@ export default function GroupedTradeList({ groups, onEdit, onClosePosition }: Gr
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 50
+          zIndex: 50,
+          animation: 'overlayIn 0.25s ease-out',
         }}>
-          <div className="card" style={{ padding: '24px', maxWidth: '400px', width: '100%', margin: '16px' }}>
+          <div className="card" style={{ padding: '24px', maxWidth: '400px', width: '100%', margin: '16px', animation: 'modalIn 0.3s ease-out' }}>
             <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>
               Delete Trade?
             </h3>

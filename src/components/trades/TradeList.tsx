@@ -50,7 +50,7 @@ export default function TradeList({ trades, onEdit, onClosePosition }: TradeList
           </tr>
         </thead>
         <tbody>
-          {trades.map((trade) => {
+          {trades.map((trade, idx) => {
             const priceKey = `${trade.symbol}-${trade.assetType}`;
             const currentPrice = prices[priceKey]?.price;
             const isOpen = trade.status === 'open' && trade.side === 'buy';
@@ -67,7 +67,7 @@ export default function TradeList({ trades, onEdit, onClosePosition }: TradeList
             const value = trade.entryPrice * trade.quantity;
 
             return (
-              <tr key={trade.id} style={{ borderBottom: '1px solid var(--border)' }}>
+              <tr key={trade.id} style={{ borderBottom: '1px solid var(--border)', animation: `slideUp 0.35s ease-out ${idx * 0.04}s both` }}>
                 <td style={tdStyle}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{
@@ -214,9 +214,10 @@ export default function TradeList({ trades, onEdit, onClosePosition }: TradeList
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 50
+          zIndex: 50,
+          animation: 'overlayIn 0.25s ease-out',
         }}>
-          <div className="card" style={{ padding: '24px', maxWidth: '400px', width: '100%', margin: '16px' }}>
+          <div className="card" style={{ padding: '24px', maxWidth: '400px', width: '100%', margin: '16px', animation: 'modalIn 0.3s ease-out' }}>
             <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>
               Delete Trade?
             </h3>

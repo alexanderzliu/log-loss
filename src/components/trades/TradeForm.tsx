@@ -87,6 +87,7 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
       className="fixed inset-0 flex items-center justify-center z-50 p-6"
       style={{
         background: 'rgba(0, 0, 0, 0.6)',
+        animation: 'overlayIn 0.25s ease-out',
       }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
@@ -97,6 +98,7 @@ export default function TradeForm({ trade, initialData, isClosing, onClose }: Tr
           borderRadius: '20px',
           border: '1px solid var(--border-light)',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+          animation: 'modalIn 0.3s ease-out',
         }}
       >
         {/* Header */}

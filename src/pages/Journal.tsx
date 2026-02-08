@@ -4,6 +4,7 @@ import { Plus, List, LayoutGrid } from 'lucide-react';
 import TradeList from '../components/trades/TradeList';
 import GroupedTradeList from '../components/trades/GroupedTradeList';
 import TradeForm from '../components/trades/TradeForm';
+import PageTransition from '../components/PageTransition';
 import { groupTradesByAsset } from '../utils/aggregatePositions';
 import type { Trade, TradeFormData } from '../types';
 
@@ -68,6 +69,7 @@ export default function Journal() {
   const closedCount = trades.filter(t => t.status === 'closed').length;
 
   return (
+    <PageTransition>
     <div style={{ maxWidth: '1200px' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
@@ -192,5 +194,6 @@ export default function Journal() {
         />
       )}
     </div>
+    </PageTransition>
   );
 }

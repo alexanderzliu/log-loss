@@ -18,6 +18,8 @@ function navLinkStyle({ isActive }: { isActive: boolean }): CSSProperties {
     textDecoration: 'none',
     color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
     background: isActive ? 'var(--bg-elevated)' : 'transparent',
+    borderLeft: isActive ? '3px solid var(--accent)' : '3px solid transparent',
+    transition: 'all 0.2s ease',
   };
 }
 

@@ -14,6 +14,7 @@ import {
 import { format } from 'date-fns';
 import { Search, TrendingUp, TrendingDown } from 'lucide-react';
 import { formatCurrency, formatPercent } from '../utils/format';
+import PageTransition from '../components/PageTransition';
 
 export default function Analytics() {
   const { trades, prices, fetchPrices } = useStore();
@@ -84,6 +85,7 @@ export default function Analytics() {
   }));
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       {/* Header */}
       <div>
@@ -294,5 +296,6 @@ export default function Analytics() {
         </div>
       )}
     </div>
+    </PageTransition>
   );
 }
