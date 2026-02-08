@@ -86,71 +86,91 @@ export default function Analytics() {
 
   return (
     <PageTransition>
-    <div className="space-y-6">
+    <div style={{ maxWidth: '1200px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Price Analytics</h1>
-        <p className="text-gray-500 mt-1">Track asset performance and price history</p>
+        <h1 style={{ fontSize: '28px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+          Price Analytics
+        </h1>
+        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+          Track asset performance and price history
+        </p>
       </div>
 
       {/* Search Bar */}
-      <div className="flex gap-4">
-        <div className="flex-1 flex gap-2">
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value.toUpperCase())}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder="Enter symbol (e.g., BTC, AAPL)"
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <select
-            value={selectedAssetType}
-            onChange={(e) => setSelectedAssetType(e.target.value as AssetType)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="crypto">Crypto</option>
-            <option value="stock">Stock</option>
-          </select>
-          <button
-            onClick={handleSearch}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-          >
-            <Search size={18} />
-            Search
-          </button>
-        </div>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <input
+          type="text"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value.toUpperCase())}
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          placeholder="Enter symbol (e.g., BTC, AAPL)"
+          style={{ flex: 1 }}
+        />
+        <select
+          value={selectedAssetType}
+          onChange={(e) => setSelectedAssetType(e.target.value as AssetType)}
+        >
+          <option value="crypto">Crypto</option>
+          <option value="stock">Stock</option>
+        </select>
+        <button
+          onClick={handleSearch}
+          className="btn-primary"
+          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <Search size={18} />
+          Search
+        </button>
       </div>
 
       {/* Tracked Assets */}
       {trackedAssets.length > 0 && (
         <div>
-          <h3 className="text-sm font-medium text-gray-500 mb-2">Your Assets</h3>
-          <div className="flex flex-wrap gap-2">
+          <h3 style={{
+            fontSize: '12px',
+            fontWeight: 500,
+            color: 'var(--text-muted)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.8px',
+            marginBottom: '12px',
+          }}>
+            Your Assets
+          </h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {trackedAssets.map(({ symbol, assetType }) => {
               const price = prices[`${symbol}-${assetType}`];
+              const isSelected = selectedSymbol === symbol && selectedAssetType === assetType;
               return (
                 <button
                   key={`${symbol}-${assetType}`}
                   onClick={() => handleAssetClick(symbol, assetType)}
-                  className={`px-3 py-2 rounded-lg border transition-colors ${
-                    selectedSymbol === symbol && selectedAssetType === assetType
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                  style={{
+                    padding: '10px 16px',
+                    borderRadius: '10px',
+                    border: isSelected ? '1px solid var(--accent)' : '1px solid var(--border)',
+                    background: isSelected ? 'var(--accent-glow)' : 'transparent',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    fontFamily: 'inherit',
+                    textAlign: 'left',
+                  }}
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{symbol}</span>
-                    <span className="text-xs text-gray-400 uppercase">{assetType}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{symbol}</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                      {assetType}
+                    </span>
                   </div>
                   {price && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <span className="text-sm">{formatCurrency(price.price)}</span>
-                      <span
-                        className={`text-xs ${
-                          price.changePercent24h >= 0 ? 'text-green-600' : 'text-red-600'
-                        }`}
-                      >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                      <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontFamily: "'DM Mono', monospace" }}>
+                        {formatCurrency(price.price)}
+                      </span>
+                      <span style={{
+                        fontSize: '12px',
+                        color: price.changePercent24h >= 0 ? 'var(--profit)' : 'var(--loss)',
+                      }}>
                         {formatPercent(price.changePercent24h)}
                       </span>
                     </div>
@@ -164,23 +184,44 @@ export default function Analytics() {
 
       {/* Price Chart */}
       {selectedSymbol && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-6">
+        <div className="card" style={{ padding: '28px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold">{selectedSymbol}</h2>
-                <span className="text-xs px-2 py-1 bg-gray-100 rounded uppercase">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {selectedSymbol}
+                </h2>
+                <span style={{
+                  fontSize: '11px',
+                  padding: '4px 10px',
+                  background: 'var(--bg-elevated)',
+                  borderRadius: '6px',
+                  textTransform: 'uppercase',
+                  color: 'var(--text-muted)',
+                  fontWeight: 500,
+                }}>
                   {selectedAssetType}
                 </span>
               </div>
               {currentPrice && (
-                <div className="flex items-center gap-3 mt-1">
-                  <span className="text-2xl font-bold">{formatCurrency(currentPrice.price)}</span>
-                  <span
-                    className={`flex items-center gap-1 ${
-                      currentPrice.changePercent24h >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}
-                  >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px' }}>
+                  <span style={{
+                    fontSize: '28px',
+                    fontWeight: 600,
+                    color: 'var(--text-primary)',
+                    fontFamily: "'DM Mono', monospace",
+                    letterSpacing: '-1px',
+                  }}>
+                    {formatCurrency(currentPrice.price)}
+                  </span>
+                  <span style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    color: currentPrice.changePercent24h >= 0 ? 'var(--profit)' : 'var(--loss)',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                  }}>
                     {currentPrice.changePercent24h >= 0 ? (
                       <TrendingUp size={16} />
                     ) : (
@@ -191,16 +232,23 @@ export default function Analytics() {
                 </div>
               )}
             </div>
-            <div className="flex gap-2">
+            <div style={{ display: 'flex', gap: '4px' }}>
               {[7, 30, 90].map((days) => (
                 <button
                   key={days}
                   onClick={() => setTimeRange(days)}
-                  className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                    timeRange === days
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
+                  style={{
+                    padding: '8px 14px',
+                    fontSize: '13px',
+                    borderRadius: '8px',
+                    border: timeRange === days ? '1px solid var(--accent)' : '1px solid var(--border)',
+                    background: timeRange === days ? 'var(--accent-glow)' : 'transparent',
+                    color: timeRange === days ? 'var(--accent)' : 'var(--text-muted)',
+                    cursor: 'pointer',
+                    fontWeight: 500,
+                    fontFamily: 'inherit',
+                    transition: 'all 0.2s ease',
+                  }}
                 >
                   {days}D
                 </button>
@@ -209,72 +257,97 @@ export default function Analytics() {
           </div>
 
           {loading ? (
-            <div className="h-80 flex items-center justify-center text-gray-500">
+            <div style={{ height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
               Loading chart...
             </div>
           ) : chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={320}>
               <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis
                   dataKey="date"
-                  tick={{ fontSize: 12 }}
+                  tick={{ fontSize: 12, fill: 'var(--text-muted)' }}
                   tickLine={false}
-                  axisLine={{ stroke: '#e5e7eb' }}
+                  axisLine={{ stroke: 'var(--border)' }}
                 />
                 <YAxis
-                  tick={{ fontSize: 12 }}
+                  tick={{ fontSize: 12, fill: 'var(--text-muted)' }}
                   tickLine={false}
-                  axisLine={{ stroke: '#e5e7eb' }}
+                  axisLine={{ stroke: 'var(--border)' }}
                   tickFormatter={(value) => `$${value.toLocaleString()}`}
                   domain={['auto', 'auto']}
                 />
                 <Tooltip
                   formatter={(value) => [formatCurrency(value as number), 'Price']}
                   contentStyle={{
-                    borderRadius: '8px',
-                    border: '1px solid #e5e7eb',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border-light)',
+                    background: 'var(--dropdown-bg)',
+                    backdropFilter: 'blur(12px)',
+                    boxShadow: 'var(--dropdown-shadow)',
+                    color: 'var(--text-primary)',
                   }}
+                  labelStyle={{ color: 'var(--text-muted)' }}
+                  itemStyle={{ color: 'var(--accent)' }}
                 />
                 <Line
                   type="monotone"
                   dataKey="price"
-                  stroke="#2563eb"
+                  stroke="var(--accent)"
                   strokeWidth={2}
                   dot={false}
                 />
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-80 flex items-center justify-center text-gray-500">
+            <div style={{ height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
               No price data available
             </div>
           )}
 
           {/* Price Stats */}
           {currentPrice && (
-            <div className="grid grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-200">
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: '16px',
+              marginTop: '24px',
+              paddingTop: '24px',
+              borderTop: '1px solid var(--border)',
+            }}>
               <div>
-                <div className="text-sm text-gray-500">24h High</div>
-                <div className="font-medium">{formatCurrency(currentPrice.high24h)}</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-500">24h Low</div>
-                <div className="font-medium">{formatCurrency(currentPrice.low24h)}</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-500">24h Change</div>
-                <div
-                  className={`font-medium ${
-                    currentPrice.change24h >= 0 ? 'text-green-600' : 'text-red-600'
-                  }`}
-                >
-                  {formatCurrency(currentPrice.change24h)}
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                  24h High
+                </div>
+                <div style={{ fontWeight: 500, color: 'var(--text-primary)', fontFamily: "'DM Mono', monospace" }}>
+                  {formatCurrency(currentPrice.high24h)}
                 </div>
               </div>
               <div>
-                <div className="text-sm text-gray-500">24h Volume</div>
-                <div className="font-medium">
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                  24h Low
+                </div>
+                <div style={{ fontWeight: 500, color: 'var(--text-primary)', fontFamily: "'DM Mono', monospace" }}>
+                  {formatCurrency(currentPrice.low24h)}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                  24h Change
+                </div>
+                <div style={{
+                  fontWeight: 500,
+                  color: currentPrice.change24h >= 0 ? 'var(--profit)' : 'var(--loss)',
+                  fontFamily: "'DM Mono', monospace",
+                }}>
+                  {currentPrice.change24h >= 0 ? '+' : ''}{formatCurrency(currentPrice.change24h)}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                  24h Volume
+                </div>
+                <div style={{ fontWeight: 500, color: 'var(--text-primary)', fontFamily: "'DM Mono', monospace" }}>
                   ${currentPrice.volume24h?.toLocaleString(undefined, {
                     maximumFractionDigits: 0,
                   }) || 'N/A'}
@@ -287,10 +360,12 @@ export default function Analytics() {
 
       {/* Empty State */}
       {!selectedSymbol && trackedAssets.length === 0 && (
-        <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-          <Search className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Search for an asset</h3>
-          <p className="text-gray-500">
+        <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
+          <Search style={{ margin: '0 auto 16px', color: 'var(--text-muted)' }} size={48} />
+          <h3 style={{ fontSize: '18px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '8px' }}>
+            Search for an asset
+          </h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
             Enter a symbol above to view price data and charts.
           </p>
         </div>
