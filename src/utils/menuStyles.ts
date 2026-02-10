@@ -1,0 +1,16 @@
+export const menuItemStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '10px',
+  width: '100%',
+  padding: '10px 14px',
+  background: 'transparent',
+  border: 'none',
+  borderRadius: '8px',
+  color: 'var(--text-secondary)',
+  fontSize: '14px',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  textAlign: 'left',
+  transition: 'background 0.15s ease',
+};

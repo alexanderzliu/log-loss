@@ -1,4 +1,4 @@
-import type { Position, Execution, TradeFormData, PositionUpdateData, PortfolioSummary } from '../types';
+import type { Position, TradeFormData, PositionUpdateData, PortfolioSummary } from '../types';
 
 const API_BASE = '/api/positions';
 
@@ -34,19 +34,6 @@ export async function createTrade(data: TradeFormData): Promise<{ position: Posi
     const body = await response.json().catch(() => null);
     throw new Error(body?.error || 'Failed to create trade');
   }
-  return response.json();
-}
-
-export async function addExecution(
-  positionId: string,
-  data: { side: string; price: number; quantity: number; date: string; notes?: string }
-): Promise<{ position: Position; execution: Execution }> {
-  const response = await fetch(`${API_BASE}/${positionId}/executions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) throw new Error('Failed to add execution');
   return response.json();
 }
 

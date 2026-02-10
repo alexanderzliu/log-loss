@@ -18,7 +18,7 @@ app.use('/api/positions', positionsRouter);
 app.use('/api/prices', pricesRouter);
 
 // Health check
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 

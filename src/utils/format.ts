@@ -27,25 +27,3 @@ export function formatDate(dateString: string): string {
   });
 }
 
-export function formatDateTime(dateString: string): string {
-  return new Date(dateString).toLocaleString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-export function calculatePnl(
-  entryPrice: number,
-  currentPrice: number | null | undefined,
-  quantity: number
-): { pnl: number | null; pnlPercent: number | null } {
-  if (!currentPrice) {
-    return { pnl: null, pnlPercent: null };
-  }
-  const pnl = (currentPrice - entryPrice) * quantity;
-  const pnlPercent = entryPrice > 0 ? ((currentPrice - entryPrice) / entryPrice) * 100 : 0;
-  return { pnl, pnlPercent };
-}

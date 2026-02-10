@@ -1,10 +1,11 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { RefreshCw, ArrowUpRight, ArrowDownRight, ChevronDown, ChevronRight } from 'lucide-react';
 import { formatCurrency, formatPercent, formatQuantity } from '../utils/format';
 import { tableHeaderStyle, tableCellStyle } from '../utils/styles';
 import { calculateUnrealizedPnl } from '../utils/aggregatePositions';
 import { useAnimatedNumber } from '../hooks/useAnimatedNumber';
+import { useSetToggle } from '../hooks/useSetToggle';
 import PageTransition from '../components/PageTransition';
 
 export default function Dashboard() {
@@ -20,7 +21,7 @@ export default function Dashboard() {
     refreshPrices,
   } = useStore();
 
-  const [expandedPositions, setExpandedPositions] = useState<Set<string>>(new Set());
+  const [expandedPositions, toggleExpanded] = useSetToggle();
 
   useEffect(() => {
     fetchPositions();
@@ -30,18 +31,6 @@ export default function Dashboard() {
   }, [fetchPositions, fetchPortfolioSummary, refreshPrices]);
 
   const openPositions = positions.filter((p) => p.status === 'open');
-
-  const toggleExpanded = (key: string) => {
-    setExpandedPositions((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  };
 
   const unrealizedPnl = openPositions.reduce((total, pos) => {
     const priceKey = `${pos.symbol}-${pos.assetType}`;

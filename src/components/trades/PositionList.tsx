@@ -4,8 +4,11 @@ import { useStore } from '../../store/useStore';
 import { formatCurrency, formatQuantity, formatDate } from '../../utils/format';
 import { calculateUnrealizedPnl } from '../../utils/aggregatePositions';
 import { tableHeaderStyle, tableCellStyle } from '../../utils/styles';
+import { useSetToggle } from '../../hooks/useSetToggle';
+import ConfirmDialog from '../ConfirmDialog';
+import DropdownMenu from '../DropdownMenu';
+import { menuItemStyle } from '../../utils/menuStyles';
 import {
-  MoreVertical,
   Edit2,
   Trash2,
   X,
@@ -23,21 +26,9 @@ interface PositionListProps {
 
 export default function PositionList({ positions, onEdit, onClosePosition }: PositionListProps) {
   const { deletePosition, prices } = useStore();
-  const [expandedPositions, setExpandedPositions] = useState<Set<string>>(new Set());
+  const [expandedPositions, toggleExpanded] = useSetToggle();
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-
-  const toggleExpanded = (key: string) => {
-    setExpandedPositions((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  };
 
   const handleDelete = async (id: string) => {
     await deletePosition(id);
@@ -170,64 +161,32 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
                     )}
                   </td>
                   <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
-                    <div style={{ position: 'relative' }}>
+                    <DropdownMenu
+                      isOpen={menuOpen === position.id}
+                      onToggle={() => setMenuOpen(menuOpen === position.id ? null : position.id)}
+                      onClose={() => setMenuOpen(null)}
+                    >
                       <button
-                        onClick={() => setMenuOpen(menuOpen === position.id ? null : position.id)}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          padding: '6px',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          color: 'var(--text-muted)'
-                        }}
+                        onClick={() => { onEdit(position); setMenuOpen(null); }}
+                        style={menuItemStyle}
                       >
-                        <MoreVertical size={16} />
+                        <Edit2 size={14} /> Edit
                       </button>
-
-                      {menuOpen === position.id && (
-                        <>
-                          <div
-                            style={{ position: 'fixed', inset: 0, zIndex: 10 }}
-                            onClick={() => setMenuOpen(null)}
-                          />
-                          <div style={{
-                            position: 'absolute',
-                            right: 0,
-                            marginTop: '4px',
-                            width: '170px',
-                            background: 'var(--dropdown-bg)',
-                            backdropFilter: 'blur(12px)',
-                            border: '1px solid var(--border-light)',
-                            borderRadius: '12px',
-                            zIndex: 20,
-                            padding: '6px',
-                            boxShadow: 'var(--dropdown-shadow)'
-                          }}>
-                            <button
-                              onClick={() => { onEdit(position); setMenuOpen(null); }}
-                              style={menuItemStyle}
-                            >
-                              <Edit2 size={14} /> Edit
-                            </button>
-                            {isOpen && (
-                              <button
-                                onClick={() => { onClosePosition(position); setMenuOpen(null); }}
-                                style={menuItemStyle}
-                              >
-                                <X size={14} /> Close Position
-                              </button>
-                            )}
-                            <button
-                              onClick={() => { setDeleteConfirm(position.id); setMenuOpen(null); }}
-                              style={{ ...menuItemStyle, color: 'var(--loss)' }}
-                            >
-                              <Trash2 size={14} /> Delete
-                            </button>
-                          </div>
-                        </>
+                      {isOpen && (
+                        <button
+                          onClick={() => { onClosePosition(position); setMenuOpen(null); }}
+                          style={menuItemStyle}
+                        >
+                          <X size={14} /> Close Position
+                        </button>
                       )}
-                    </div>
+                      <button
+                        onClick={() => { setDeleteConfirm(position.id); setMenuOpen(null); }}
+                        style={{ ...menuItemStyle, color: 'var(--loss)' }}
+                      >
+                        <Trash2 size={14} /> Delete
+                      </button>
+                    </DropdownMenu>
                   </td>
                 </tr>
 
@@ -308,48 +267,13 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
         </tbody>
       </table>
 
-      {/* Delete Modal */}
       {deleteConfirm && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'var(--overlay-bg)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 50,
-          animation: 'overlayIn 0.25s ease-out',
-        }}>
-          <div className="card" style={{ padding: '24px', maxWidth: '400px', width: '100%', margin: '16px', animation: 'modalIn 0.3s ease-out' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>
-              Delete Position?
-            </h3>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', fontSize: '14px' }}>
-              This will delete the position and all its executions. This action cannot be undone.
-            </p>
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setDeleteConfirm(null)} className="btn-ghost">
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDelete(deleteConfirm)}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'var(--loss)',
-                  color: '#fff',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit'
-                }}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title="Delete Position?"
+          message="This will delete the position and all its executions. This action cannot be undone."
+          onConfirm={() => handleDelete(deleteConfirm)}
+          onCancel={() => setDeleteConfirm(null)}
+        />
       )}
     </div>
   );
@@ -358,19 +282,3 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
 const thStyle = { ...tableHeaderStyle, padding: '18px 24px' };
 const tdStyle = { ...tableCellStyle, padding: '16px 24px' };
 
-const menuItemStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '10px',
-  width: '100%',
-  padding: '10px 14px',
-  background: 'transparent',
-  border: 'none',
-  borderRadius: '8px',
-  color: 'var(--text-secondary)',
-  fontSize: '14px',
-  cursor: 'pointer',
-  fontFamily: 'inherit',
-  textAlign: 'left',
-  transition: 'background 0.15s ease',
-};

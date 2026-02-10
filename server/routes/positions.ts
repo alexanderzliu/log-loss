@@ -155,7 +155,7 @@ router.get('/', (req, res) => {
 });
 
 // GET /stats/summary - Portfolio summary
-router.get('/stats/summary', (req, res) => {
+router.get('/stats/summary', (_req, res) => {
   try {
     const openCount = db.prepare(
       "SELECT COUNT(*) as count FROM positions WHERE status = 'open'"

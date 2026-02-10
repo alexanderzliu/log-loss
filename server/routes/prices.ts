@@ -98,7 +98,7 @@ async function fetchCryptoPrice(symbol: string): Promise<{
 
     if (!response.ok) return null;
 
-    const data = await response.json();
+    const data = await response.json() as Record<string, Record<string, number>>;
     const coinData = data[coinId];
 
     if (!coinData) return null;
@@ -133,7 +133,8 @@ async function fetchStockPrice(symbol: string): Promise<{
 
     if (!response.ok) return null;
 
-    const data = await response.json();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await response.json() as any;
     const quote = data.chart?.result?.[0]?.meta;
     const indicators = data.chart?.result?.[0]?.indicators?.quote?.[0];
 
@@ -259,7 +260,7 @@ router.get('/history/:assetType/:symbol', async (req, res) => {
         return res.status(404).json({ error: 'Price history not found' });
       }
 
-      const data = await response.json();
+      const data = await response.json() as { prices: [number, number][] };
       const history = data.prices.map(([timestamp, price]: [number, number]) => ({
         timestamp: new Date(timestamp).toISOString(),
         price,
@@ -277,7 +278,8 @@ router.get('/history/:assetType/:symbol', async (req, res) => {
         return res.status(404).json({ error: 'Price history not found' });
       }
 
-      const data = await response.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = await response.json() as any;
       const result = data.chart?.result?.[0];
 
       if (!result) {
