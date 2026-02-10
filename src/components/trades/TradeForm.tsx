@@ -255,14 +255,11 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
               <FieldSection label="Market" icon={<TrendingUp size={12} />}>
                 <div className="grid grid-cols-2 gap-3">
                   <FieldGroup label="Asset Type">
-                    {/* Segmented control */}
+                    {/* Glowing underline toggle */}
                     <div style={{
                       display: 'flex',
-                      gap: '2px',
-                      padding: '3px',
-                      borderRadius: '12px',
-                      background: 'var(--bg-elevated)',
-                      border: '1px solid var(--border)',
+                      position: 'relative',
+                      borderBottom: '2px solid var(--border)',
                     }}>
                       {(['crypto', 'stock'] as const).map((type) => (
                         <button
@@ -277,28 +274,35 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
                           disabled={isClosing}
                           style={{
                             flex: 1,
-                            padding: '8px 12px',
-                            borderRadius: '10px',
+                            padding: '10px 12px',
                             fontSize: '13px',
-                            fontWeight: 500,
+                            fontWeight: 600,
                             fontFamily: 'inherit',
                             border: 'none',
+                            background: 'transparent',
                             cursor: isClosing ? 'not-allowed' : 'pointer',
-                            transition: 'all 0.15s ease',
-                            background: formData.assetType === type
-                              ? 'var(--bg-hover)'
-                              : 'transparent',
+                            transition: 'color 0.2s ease',
                             color: formData.assetType === type
                               ? 'var(--text-primary)'
                               : 'var(--text-muted)',
-                            boxShadow: formData.assetType === type
-                              ? '0 1px 3px rgba(0,0,0,0.2)'
-                              : 'none',
                           }}
                         >
                           {type === 'crypto' ? 'Crypto' : 'Stock'}
                         </button>
                       ))}
+                      {/* Sliding glowing underline */}
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '-2px',
+                        left: 0,
+                        width: '50%',
+                        height: '2px',
+                        borderRadius: '2px',
+                        background: 'var(--accent)',
+                        transform: `translateX(${formData.assetType === 'stock' ? '100%' : '0'})`,
+                        transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                        boxShadow: '0 0 8px rgba(16, 185, 129, 0.6), 0 0 20px rgba(16, 185, 129, 0.3)',
+                      }} />
                     </div>
                   </FieldGroup>
                   <FieldGroup label="Symbol">
@@ -330,14 +334,11 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
 
               {/* Order Section */}
               <FieldSection label="Order" icon={<Zap size={12} />}>
-                {/* Buy / Sell toggle */}
+                {/* Buy / Sell toggle with glowing underline */}
                 <div style={{
                   display: 'flex',
-                  gap: '3px',
-                  padding: '3px',
-                  borderRadius: '12px',
-                  background: 'var(--bg-elevated)',
-                  border: '1px solid var(--border)',
+                  position: 'relative',
+                  borderBottom: '2px solid var(--border)',
                 }}>
                   <button
                     type="button"
@@ -345,32 +346,26 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
                     disabled={isClosing}
                     style={{
                       flex: 1,
-                      padding: '10px',
-                      borderRadius: '10px',
+                      padding: '12px',
                       fontWeight: 600,
-                      fontSize: '13px',
+                      fontSize: '14px',
                       fontFamily: 'inherit',
                       letterSpacing: '0.3px',
                       border: 'none',
+                      background: 'transparent',
                       cursor: isClosing ? 'not-allowed' : 'pointer',
                       opacity: isClosing ? 0.5 : 1,
-                      transition: 'all 0.15s ease',
+                      transition: 'color 0.2s ease',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '6px',
-                      background: formData.side === 'buy'
-                        ? 'rgba(52, 211, 153, 0.12)'
-                        : 'transparent',
                       color: formData.side === 'buy'
                         ? 'var(--profit)'
                         : 'var(--text-muted)',
-                      boxShadow: formData.side === 'buy'
-                        ? 'inset 0 0 0 1px rgba(52, 211, 153, 0.2)'
-                        : 'none',
                     }}
                   >
-                    <TrendingUp size={14} />
+                    <TrendingUp size={16} />
                     Buy
                   </button>
                   <button
@@ -379,34 +374,43 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
                     disabled={isClosing}
                     style={{
                       flex: 1,
-                      padding: '10px',
-                      borderRadius: '10px',
+                      padding: '12px',
                       fontWeight: 600,
-                      fontSize: '13px',
+                      fontSize: '14px',
                       fontFamily: 'inherit',
                       letterSpacing: '0.3px',
                       border: 'none',
+                      background: 'transparent',
                       cursor: isClosing ? 'not-allowed' : 'pointer',
                       opacity: isClosing ? 0.5 : 1,
-                      transition: 'all 0.15s ease',
+                      transition: 'color 0.2s ease',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '6px',
-                      background: formData.side === 'sell'
-                        ? 'rgba(248, 113, 113, 0.12)'
-                        : 'transparent',
                       color: formData.side === 'sell'
                         ? 'var(--loss)'
                         : 'var(--text-muted)',
-                      boxShadow: formData.side === 'sell'
-                        ? 'inset 0 0 0 1px rgba(248, 113, 113, 0.2)'
-                        : 'none',
                     }}
                   >
-                    <TrendingDown size={14} />
+                    <TrendingDown size={16} />
                     Sell
                   </button>
+                  {/* Glowing underline */}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '-2px',
+                    left: 0,
+                    width: '50%',
+                    height: '2px',
+                    borderRadius: '2px',
+                    background: formData.side === 'buy' ? 'var(--profit)' : 'var(--loss)',
+                    transform: `translateX(${formData.side === 'sell' ? '100%' : '0'})`,
+                    transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.3s ease, box-shadow 0.3s ease',
+                    boxShadow: formData.side === 'buy'
+                      ? '0 0 8px rgba(52, 211, 153, 0.6), 0 0 20px rgba(52, 211, 153, 0.3)'
+                      : '0 0 8px rgba(248, 113, 113, 0.6), 0 0 20px rgba(248, 113, 113, 0.3)',
+                  }} />
                 </div>
 
                 <FieldGroup label={isClosing ? 'Exit Date' : 'Entry Date'}>

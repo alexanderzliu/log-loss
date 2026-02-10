@@ -17,13 +17,18 @@ export default function PnlDisplay({ pnl, pnlPercent, size = 'default', fallback
   const color = pnl >= 0 ? 'var(--profit)' : 'var(--loss)';
   const isSm = size === 'sm';
 
+  const glowShadow = pnl >= 0
+    ? '0 0 20px rgba(52, 211, 153, 0.25)'
+    : '0 0 20px rgba(248, 113, 113, 0.25)';
+
   return (
     <div>
       <div style={{
         fontFamily: "'DM Mono', monospace",
-        fontWeight: isSm ? undefined : 500,
+        fontWeight: isSm ? undefined : 600,
         fontSize: isSm ? '13px' : undefined,
         color,
+        textShadow: isSm ? 'none' : glowShadow,
       }}>
         {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
       </div>

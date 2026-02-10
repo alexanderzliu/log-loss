@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
-import { useState, useEffect, type CSSProperties } from 'react';
-import { BookOpen, LayoutDashboard, TrendingUp, CircleDot, Sun, Moon } from 'lucide-react';
+import { useEffect, type CSSProperties } from 'react';
+import { BookOpen, LayoutDashboard, TrendingUp, CircleDot } from 'lucide-react';
+import { useStore } from './store/useStore';
+import { formatCurrency } from './utils/format';
 import Journal from './pages/Journal';
 import Predictions from './pages/Predictions';
 import Dashboard from './pages/Dashboard';
@@ -15,29 +17,39 @@ function navLinkStyle({ isActive }: { isActive: boolean }): CSSProperties {
     padding: '12px 16px',
     borderRadius: '12px',
     fontSize: '14px',
-    fontWeight: 500,
+    fontWeight: isActive ? 600 : 500,
     textDecoration: 'none',
     color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
     background: isActive
-      ? 'linear-gradient(135deg, var(--accent-soft), rgba(139, 92, 246, 0.04))'
+      ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(139, 92, 246, 0.06))'
       : 'transparent',
     borderLeft: isActive ? '3px solid var(--accent)' : '3px solid transparent',
     transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+    position: 'relative',
   };
 }
 
 function App() {
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    const saved = localStorage.getItem('theme');
-    return (saved === 'light' || saved === 'dark') ? saved : 'dark';
-  });
+  const {
+    positions,
+    predictions,
+    portfolioSummary,
+    predictionsSummary,
+    fetchPositions,
+    fetchPortfolioSummary,
+    fetchPredictionsSummary,
+  } = useStore();
 
   useEffect(() => {
-    document.documentElement.classList.toggle('light', theme === 'light');
-    localStorage.setItem('theme', theme);
-  }, [theme]);
+    fetchPositions();
+    fetchPortfolioSummary();
+    fetchPredictionsSummary();
+  }, [fetchPositions, fetchPortfolioSummary, fetchPredictionsSummary]);
 
-  const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
+  const openPositionsCount = positions.filter(p => p.status === 'open').length;
+  const openPredictionsCount = predictions.filter(p => p.status === 'open').length;
+  const totalPnl = (portfolioSummary?.realizedPnl || 0) + (predictionsSummary?.predictionsPnl || 0);
+  const isPositive = totalPnl >= 0;
 
   return (
     <BrowserRouter>
@@ -54,9 +66,9 @@ function App() {
           bottom: 0,
           backdropFilter: 'blur(20px)',
         }}>
-          {/* Logo */}
+          {/* Logo + P&L Summary */}
           <div style={{ padding: '24px', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
               <div style={{
                 width: '36px',
                 height: '36px',
@@ -69,7 +81,7 @@ function App() {
                 fontSize: '14px',
                 color: '#000',
                 letterSpacing: '-0.5px',
-                boxShadow: '0 2px 8px var(--accent-glow)',
+                boxShadow: '0 2px 12px var(--accent-glow), 0 0 40px rgba(16, 185, 129, 0.08)',
               }}>
                 TJ
               </div>
@@ -82,6 +94,37 @@ function App() {
                 </p>
               </div>
             </div>
+
+            {/* Mini P&L Card */}
+            <div style={{
+              padding: '10px 12px',
+              borderRadius: '10px',
+              background: isPositive ? 'rgba(52, 211, 153, 0.06)' : 'rgba(248, 113, 113, 0.06)',
+              border: `1px solid ${isPositive ? 'rgba(52, 211, 153, 0.12)' : 'rgba(248, 113, 113, 0.12)'}`,
+            }}>
+              <div style={{
+                fontSize: '10px',
+                color: 'var(--text-muted)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.8px',
+                marginBottom: '4px',
+                fontWeight: 600,
+              }}>
+                Realized P&L
+              </div>
+              <div style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: '16px',
+                fontWeight: 500,
+                fontVariantNumeric: 'tabular-nums',
+                color: isPositive ? 'var(--profit)' : 'var(--loss)',
+                textShadow: isPositive
+                  ? '0 0 20px rgba(52, 211, 153, 0.3)'
+                  : '0 0 20px rgba(248, 113, 113, 0.3)',
+              }}>
+                {totalPnl >= 0 ? '+' : ''}{formatCurrency(totalPnl)}
+              </div>
+            </div>
           </div>
 
           {/* Nav */}
@@ -92,42 +135,43 @@ function App() {
             </NavLink>
             <NavLink to="/trades" style={navLinkStyle}>
               <BookOpen size={18} />
-              Trades
+              <span style={{ flex: 1 }}>Trades</span>
+              {openPositionsCount > 0 && (
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: '9999px',
+                  background: 'rgba(52, 211, 153, 0.1)',
+                  color: 'var(--profit)',
+                  fontFamily: "'DM Mono', monospace",
+                }}>
+                  {openPositionsCount}
+                </span>
+              )}
             </NavLink>
             <NavLink to="/predictions" style={navLinkStyle}>
               <CircleDot size={18} />
-              Predictions
+              <span style={{ flex: 1 }}>Predictions</span>
+              {openPredictionsCount > 0 && (
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: '9999px',
+                  background: 'rgba(139, 92, 246, 0.1)',
+                  color: 'var(--accent-violet)',
+                  fontFamily: "'DM Mono', monospace",
+                }}>
+                  {openPredictionsCount}
+                </span>
+              )}
             </NavLink>
             <NavLink to="/analytics" style={navLinkStyle}>
               <TrendingUp size={18} />
               Analytics
             </NavLink>
           </nav>
-
-          {/* Theme Toggle */}
-          <div style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
-            <button
-              onClick={toggleTheme}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                width: '100%',
-                padding: '12px 16px',
-                borderRadius: '12px',
-                fontSize: '14px',
-                fontWeight: 500,
-                color: 'var(--text-secondary)',
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border)',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-              {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-            </button>
-          </div>
         </aside>
 
         {/* Main Content */}

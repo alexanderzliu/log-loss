@@ -60,6 +60,8 @@ export default function Dashboard() {
   const animatedPortfolioValue = useAnimatedNumber(totalInvested + unrealizedPnl);
   const animatedTotalPnl = useAnimatedNumber(totalPnl);
 
+  const isUp = totalPnl >= 0;
+
   const stagger = (index: number) => ({
     animation: `slideUp 0.4s ease-out ${index * 0.06}s both`,
   });
@@ -67,66 +69,102 @@ export default function Dashboard() {
   return (
     <PageTransition>
       <div style={{ maxWidth: '1200px' }}>
-        {/* Portfolio Value Header */}
-        <div style={{
-          marginBottom: '56px',
-          padding: '32px',
-          borderRadius: '24px',
-          background: 'var(--gradient-card)',
-          border: '1px solid var(--border)',
-          position: 'relative',
-          overflow: 'hidden',
-        }}>
-          {/* Atmospheric glow */}
+        {/* Portfolio Value Header with Ambient Glow */}
+        <div style={{ position: 'relative', marginBottom: '56px' }}>
+          {/* Ambient glow halo behind the card */}
           <div style={{
             position: 'absolute',
-            top: '-40px',
-            right: '-40px',
-            width: '200px',
-            height: '200px',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '110%',
+            height: '200%',
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%)',
+            background: isUp
+              ? 'radial-gradient(ellipse, rgba(52, 211, 153, 0.1) 0%, rgba(52, 211, 153, 0.03) 40%, transparent 70%)'
+              : 'radial-gradient(ellipse, rgba(248, 113, 113, 0.1) 0%, rgba(248, 113, 113, 0.03) 40%, transparent 70%)',
             pointerEvents: 'none',
+            transition: 'background 0.8s ease',
           }} />
-          <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>
-            Total Portfolio Value
-          </p>
-          <h1 style={{
-            fontSize: '56px',
-            fontWeight: 700,
-            color: 'var(--text-primary)',
-            fontFamily: "'DM Mono', monospace",
-            letterSpacing: '-3px',
-            marginBottom: '12px',
-            fontVariantNumeric: 'tabular-nums',
+
+          {/* Hero Card */}
+          <div style={{
+            padding: '36px 40px',
+            borderRadius: '24px',
+            background: 'var(--gradient-card)',
+            border: `1px solid ${isUp ? 'rgba(52, 211, 153, 0.12)' : 'rgba(248, 113, 113, 0.12)'}`,
+            position: 'relative',
+            overflow: 'hidden',
+            boxShadow: isUp
+              ? 'var(--shadow-card), 0 0 60px rgba(52, 211, 153, 0.06), 0 0 0 1px rgba(52, 211, 153, 0.05)'
+              : 'var(--shadow-card), 0 0 60px rgba(248, 113, 113, 0.06), 0 0 0 1px rgba(248, 113, 113, 0.05)',
+            transition: 'border-color 0.5s ease, box-shadow 0.5s ease',
           }}>
-            {formatCurrency(animatedPortfolioValue)}
-          </h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* Inner atmospheric glow */}
             <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: '9999px',
-              background: totalPnl >= 0 ? 'rgba(52, 211, 153, 0.1)' : 'rgba(248, 113, 113, 0.1)',
-              border: `1px solid ${totalPnl >= 0 ? 'rgba(52, 211, 153, 0.2)' : 'rgba(248, 113, 113, 0.2)'}`,
+              position: 'absolute',
+              top: '-80px',
+              right: '-80px',
+              width: '300px',
+              height: '300px',
+              borderRadius: '50%',
+              background: isUp
+                ? 'radial-gradient(circle, rgba(52, 211, 153, 0.1) 0%, transparent 70%)'
+                : 'radial-gradient(circle, rgba(248, 113, 113, 0.1) 0%, transparent 70%)',
+              pointerEvents: 'none',
+              transition: 'background 0.8s ease',
+            }} />
+            <p style={{
+              color: 'var(--text-muted)',
+              fontSize: '13px',
+              marginBottom: '8px',
+              textTransform: 'uppercase',
+              letterSpacing: '1.5px',
+              fontWeight: 600,
             }}>
-              {totalPnl >= 0 ? (
-                <ArrowUpRight size={18} style={{ color: 'var(--profit)' }} />
-              ) : (
-                <ArrowDownRight size={18} style={{ color: 'var(--loss)' }} />
-              )}
-              <span style={{
-                color: totalPnl >= 0 ? 'var(--profit)' : 'var(--loss)',
-                fontSize: '15px',
-                fontWeight: 600,
-                fontVariantNumeric: 'tabular-nums',
+              Total Portfolio Value
+            </p>
+            <h1 style={{
+              fontSize: '72px',
+              fontWeight: 700,
+              color: 'var(--text-primary)',
+              fontFamily: "'DM Mono', monospace",
+              letterSpacing: '-4px',
+              marginBottom: '16px',
+              fontVariantNumeric: 'tabular-nums',
+              lineHeight: 1,
+            }}>
+              {formatCurrency(animatedPortfolioValue)}
+            </h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: '9999px',
+                background: isUp ? 'rgba(52, 211, 153, 0.1)' : 'rgba(248, 113, 113, 0.1)',
+                border: `1px solid ${isUp ? 'rgba(52, 211, 153, 0.2)' : 'rgba(248, 113, 113, 0.2)'}`,
               }}>
-                {animatedTotalPnl >= 0 ? '+' : ''}{formatCurrency(animatedTotalPnl)} ({formatPercent(totalPnlPercent)})
-              </span>
+                {isUp ? (
+                  <ArrowUpRight size={18} style={{ color: 'var(--profit)' }} />
+                ) : (
+                  <ArrowDownRight size={18} style={{ color: 'var(--loss)' }} />
+                )}
+                <span style={{
+                  color: isUp ? 'var(--profit)' : 'var(--loss)',
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  fontVariantNumeric: 'tabular-nums',
+                  textShadow: isUp
+                    ? '0 0 20px rgba(52, 211, 153, 0.4)'
+                    : '0 0 20px rgba(248, 113, 113, 0.4)',
+                }}>
+                  {animatedTotalPnl >= 0 ? '+' : ''}{formatCurrency(animatedTotalPnl)} ({formatPercent(totalPnlPercent)})
+                </span>
+              </div>
+              <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>All time</span>
             </div>
-            <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>All time</span>
           </div>
         </div>
 
@@ -197,7 +235,14 @@ export default function Dashboard() {
             alignItems: 'center',
             marginBottom: '20px'
           }}>
-            <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h2 style={{
+              fontSize: '20px',
+              fontWeight: 700,
+              color: 'var(--text-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+            }}>
               Open Positions
               {openPositions.length > 0 && (
                 <span style={{
@@ -207,6 +252,7 @@ export default function Dashboard() {
                   borderRadius: '50%',
                   background: 'var(--profit)',
                   animation: 'pulse-dot 2s ease-in-out infinite',
+                  boxShadow: '0 0 8px rgba(52, 211, 153, 0.5)',
                 }} />
               )}
             </h2>
@@ -227,7 +273,7 @@ export default function Dashboard() {
             </div>
           ) : openPositions.length === 0 ? (
             <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>No open positions</p>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '8px', fontSize: '16px', fontWeight: 600 }}>No open positions</p>
               <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
                 Add a trade in the Journal to get started
               </p>
@@ -259,6 +305,9 @@ export default function Dashboard() {
                     const buyExecutions = position.executions.filter(e => e.side === 'buy');
                     const hasMultipleLots = buyExecutions.length > 1;
 
+                    // P&L-based row color bar
+                    const rowPnlPositive = pnl !== null ? pnl >= 0 : true;
+
                     return (
                       <Fragment key={positionKey}>
                         <tr
@@ -266,11 +315,25 @@ export default function Dashboard() {
                             borderBottom: isExpanded ? 'none' : '1px solid var(--border)',
                             cursor: hasMultipleLots ? 'pointer' : 'default',
                             animation: `slideUp 0.35s ease-out ${idx * 0.04}s both`,
+                            position: 'relative',
                           }}
                           onClick={() => hasMultipleLots && toggleExpanded(positionKey)}
                         >
                           <td style={tdStyle}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              {/* Left color bar */}
+                              <div style={{
+                                position: 'absolute',
+                                left: 0,
+                                top: '8px',
+                                bottom: '8px',
+                                width: '3px',
+                                borderRadius: '0 3px 3px 0',
+                                background: rowPnlPositive ? 'var(--profit)' : 'var(--loss)',
+                                boxShadow: rowPnlPositive
+                                  ? '0 0 8px rgba(52, 211, 153, 0.4)'
+                                  : '0 0 8px rgba(248, 113, 113, 0.4)',
+                              }} />
                               {hasMultipleLots && (
                                 <div style={{ color: 'var(--text-muted)', width: '16px' }}>
                                   {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -292,7 +355,7 @@ export default function Dashboard() {
                                 {position.symbol.slice(0, 2)}
                               </div>
                               <div>
-                                <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
                                   {position.symbol}
                                 </div>
                                 <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -432,14 +495,22 @@ function StatCard({
     ? (positive ? 'stat-gradient-profit' : 'stat-gradient-loss')
     : 'stat-gradient-neutral';
 
+  // Dynamic glow on the card border based on value
+  const glowBorder = positive !== undefined
+    ? (positive
+      ? { borderColor: 'rgba(52, 211, 153, 0.1)', boxShadow: 'var(--shadow-card), 0 0 20px rgba(52, 211, 153, 0.04)' }
+      : { borderColor: 'rgba(248, 113, 113, 0.1)', boxShadow: 'var(--shadow-card), 0 0 20px rgba(248, 113, 113, 0.04)' })
+    : {};
+
   return (
     <div className={`card ${gradientClass}`} style={{
       padding: '28px',
       position: 'relative',
       overflow: 'hidden',
+      ...glowBorder,
       ...style,
     }}>
-      {/* Left-side stripe */}
+      {/* Left-side stripe with glow */}
       {positive !== undefined && (
         <div style={{
           position: 'absolute',
@@ -448,9 +519,10 @@ function StatCard({
           bottom: '16px',
           width: '3px',
           borderRadius: '0 3px 3px 0',
-          background: positive
-            ? 'var(--profit)'
-            : 'var(--loss)',
+          background: positive ? 'var(--profit)' : 'var(--loss)',
+          boxShadow: positive
+            ? '0 0 8px rgba(52, 211, 153, 0.5)'
+            : '0 0 8px rgba(248, 113, 113, 0.5)',
         }} />
       )}
       <p style={{
@@ -459,15 +531,20 @@ function StatCard({
         marginBottom: '12px',
         textTransform: 'uppercase',
         letterSpacing: '0.8px',
-        fontWeight: 500
+        fontWeight: 600,
       }}>{label}</p>
       <p style={{
-        fontSize: '28px',
-        fontWeight: 600,
+        fontSize: '30px',
+        fontWeight: 700,
         color: valueColor,
         fontFamily: "'DM Mono', monospace",
-        letterSpacing: '-1px',
+        letterSpacing: '-1.5px',
         fontVariantNumeric: 'tabular-nums',
+        textShadow: positive !== undefined
+          ? (positive
+            ? '0 0 30px rgba(52, 211, 153, 0.2)'
+            : '0 0 30px rgba(248, 113, 113, 0.2)')
+          : 'none',
       }}>
         {displayValue}
       </p>
