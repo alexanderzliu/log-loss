@@ -14,7 +14,15 @@ interface PriceData {
   volume24h: number;
 }
 
-// Cache helper functions
+// --- Cache helpers ---
+// For DexScreener tokens, we use contractAddress as the cache symbol key (globally unique).
+// For CoinGecko/Yahoo, we use the uppercased ticker symbol.
+
+function cacheKey(symbol: string, chain?: string | null, contractAddress?: string | null): string {
+  if (chain && contractAddress) return `${chain}:${contractAddress}`;
+  return symbol;
+}
+
 function getCachedPrice(symbol: string, assetType: string): Record<string, unknown> | undefined {
   return db.prepare(`
     SELECT * FROM price_cache
@@ -23,14 +31,14 @@ function getCachedPrice(symbol: string, assetType: string): Record<string, unkno
   `).get(symbol, assetType) as Record<string, unknown> | undefined;
 }
 
-function cachePrice(symbol: string, assetType: string, priceData: PriceData): string {
+function cachePriceData(key: string, assetType: string, priceData: PriceData): string {
   const now = new Date().toISOString();
   db.prepare(`
     INSERT OR REPLACE INTO price_cache
     (symbol, asset_type, price, change_24h, change_percent_24h, high_24h, low_24h, volume_24h, last_updated)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    symbol,
+    key,
     assetType,
     priceData.price,
     priceData.change24h,
@@ -57,7 +65,8 @@ function formatCachedPrice(cached: Record<string, unknown>, symbol: string, asse
   };
 }
 
-// Common crypto symbol to CoinGecko ID mapping
+// --- CoinGecko ---
+
 const cryptoIdMap: Record<string, string> = {
   BTC: 'bitcoin',
   ETH: 'ethereum',
@@ -81,15 +90,7 @@ const cryptoIdMap: Record<string, string> = {
   OP: 'optimism',
 };
 
-// Fetch crypto price from CoinGecko
-async function fetchCryptoPrice(symbol: string): Promise<{
-  price: number;
-  change24h: number;
-  changePercent24h: number;
-  high24h: number;
-  low24h: number;
-  volume24h: number;
-} | null> {
+async function fetchCryptoPrice(symbol: string): Promise<PriceData | null> {
   try {
     const coinId = cryptoIdMap[symbol.toUpperCase()] || symbol.toLowerCase();
     const response = await fetch(
@@ -117,15 +118,9 @@ async function fetchCryptoPrice(symbol: string): Promise<{
   }
 }
 
-// Fetch stock price from Yahoo Finance (via a free proxy)
-async function fetchStockPrice(symbol: string): Promise<{
-  price: number;
-  change24h: number;
-  changePercent24h: number;
-  high24h: number;
-  low24h: number;
-  volume24h: number;
-} | null> {
+// --- Yahoo Finance ---
+
+async function fetchStockPrice(symbol: string): Promise<PriceData | null> {
   try {
     const response = await fetch(
       `https://query1.finance.yahoo.com/v8/finance/chart/${symbol.toUpperCase()}?interval=1d&range=1d`
@@ -157,10 +152,67 @@ async function fetchStockPrice(symbol: string): Promise<{
   }
 }
 
-// Get or fetch price for a single asset (used by both single and batch endpoints)
-async function getPrice(symbol: string, assetType: string): Promise<{
+// --- DexScreener ---
+
+interface DexScreenerPair {
+  chainId: string;
+  dexId: string;
+  pairAddress: string;
+  baseToken: { address: string; name: string; symbol: string };
+  quoteToken: { address: string; name: string; symbol: string };
+  priceUsd: string;
+  volume: { h24: number; h6: number; h1: number; m5: number };
+  priceChange: { h24: number; h6: number; h1: number; m5: number };
+  liquidity: { usd: number; base: number; quote: number };
+  fdv: number;
+  marketCap: number;
+  info?: { imageUrl?: string };
+}
+
+async function fetchDexScreenerPrice(chain: string, contractAddress: string): Promise<PriceData | null> {
+  try {
+    const response = await fetch(
+      `https://api.dexscreener.com/tokens/v1/${chain}/${contractAddress}`
+    );
+    if (!response.ok) return null;
+
+    const pairs = await response.json() as DexScreenerPair[];
+    if (!pairs || pairs.length === 0) return null;
+
+    // Pick the pair with highest liquidity
+    const best = pairs.reduce((a, b) =>
+      (a.liquidity?.usd || 0) >= (b.liquidity?.usd || 0) ? a : b
+    );
+
+    const priceUsd = parseFloat(best.priceUsd);
+    if (isNaN(priceUsd)) return null;
+
+    return {
+      price: priceUsd,
+      change24h: priceUsd * ((best.priceChange?.h24 || 0) / 100),
+      changePercent24h: best.priceChange?.h24 || 0,
+      high24h: priceUsd,
+      low24h: priceUsd,
+      volume24h: best.volume?.h24 || 0,
+    };
+  } catch (error) {
+    console.error(`DexScreener price error for ${chain}/${contractAddress}:`, error);
+    return null;
+  }
+}
+
+// --- Unified price resolver ---
+
+async function getPrice(
+  symbol: string,
+  assetType: string,
+  chain?: string | null,
+  contractAddress?: string | null,
+): Promise<{
   symbol: string;
   assetType: string;
+  chain?: string | null;
+  contractAddress?: string | null;
   price?: number;
   change24h?: number;
   changePercent24h?: number;
@@ -171,31 +223,105 @@ async function getPrice(symbol: string, assetType: string): Promise<{
   error?: string;
 }> {
   const upperSymbol = symbol.toUpperCase();
+  const key = cacheKey(upperSymbol, chain, contractAddress);
 
   // Check cache first
-  const cached = getCachedPrice(upperSymbol, assetType);
+  const cached = getCachedPrice(key, assetType);
   if (cached) {
-    return formatCachedPrice(cached, upperSymbol, assetType);
+    return { ...formatCachedPrice(cached, upperSymbol, assetType), chain, contractAddress };
   }
 
-  // Fetch fresh data
-  const priceData = assetType === 'crypto'
-    ? await fetchCryptoPrice(upperSymbol)
-    : await fetchStockPrice(upperSymbol);
+  // Fetch from the appropriate provider
+  let priceData: PriceData | null = null;
+
+  if (contractAddress && chain) {
+    priceData = await fetchDexScreenerPrice(chain, contractAddress);
+  } else if (assetType === 'crypto') {
+    priceData = await fetchCryptoPrice(upperSymbol);
+  } else {
+    priceData = await fetchStockPrice(upperSymbol);
+  }
 
   if (!priceData) {
-    return { symbol: upperSymbol, assetType, error: 'Price not found' };
+    return { symbol: upperSymbol, assetType, chain, contractAddress, error: 'Price not found' };
   }
 
-  const lastUpdated = cachePrice(upperSymbol, assetType, priceData);
+  const lastUpdated = cachePriceData(key, assetType, priceData);
 
   return {
     symbol: upperSymbol,
     assetType,
+    chain,
+    contractAddress,
     ...priceData,
     lastUpdated,
   };
 }
+
+// --- Routes ---
+
+// Search tokens via DexScreener (for autocomplete)
+router.get('/search', async (req, res) => {
+  try {
+    const q = req.query.q as string;
+    if (!q || q.length < 2) {
+      return res.json({ tokens: [] });
+    }
+
+    const response = await fetch(
+      `https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(q)}`
+    );
+    if (!response.ok) {
+      return res.json({ tokens: [] });
+    }
+
+    const data = await response.json() as { pairs: DexScreenerPair[] };
+    const pairs = data.pairs || [];
+
+    // Deduplicate by (chain, baseToken.address), keep highest-liquidity pair
+    const tokenMap = new Map<string, {
+      symbol: string;
+      name: string;
+      chain: string;
+      contractAddress: string;
+      priceUsd: string;
+      liquidity: number;
+      volume24h: number;
+      priceChange24h: number;
+      imageUrl: string | null;
+      pairAddress: string;
+    }>();
+
+    for (const pair of pairs) {
+      const key = `${pair.chainId}:${pair.baseToken.address}`;
+      const existing = tokenMap.get(key);
+      if (!existing || (pair.liquidity?.usd || 0) > existing.liquidity) {
+        tokenMap.set(key, {
+          symbol: pair.baseToken.symbol,
+          name: pair.baseToken.name,
+          chain: pair.chainId,
+          contractAddress: pair.baseToken.address,
+          priceUsd: pair.priceUsd,
+          liquidity: pair.liquidity?.usd || 0,
+          volume24h: pair.volume?.h24 || 0,
+          priceChange24h: pair.priceChange?.h24 || 0,
+          imageUrl: pair.info?.imageUrl || null,
+          pairAddress: pair.pairAddress,
+        });
+      }
+    }
+
+    // Sort by liquidity descending, limit to 20
+    const tokens = Array.from(tokenMap.values())
+      .sort((a, b) => b.liquidity - a.liquidity)
+      .slice(0, 20);
+
+    res.json({ tokens });
+  } catch (error) {
+    console.error('Token search error:', error);
+    res.json({ tokens: [] });
+  }
+});
 
 // Get price for a single asset
 router.get('/:assetType/:symbol', async (req, res) => {
@@ -217,7 +343,9 @@ router.get('/:assetType/:symbol', async (req, res) => {
 // Get prices for multiple assets (batch)
 router.post('/batch', async (req, res) => {
   try {
-    const { assets } = req.body as { assets: { symbol: string; assetType: string }[] };
+    const { assets } = req.body as {
+      assets: { symbol: string; assetType: string; chain?: string; contractAddress?: string }[]
+    };
 
     if (!assets || !Array.isArray(assets)) {
       return res.status(400).json({ error: 'Assets array is required' });
@@ -227,7 +355,9 @@ router.post('/batch', async (req, res) => {
     }
 
     const results = await Promise.all(
-      assets.map(({ symbol, assetType }) => getPrice(symbol, assetType))
+      assets.map(({ symbol, assetType, chain, contractAddress }) =>
+        getPrice(symbol, assetType, chain, contractAddress)
+      )
     );
 
     res.json(results);
@@ -241,13 +371,18 @@ router.post('/batch', async (req, res) => {
 router.get('/history/:assetType/:symbol', async (req, res) => {
   try {
     const { assetType, symbol } = req.params;
-    const { days: daysParam = '30' } = req.query;
+    const { days: daysParam = '30', contractAddress } = req.query;
     const upperSymbol = symbol.toUpperCase();
 
     // Validate days parameter
     const days = parseInt(String(daysParam), 10);
     if (isNaN(days) || days < 1 || days > 365) {
       return res.status(400).json({ error: 'Days must be a number between 1 and 365' });
+    }
+
+    // DexScreener tokens: no historical data available
+    if (contractAddress) {
+      return res.json({ symbol: upperSymbol, assetType, history: [], unavailable: true });
     }
 
     if (assetType === 'crypto') {

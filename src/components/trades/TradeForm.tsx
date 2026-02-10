@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useStore } from '../../store/useStore';
+import TokenSearch from './TokenSearch';
 import type { Position, TradeFormData, PositionUpdateData } from '../../types';
 
 interface TradeFormProps {
@@ -25,6 +26,8 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
     stopLoss: position?.stopLoss ?? null,
     takeProfit: position?.takeProfit ?? null,
     hypothesis: position?.hypothesis || '',
+    chain: position?.chain ?? null,
+    contractAddress: position?.contractAddress ?? null,
     notes: isEditing ? (position?.notes || '') : '',
     positionId: isClosing ? position?.id : undefined,
   });
@@ -233,7 +236,16 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
                   <select
                     name="assetType"
                     value={formData.assetType}
-                    onChange={handleChange}
+                    onChange={(e) => {
+                      const newType = e.target.value as 'crypto' | 'stock';
+                      setFormData((prev) => ({
+                        ...prev,
+                        assetType: newType,
+                        // Clear chain/contractAddress when switching to stock
+                        chain: newType === 'stock' ? null : prev.chain,
+                        contractAddress: newType === 'stock' ? null : prev.contractAddress,
+                      }));
+                    }}
                     disabled={isClosing}
                     className="w-full disabled:opacity-50"
                   >
@@ -245,16 +257,28 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
                   <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
                     Symbol
                   </label>
-                  <input
-                    type="text"
-                    name="symbol"
-                    value={formData.symbol}
-                    onChange={handleChange}
-                    disabled={isClosing}
-                    placeholder="e.g., BTC, AAPL"
-                    className="w-full uppercase disabled:opacity-50"
-                    required
-                  />
+                  {formData.assetType === 'crypto' && !isClosing ? (
+                    <TokenSearch
+                      value={formData.symbol}
+                      chain={formData.chain ?? null}
+                      contractAddress={formData.contractAddress ?? null}
+                      disabled={isClosing}
+                      onChange={({ symbol, chain, contractAddress }) => {
+                        setFormData((prev) => ({ ...prev, symbol, chain, contractAddress }));
+                      }}
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      name="symbol"
+                      value={formData.symbol}
+                      onChange={handleChange}
+                      disabled={isClosing}
+                      placeholder={formData.assetType === 'stock' ? 'e.g., AAPL' : 'e.g., BTC'}
+                      className="w-full uppercase disabled:opacity-50"
+                      required
+                    />
+                  )}
                 </div>
               </div>
 

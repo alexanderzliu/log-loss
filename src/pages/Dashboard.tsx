@@ -1,9 +1,10 @@
 import { Fragment, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { RefreshCw, ArrowUpRight, ArrowDownRight, ChevronDown, ChevronRight } from 'lucide-react';
-import { formatCurrency, formatPercent, formatQuantity } from '../utils/format';
+import { formatCurrency, formatPercent, formatQuantity, formatPrice } from '../utils/format';
 import { tableHeaderStyle, tableCellStyle } from '../utils/styles';
 import { calculateUnrealizedPnl } from '../utils/aggregatePositions';
+import { priceKey as getPriceKey } from '../utils/priceKey';
 import { useAnimatedNumber } from '../hooks/useAnimatedNumber';
 import { useSetToggle } from '../hooks/useSetToggle';
 import PageTransition from '../components/PageTransition';
@@ -33,8 +34,7 @@ export default function Dashboard() {
   const openPositions = positions.filter((p) => p.status === 'open');
 
   const unrealizedPnl = openPositions.reduce((total, pos) => {
-    const priceKey = `${pos.symbol}-${pos.assetType}`;
-    const currentPrice = prices[priceKey]?.price;
+    const currentPrice = prices[getPriceKey(pos)]?.price;
     const { pnl } = calculateUnrealizedPnl(pos, currentPrice);
     return total + (pnl ?? 0);
   }, 0);
@@ -202,9 +202,9 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {openPositions.map((position, idx) => {
-                    const priceKey = `${position.symbol}-${position.assetType}`;
-                    const currentPrice = prices[priceKey]?.price;
-                    const priceChange = prices[priceKey]?.changePercent24h;
+                    const pk = getPriceKey(position);
+                    const currentPrice = prices[pk]?.price;
+                    const priceChange = prices[pk]?.changePercent24h;
                     const { pnl, pnlPercent } = calculateUnrealizedPnl(position, currentPrice);
                     const value = currentPrice
                       ? currentPrice * position.remainingQuantity
@@ -249,8 +249,21 @@ export default function Dashboard() {
                                 <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
                                   {position.symbol}
                                 </div>
-                                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                                  {hasMultipleLots
+                                <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  {position.chain ? (
+                                    <>
+                                      <span style={{
+                                        fontSize: '10px', padding: '1px 5px', borderRadius: '4px',
+                                        background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                                        textTransform: 'capitalize',
+                                      }}>
+                                        {position.chain}
+                                      </span>
+                                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px' }}>
+                                        {position.contractAddress?.slice(0, 6)}...{position.contractAddress?.slice(-4)}
+                                      </span>
+                                    </>
+                                  ) : hasMultipleLots
                                     ? `${buyExecutions.length} entries`
                                     : position.assetType}
                                 </div>
@@ -258,11 +271,11 @@ export default function Dashboard() {
                             </div>
                           </td>
                           <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontVariantNumeric: 'tabular-nums' }}>
-                            {formatCurrency(position.avgEntryPrice)}
+                            {formatPrice(position.avgEntryPrice)}
                           </td>
                           <td style={{ ...tdStyle, textAlign: 'right' }}>
                             <div style={{ fontFamily: "'DM Mono', monospace", color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
-                              {currentPrice ? formatCurrency(currentPrice) : '—'}
+                              {currentPrice ? formatPrice(currentPrice) : '—'}
                             </div>
                             {priceChange !== undefined && (
                               <div style={{
@@ -333,7 +346,7 @@ export default function Dashboard() {
                                 </div>
                               </td>
                               <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                {formatCurrency(exec.price)}
+                                {formatPrice(exec.price)}
                               </td>
                               <td style={{ ...tdStyle, textAlign: 'right' }}>
                                 {/* Empty for entries */}

@@ -33,6 +33,8 @@ export interface Position {
   notes: string;
   openedAt: string;
   closedAt: string | null;
+  chain: string | null;
+  contractAddress: string | null;
   createdAt: string;
   updatedAt: string;
   executions: Execution[];
@@ -49,6 +51,8 @@ export interface TradeFormData {
   takeProfit: number | null;
   hypothesis: string;
   notes: string;
+  chain?: string | null;
+  contractAddress?: string | null;
   positionId?: string;
 }
 
@@ -68,7 +72,22 @@ export interface PriceData {
   high24h: number;
   low24h: number;
   volume24h: number;
+  chain?: string | null;
+  contractAddress?: string | null;
   lastUpdated: string;
+}
+
+export interface DexScreenerToken {
+  symbol: string;
+  name: string;
+  chain: string;
+  contractAddress: string;
+  priceUsd: string;
+  liquidity: number;
+  volume24h: number;
+  priceChange24h: number;
+  imageUrl: string | null;
+  pairAddress: string;
 }
 
 export interface PriceHistory {

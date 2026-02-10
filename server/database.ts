@@ -78,6 +78,9 @@ export function initDatabase() {
   // Migrate from old trades table if it exists
   migrateFromTrades();
 
+  // Add chain/contract_address support for DexScreener tokens
+  migrateAddChainColumns();
+
   console.log('Database initialized successfully');
 }
 
@@ -246,4 +249,17 @@ function migrateFromTrades() {
   const migratedPositions = db.prepare('SELECT COUNT(*) as count FROM positions').get() as { count: number };
   const migratedExecutions = db.prepare('SELECT COUNT(*) as count FROM executions').get() as { count: number };
   console.log(`Migration complete: ${migratedPositions.count} positions, ${migratedExecutions.count} executions`);
+}
+
+function migrateAddChainColumns() {
+  // Add chain and contract_address columns to positions (idempotent via try/catch)
+  const columns = db.prepare('PRAGMA table_info(positions)').all() as { name: string }[];
+  const columnNames = columns.map(c => c.name);
+
+  if (!columnNames.includes('chain')) {
+    db.exec('ALTER TABLE positions ADD COLUMN chain TEXT DEFAULT NULL');
+    db.exec('ALTER TABLE positions ADD COLUMN contract_address TEXT DEFAULT NULL');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_positions_chain_address ON positions(chain, contract_address)');
+    console.log('Added chain/contract_address columns to positions');
+  }
 }

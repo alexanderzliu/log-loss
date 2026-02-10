@@ -23,6 +23,8 @@ function rowToPosition(row: Record<string, unknown>): Position {
     takeProfit: row.take_profit as number | null,
     hypothesis: row.hypothesis as string,
     notes: row.notes as string,
+    chain: (row.chain as string) || null,
+    contractAddress: (row.contract_address as string) || null,
     openedAt: row.opened_at as string,
     closedAt: row.closed_at as string | null,
     createdAt: row.created_at as string,
@@ -236,7 +238,7 @@ router.get('/:id', (req, res) => {
 // POST / - Create trade (auto-joins existing position or creates new one)
 router.post('/', (req, res) => {
   try {
-    const { assetType, symbol, side, date, price, quantity, stopLoss, takeProfit, hypothesis, notes, positionId } = req.body;
+    const { assetType, symbol, side, date, price, quantity, stopLoss, takeProfit, hypothesis, notes, positionId, chain, contractAddress } = req.body;
 
     // Validate required fields
     if (!symbol || typeof symbol !== 'string') {
@@ -263,11 +265,12 @@ router.post('/', (req, res) => {
 
     const createTrade = db.transaction(() => {
       if (side === 'buy') {
-        // Check for existing open position for this symbol
+        // Check for existing open position for this symbol + chain + address
         const existingPosition = db.prepare(`
           SELECT id FROM positions
           WHERE symbol = ? AND asset_type = ? AND status = 'open'
-        `).get(upperSymbol, assetType) as { id: string } | undefined;
+            AND chain IS ? AND contract_address IS ?
+        `).get(upperSymbol, assetType, chain || null, contractAddress || null) as { id: string } | undefined;
 
         let posId: string;
 
@@ -285,8 +288,8 @@ router.post('/', (req, res) => {
           if (stopLoss !== undefined || takeProfit !== undefined || hypothesis !== undefined) {
             const updates: string[] = [];
             const updateParams: unknown[] = [];
-            if (stopLoss !== undefined) { updates.push('stop_loss = ?'); updateParams.push(stopLoss || null); }
-            if (takeProfit !== undefined) { updates.push('take_profit = ?'); updateParams.push(takeProfit || null); }
+            if (stopLoss !== undefined) { updates.push('stop_loss = ?'); updateParams.push(stopLoss ?? null); }
+            if (takeProfit !== undefined) { updates.push('take_profit = ?'); updateParams.push(takeProfit ?? null); }
             if (hypothesis !== undefined) { updates.push('hypothesis = ?'); updateParams.push(hypothesis || ''); }
             if (updates.length > 0) {
               updates.push("updated_at = datetime('now')");
@@ -306,13 +309,15 @@ router.post('/', (req, res) => {
               total_quantity, remaining_quantity, avg_entry_price, total_cost_basis,
               realized_pnl, realized_pnl_percent,
               stop_loss, take_profit, hypothesis, notes,
+              chain, contract_address,
               opened_at
-            ) VALUES (?, ?, ?, 'long', 'open', ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, 'long', 'open', ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?, ?, ?, ?)
           `).run(
             posId, assetType, upperSymbol,
             quantity, quantity, price, price * quantity,
-            stopLoss || null, takeProfit || null,
+            stopLoss ?? null, takeProfit ?? null,
             hypothesis || '', notes || '',
+            chain || null, contractAddress || null,
             date
           );
 

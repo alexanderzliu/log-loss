@@ -1,7 +1,8 @@
 import { Fragment, useState } from 'react';
 import type { Position } from '../../types';
 import { useStore } from '../../store/useStore';
-import { formatCurrency, formatQuantity, formatDate } from '../../utils/format';
+import { formatCurrency, formatPrice, formatQuantity, formatDate } from '../../utils/format';
+import { priceKey as getPriceKey } from '../../utils/priceKey';
 import { calculateUnrealizedPnl } from '../../utils/aggregatePositions';
 import { tableHeaderStyle, tableCellStyle } from '../../utils/styles';
 import { useSetToggle } from '../../hooks/useSetToggle';
@@ -65,8 +66,8 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
           {positions.map((position, posIdx) => {
             const isExpanded = expandedPositions.has(position.id);
             const isOpen = position.status === 'open';
-            const priceKey = `${position.symbol}-${position.assetType}`;
-            const currentPrice = prices[priceKey]?.price;
+            const pk = getPriceKey(position);
+            const currentPrice = prices[pk]?.price;
 
             let displayPnl: number | null = position.realizedPnl;
             let displayPnlPercent: number | null = position.realizedPnlPercent;
@@ -112,11 +113,25 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
                         {position.symbol.slice(0, 2)}
                       </div>
                       <div>
-                        <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
-                          {position.symbol}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                            {position.symbol}
+                          </span>
+                          {position.chain && (
+                            <span style={{
+                              fontSize: '10px', padding: '1px 6px', borderRadius: '4px',
+                              background: 'var(--bg-elevated)', color: 'var(--text-muted)',
+                              border: '1px solid var(--border)', textTransform: 'capitalize',
+                            }}>
+                              {position.chain}
+                            </span>
+                          )}
                         </div>
                         <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
-                          {position.assetType} · {position.executions.length} execution{position.executions.length !== 1 ? 's' : ''}
+                          {position.contractAddress
+                            ? `${position.contractAddress.slice(0, 6)}...${position.contractAddress.slice(-4)}`
+                            : position.assetType
+                          } · {position.executions.length} execution{position.executions.length !== 1 ? 's' : ''}
                         </div>
                       </div>
                     </div>
@@ -127,7 +142,7 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
                     </span>
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace" }}>
-                    {formatCurrency(position.avgEntryPrice)}
+                    {formatPrice(position.avgEntryPrice)}
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace" }}>
                     {isOpen
@@ -212,7 +227,7 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
                           </span>
                           <div>
                             <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                              {formatCurrency(exec.price)} × {formatQuantity(exec.quantity)}
+                              {formatPrice(exec.price)} × {formatQuantity(exec.quantity)}
                             </div>
                             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                               {formatDate(exec.executedAt)}
@@ -226,7 +241,7 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
                         </span>
                       </td>
                       <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontSize: '13px', color: 'var(--text-secondary)' }}>
-                        {formatCurrency(exec.price)}
+                        {formatPrice(exec.price)}
                       </td>
                       <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontSize: '13px', color: 'var(--text-secondary)' }}>
                         {formatQuantity(exec.quantity)}

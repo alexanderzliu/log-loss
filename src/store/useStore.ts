@@ -2,13 +2,14 @@ import { create } from 'zustand';
 import type { Position, PriceData, PortfolioSummary, AssetType, TradeFormData, PositionUpdateData } from '../types';
 import * as positionsApi from '../api/positions';
 import * as pricesApi from '../api/prices';
+import { priceKey } from '../utils/priceKey';
 
 // Extract unique assets from open positions
-function getUniqueOpenAssets(positions: Position[]): { symbol: string; assetType: AssetType }[] {
+function getUniqueOpenAssets(positions: Position[]): { symbol: string; assetType: AssetType; chain?: string | null; contractAddress?: string | null }[] {
   const open = positions.filter((p) => p.status === 'open');
-  const assets = open.map((p) => ({ symbol: p.symbol, assetType: p.assetType }));
+  const assets = open.map((p) => ({ symbol: p.symbol, assetType: p.assetType, chain: p.chain, contractAddress: p.contractAddress }));
   return Array.from(
-    new Map(assets.map((a) => [`${a.symbol}-${a.assetType}`, a])).values()
+    new Map(assets.map((a) => [priceKey(a), a])).values()
   );
 }
 
@@ -35,7 +36,7 @@ interface StoreState {
   deletePosition: (id: string) => Promise<void>;
   deleteExecution: (positionId: string, executionId: string) => Promise<void>;
   fetchPortfolioSummary: () => Promise<void>;
-  fetchPrices: (assets: { symbol: string; assetType: 'crypto' | 'stock' }[]) => Promise<void>;
+  fetchPrices: (assets: { symbol: string; assetType: AssetType; chain?: string | null; contractAddress?: string | null }[]) => Promise<void>;
   refreshPrices: () => Promise<void>;
 }
 
@@ -130,7 +131,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const pricesMap = { ...get().prices };
       priceData.forEach((p) => {
         if (!('error' in p)) {
-          pricesMap[`${p.symbol}-${p.assetType}`] = p;
+          pricesMap[priceKey(p)] = p;
         }
       });
       set({ prices: pricesMap, pricesLoading: false });

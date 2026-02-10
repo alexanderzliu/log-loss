@@ -294,3 +294,7 @@ input:focus, select:focus, textarea:focus {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.4; transform: scale(1.8); }
 }
+
+@keyframes spin {
+  to { transform: translateY(-50%) rotate(360deg); }
+}
