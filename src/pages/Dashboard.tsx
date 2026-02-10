@@ -55,6 +55,8 @@ export default function Dashboard() {
 
   const unrealizedPnlPercent = totalInvested > 0 ? (unrealizedPnl / totalInvested) * 100 : 0;
   const totalPnl = (portfolioSummary?.realizedPnl || 0) + unrealizedPnl;
+  const totalCostBasis = portfolioSummary?.totalCostBasis || 0;
+  const totalPnlPercent = totalCostBasis > 0 ? (totalPnl / totalCostBasis) * 100 : 0;
 
   const animatedPortfolioValue = useAnimatedNumber(totalInvested + unrealizedPnl);
   const animatedTotalPnl = useAnimatedNumber(totalPnl);
@@ -102,7 +104,7 @@ export default function Dashboard() {
                 fontWeight: 600,
                 fontVariantNumeric: 'tabular-nums',
               }}>
-                {animatedTotalPnl >= 0 ? '+' : ''}{formatCurrency(animatedTotalPnl)} ({formatPercent(unrealizedPnlPercent)})
+                {animatedTotalPnl >= 0 ? '+' : ''}{formatCurrency(animatedTotalPnl)} ({formatPercent(totalPnlPercent)})
               </span>
             </div>
             <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>All time</span>

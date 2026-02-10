@@ -201,10 +201,13 @@ router.get('/stats/summary', (req, res) => {
       ? (pnlStats.total_pnl / closedPositionsCost.total) * 100
       : 0;
 
+    const totalCostBasis = openPositionsCost.total + closedPositionsCost.total;
+
     res.json({
       openPositionsCost: openPositionsCost.total,
       realizedPnl: pnlStats.total_pnl,
       realizedPnlPercent,
+      totalCostBasis,
       openPositions: openCount.count,
       closedPositions: closedCount.count,
       winRate,

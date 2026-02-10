@@ -80,6 +80,7 @@ export interface PortfolioSummary {
   openPositionsCost: number;
   realizedPnl: number;
   realizedPnlPercent: number;
+  totalCostBasis: number;
   openPositions: number;
   closedPositions: number;
   winRate: number;
