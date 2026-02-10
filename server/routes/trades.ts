@@ -283,10 +283,22 @@ router.put('/:id', (req, res) => {
       pnlPercent = entryPrice > 0 ? ((exitPrice - entryPrice) / entryPrice) * 100 : 0;
     }
 
+    // If editing a buy trade's quantity, update remaining_quantity accordingly
+    let remainingQuantity = req.body.remainingQuantity;
+    if (side === 'buy') {
+      const existing = db.prepare('SELECT quantity, remaining_quantity FROM trades WHERE id = ?').get(id) as { quantity: number; remaining_quantity: number | null } | undefined;
+      if (existing) {
+        const oldQty = existing.quantity;
+        const oldRemaining = existing.remaining_quantity ?? oldQty;
+        const alreadySold = oldQty - oldRemaining;
+        remainingQuantity = Math.max(0, quantity - alreadySold);
+      }
+    }
+
     const stmt = db.prepare(`
       UPDATE trades SET
         asset_type = ?, symbol = ?, side = ?, entry_date = ?, entry_price = ?,
-        quantity = ?, stop_loss = ?, take_profit = ?, hypothesis = ?, status = ?,
+        quantity = ?, remaining_quantity = ?, stop_loss = ?, take_profit = ?, hypothesis = ?, status = ?,
         exit_date = ?, exit_price = ?, pnl = ?, pnl_percent = ?, notes = ?,
         updated_at = datetime('now')
       WHERE id = ?
@@ -299,6 +311,7 @@ router.put('/:id', (req, res) => {
       entryDate,
       entryPrice,
       quantity,
+      remainingQuantity ?? null,
       stopLoss || null,
       takeProfit || null,
       hypothesis || '',
