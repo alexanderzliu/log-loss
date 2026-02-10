@@ -60,7 +60,26 @@ export default function Dashboard() {
     <PageTransition>
       <div style={{ maxWidth: '1200px' }}>
         {/* Portfolio Value Header */}
-        <div style={{ marginBottom: '56px' }}>
+        <div style={{
+          marginBottom: '56px',
+          padding: '32px',
+          borderRadius: '24px',
+          background: 'var(--gradient-card)',
+          border: '1px solid var(--border)',
+          position: 'relative',
+          overflow: 'hidden',
+        }}>
+          {/* Atmospheric glow */}
+          <div style={{
+            position: 'absolute',
+            top: '-40px',
+            right: '-40px',
+            width: '200px',
+            height: '200px',
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%)',
+            pointerEvents: 'none',
+          }} />
           <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>
             Total Portfolio Value
           </p>
@@ -80,9 +99,10 @@ export default function Dashboard() {
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              padding: '6px 12px',
-              borderRadius: '8px',
-              background: totalPnl >= 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+              padding: '6px 14px',
+              borderRadius: '9999px',
+              background: totalPnl >= 0 ? 'rgba(52, 211, 153, 0.1)' : 'rgba(248, 113, 113, 0.1)',
+              border: `1px solid ${totalPnl >= 0 ? 'rgba(52, 211, 153, 0.2)' : 'rgba(248, 113, 113, 0.2)'}`,
             }}>
               {totalPnl >= 0 ? (
                 <ArrowUpRight size={18} style={{ color: 'var(--profit)' }} />
@@ -107,8 +127,8 @@ export default function Dashboard() {
           <div className="card" style={{
             padding: '16px 24px',
             marginBottom: '20px',
-            background: 'rgba(239, 68, 68, 0.08)',
-            border: '1px solid rgba(239, 68, 68, 0.2)',
+            background: 'rgba(248, 113, 113, 0.06)',
+            border: '1px solid rgba(248, 113, 113, 0.15)',
             color: 'var(--loss)',
             fontSize: '14px',
           }}>
@@ -234,8 +254,9 @@ export default function Dashboard() {
                               <div style={{
                                 width: '40px',
                                 height: '40px',
-                                borderRadius: '10px',
-                                background: 'var(--bg-elevated)',
+                                borderRadius: '12px',
+                                background: 'linear-gradient(135deg, var(--bg-elevated), var(--bg-hover))',
+                                border: '1px solid var(--border)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -419,24 +440,29 @@ function StatCard({
     ? (positive ? 'var(--profit)' : 'var(--loss)')
     : 'var(--text-primary)';
 
+  const gradientClass = positive !== undefined
+    ? (positive ? 'stat-gradient-profit' : 'stat-gradient-loss')
+    : 'stat-gradient-neutral';
+
   return (
-    <div className="card" style={{
+    <div className={`card ${gradientClass}`} style={{
       padding: '28px',
       position: 'relative',
       overflow: 'hidden',
       ...style,
     }}>
-      {/* Subtle gradient accent for positive/negative */}
+      {/* Left-side stripe */}
       {positive !== undefined && (
         <div style={{
           position: 'absolute',
-          top: 0,
+          top: '16px',
           left: 0,
-          right: 0,
-          height: '3px',
+          bottom: '16px',
+          width: '3px',
+          borderRadius: '0 3px 3px 0',
           background: positive
-            ? 'linear-gradient(90deg, var(--profit), transparent)'
-            : 'linear-gradient(90deg, var(--loss), transparent)',
+            ? 'var(--profit)'
+            : 'var(--loss)',
         }} />
       )}
       <p style={{

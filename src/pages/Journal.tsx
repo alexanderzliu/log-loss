@@ -84,15 +84,15 @@ export default function Journal() {
               onClick={() => setFilter(f.key as typeof filter)}
               style={{
                 padding: '10px 18px',
-                borderRadius: '10px',
-                border: filter === f.key ? '1px solid var(--border-light)' : '1px solid transparent',
-                background: filter === f.key ? 'rgba(255, 255, 255, 0.06)' : 'transparent',
-                color: filter === f.key ? 'var(--text-primary)' : 'var(--text-muted)',
+                borderRadius: '9999px',
+                border: filter === f.key ? '1px solid var(--border-accent)' : '1px solid transparent',
+                background: filter === f.key ? 'var(--accent-soft)' : 'transparent',
+                color: filter === f.key ? 'var(--accent)' : 'var(--text-muted)',
                 fontSize: '14px',
                 fontWeight: 500,
                 cursor: 'pointer',
                 fontFamily: 'inherit',
-                transition: 'all 0.2s ease',
+                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
               }}
             >
               {f.label} <span style={{ opacity: 0.6, marginLeft: '4px' }}>{f.count}</span>
@@ -104,7 +104,7 @@ export default function Journal() {
         <div style={{
           display: 'flex',
           background: 'var(--bg-tertiary)',
-          borderRadius: '10px',
+          borderRadius: '12px',
           padding: '4px',
           gap: '4px',
         }}>
@@ -117,7 +117,7 @@ export default function Journal() {
               justifyContent: 'center',
               width: '36px',
               height: '32px',
-              borderRadius: '8px',
+              borderRadius: '10px',
               border: 'none',
               background: viewMode === 'positions' ? 'var(--bg-elevated)' : 'transparent',
               color: viewMode === 'positions' ? 'var(--text-primary)' : 'var(--text-muted)',
@@ -136,7 +136,7 @@ export default function Journal() {
               justifyContent: 'center',
               width: '36px',
               height: '32px',
-              borderRadius: '8px',
+              borderRadius: '10px',
               border: 'none',
               background: viewMode === 'executions' ? 'var(--bg-elevated)' : 'transparent',
               color: viewMode === 'executions' ? 'var(--text-primary)' : 'var(--text-muted)',

@@ -101,8 +101,9 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
                       <div style={{
                         width: '40px',
                         height: '40px',
-                        borderRadius: '10px',
-                        background: 'var(--bg-elevated)',
+                        borderRadius: '12px',
+                        background: 'linear-gradient(135deg, var(--bg-elevated), var(--bg-hover))',
+                        border: '1px solid var(--border)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -296,4 +297,3 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
 
 const thStyle = { ...tableHeaderStyle, padding: '18px 24px' };
 const tdStyle = { ...tableCellStyle, padding: '16px 24px' };
-

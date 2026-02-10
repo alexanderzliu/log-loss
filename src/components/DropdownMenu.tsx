@@ -17,7 +17,7 @@ export default function DropdownMenu({ isOpen, onToggle, onClose, children }: Dr
           background: 'transparent',
           border: 'none',
           padding: '6px',
-          borderRadius: '6px',
+          borderRadius: '8px',
           cursor: 'pointer',
           color: 'var(--text-muted)'
         }}
@@ -39,7 +39,7 @@ export default function DropdownMenu({ isOpen, onToggle, onClose, children }: Dr
             background: 'var(--dropdown-bg)',
             backdropFilter: 'blur(12px)',
             border: '1px solid var(--border-light)',
-            borderRadius: '12px',
+            borderRadius: '14px',
             zIndex: 20,
             padding: '6px',
             boxShadow: 'var(--dropdown-shadow)'

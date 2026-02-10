@@ -93,7 +93,7 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
     <div
       className="fixed inset-0 flex items-center justify-center z-50 p-6"
       style={{
-        background: 'rgba(0, 0, 0, 0.7)',
+        background: 'var(--overlay-bg)',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
         animation: 'overlayIn 0.25s ease-out',
@@ -106,8 +106,8 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
           background: 'var(--bg-surface)',
           borderRadius: '20px',
           border: '1px solid var(--border-light)',
-          boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.03)',
-          animation: 'modalIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+          boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.6), 0 0 40px rgba(16, 185, 129, 0.04), 0 0 0 1px rgba(255,255,255,0.03)',
+          animation: 'modalIn 0.35s var(--spring)',
         }}
       >
         {/* Accent bar */}
@@ -128,11 +128,11 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
             <div style={{
               width: '36px',
               height: '36px',
-              borderRadius: '10px',
+              borderRadius: '12px',
               background: isClosing
-                ? 'rgba(239, 68, 68, 0.1)'
+                ? 'rgba(248, 113, 113, 0.1)'
                 : 'var(--accent-glow)',
-              border: `1px solid ${isClosing ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.15)'}`,
+              border: `1px solid ${isClosing ? 'rgba(248, 113, 113, 0.2)' : 'rgba(16, 185, 129, 0.15)'}`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -155,7 +155,7 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
             style={{
               width: '32px',
               height: '32px',
-              borderRadius: '8px',
+              borderRadius: '10px',
               background: 'var(--bg-elevated)',
               border: '1px solid var(--border)',
               display: 'flex',
@@ -182,10 +182,10 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
           {error && (
             <div style={{
               padding: '10px 14px',
-              borderRadius: '10px',
+              borderRadius: '12px',
               fontSize: '13px',
-              background: 'rgba(239, 68, 68, 0.08)',
-              border: '1px solid rgba(239, 68, 68, 0.15)',
+              background: 'rgba(248, 113, 113, 0.06)',
+              border: '1px solid rgba(248, 113, 113, 0.12)',
               color: 'var(--loss)',
               marginBottom: '16px',
             }}>
@@ -196,7 +196,7 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
           {isClosing && (
             <div style={{
               padding: '10px 14px',
-              borderRadius: '10px',
+              borderRadius: '12px',
               fontSize: '13px',
               background: 'rgba(59, 130, 246, 0.08)',
               border: '1px solid rgba(59, 130, 246, 0.15)',
@@ -273,8 +273,8 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
                       display: 'flex',
                       gap: '2px',
                       padding: '3px',
-                      borderRadius: '10px',
-                      background: 'rgba(26, 26, 36, 0.6)',
+                      borderRadius: '12px',
+                      background: 'var(--bg-elevated)',
                       border: '1px solid var(--border)',
                     }}>
                       {(['crypto', 'stock'] as const).map((type) => (
@@ -291,7 +291,7 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
                           style={{
                             flex: 1,
                             padding: '8px 12px',
-                            borderRadius: '8px',
+                            borderRadius: '10px',
                             fontSize: '13px',
                             fontWeight: 500,
                             fontFamily: 'inherit',
@@ -348,8 +348,8 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
                   display: 'flex',
                   gap: '3px',
                   padding: '3px',
-                  borderRadius: '10px',
-                  background: 'rgba(26, 26, 36, 0.6)',
+                  borderRadius: '12px',
+                  background: 'var(--bg-elevated)',
                   border: '1px solid var(--border)',
                 }}>
                   <button
@@ -359,7 +359,7 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
                     style={{
                       flex: 1,
                       padding: '10px',
-                      borderRadius: '8px',
+                      borderRadius: '10px',
                       fontWeight: 600,
                       fontSize: '13px',
                       fontFamily: 'inherit',
@@ -373,13 +373,13 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
                       justifyContent: 'center',
                       gap: '6px',
                       background: formData.side === 'buy'
-                        ? 'rgba(16, 185, 129, 0.15)'
+                        ? 'rgba(52, 211, 153, 0.12)'
                         : 'transparent',
                       color: formData.side === 'buy'
                         ? 'var(--profit)'
                         : 'var(--text-muted)',
                       boxShadow: formData.side === 'buy'
-                        ? 'inset 0 0 0 1px rgba(16, 185, 129, 0.25)'
+                        ? 'inset 0 0 0 1px rgba(52, 211, 153, 0.2)'
                         : 'none',
                     }}
                   >
@@ -393,7 +393,7 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
                     style={{
                       flex: 1,
                       padding: '10px',
-                      borderRadius: '8px',
+                      borderRadius: '10px',
                       fontWeight: 600,
                       fontSize: '13px',
                       fontFamily: 'inherit',
@@ -407,13 +407,13 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
                       justifyContent: 'center',
                       gap: '6px',
                       background: formData.side === 'sell'
-                        ? 'rgba(239, 68, 68, 0.15)'
+                        ? 'rgba(248, 113, 113, 0.12)'
                         : 'transparent',
                       color: formData.side === 'sell'
                         ? 'var(--loss)'
                         : 'var(--text-muted)',
                       boxShadow: formData.side === 'sell'
-                        ? 'inset 0 0 0 1px rgba(239, 68, 68, 0.25)'
+                        ? 'inset 0 0 0 1px rgba(248, 113, 113, 0.2)'
                         : 'none',
                     }}
                   >
@@ -469,7 +469,7 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     padding: '10px 14px',
-                    borderRadius: '8px',
+                    borderRadius: '10px',
                     background: 'var(--bg-elevated)',
                     border: '1px solid var(--border)',
                   }}>
@@ -559,7 +559,7 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
               className="btn-primary flex-1"
               style={isClosing ? {
                 background: 'linear-gradient(135deg, var(--loss) 0%, #dc2626 100%)',
-                boxShadow: '0 2px 12px rgba(239, 68, 68, 0.2)',
+                boxShadow: '0 2px 12px rgba(248, 113, 113, 0.2)',
               } : {}}
             >
               {loading ? 'Saving...' : isClosing ? 'Close Position' : isEditing ? 'Update Position' : 'Add Trade'}
@@ -582,7 +582,7 @@ function FieldSection({ label, icon, children }: {
   return (
     <div style={{
       padding: '14px',
-      borderRadius: '14px',
+      borderRadius: '16px',
       background: 'rgba(255, 255, 255, 0.02)',
       border: '1px solid var(--border)',
       display: 'flex',

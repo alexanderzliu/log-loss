@@ -18,7 +18,7 @@ export default function ConfirmDialog({ title, message, onConfirm, onCancel }: C
       zIndex: 50,
       animation: 'overlayIn 0.25s ease-out',
     }}>
-      <div className="card" style={{ padding: '24px', maxWidth: '400px', width: '100%', margin: '16px', animation: 'modalIn 0.3s ease-out' }}>
+      <div className="card" style={{ padding: '24px', maxWidth: '400px', width: '100%', margin: '16px', animation: 'modalIn 0.35s var(--spring)' }}>
         <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>
           {title}
         </h3>
@@ -33,7 +33,7 @@ export default function ConfirmDialog({ title, message, onConfirm, onCancel }: C
             onClick={onConfirm}
             style={{
               padding: '10px 20px',
-              borderRadius: '8px',
+              borderRadius: 'var(--radius-btn)',
               border: 'none',
               background: 'var(--loss)',
               color: '#fff',

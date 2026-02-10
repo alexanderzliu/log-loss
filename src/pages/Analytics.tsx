@@ -127,7 +127,7 @@ export default function Analytics() {
             fontWeight: 500,
             color: 'var(--text-muted)',
             textTransform: 'uppercase',
-            letterSpacing: '0.8px',
+            letterSpacing: '1px',
             marginBottom: '12px',
           }}>
             Your Assets
@@ -142,11 +142,12 @@ export default function Analytics() {
                   onClick={() => handleAssetClick(symbol, assetType)}
                   style={{
                     padding: '10px 16px',
-                    borderRadius: '10px',
-                    border: isSelected ? '1px solid var(--accent)' : '1px solid var(--border)',
-                    background: isSelected ? 'var(--accent-glow)' : 'transparent',
+                    borderRadius: '16px',
+                    border: isSelected ? '1px solid var(--border-accent)' : '1px solid var(--border)',
+                    background: isSelected ? 'var(--gradient-card)' : 'transparent',
+                    boxShadow: isSelected ? 'var(--shadow-glow)' : 'none',
                     cursor: 'pointer',
-                    transition: 'all 0.2s ease',
+                    transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
                     fontFamily: 'inherit',
                     textAlign: 'left',
                   }}
@@ -190,7 +191,7 @@ export default function Analytics() {
                   fontSize: '11px',
                   padding: '4px 10px',
                   background: 'var(--bg-elevated)',
-                  borderRadius: '6px',
+                  borderRadius: '9999px',
                   textTransform: 'uppercase',
                   color: 'var(--text-muted)',
                   fontWeight: 500,
@@ -235,14 +236,14 @@ export default function Analytics() {
                   style={{
                     padding: '8px 14px',
                     fontSize: '13px',
-                    borderRadius: '8px',
-                    border: timeRange === days ? '1px solid var(--accent)' : '1px solid var(--border)',
-                    background: timeRange === days ? 'var(--accent-glow)' : 'transparent',
+                    borderRadius: '9999px',
+                    border: timeRange === days ? '1px solid var(--border-accent)' : '1px solid var(--border)',
+                    background: timeRange === days ? 'var(--accent-soft)' : 'transparent',
                     color: timeRange === days ? 'var(--accent)' : 'var(--text-muted)',
                     cursor: 'pointer',
                     fontWeight: 500,
                     fontFamily: 'inherit',
-                    transition: 'all 0.2s ease',
+                    transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                 >
                   {days}D
@@ -275,7 +276,7 @@ export default function Analytics() {
                 <Tooltip
                   formatter={(value) => [formatCurrency(value as number), 'Price']}
                   contentStyle={{
-                    borderRadius: '10px',
+                    borderRadius: '12px',
                     border: '1px solid var(--border-light)',
                     background: 'var(--dropdown-bg)',
                     backdropFilter: 'blur(12px)',
@@ -356,11 +357,23 @@ export default function Analytics() {
       {/* Empty State */}
       {!selectedSymbol && trackedAssets.length === 0 && (
         <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-          <Search style={{ margin: '0 auto 16px', color: 'var(--text-muted)' }} size={48} />
+          <div style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '16px',
+            background: 'var(--accent-soft)',
+            border: '1px solid var(--border-accent)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 16px',
+          }}>
+            <Search style={{ color: 'var(--accent)' }} size={28} />
+          </div>
           <h3 style={{ fontSize: '18px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '8px' }}>
             Search for an asset
           </h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '14px', maxWidth: '320px', margin: '0 auto' }}>
             Enter a symbol above to view price data and charts.
           </p>
         </div>

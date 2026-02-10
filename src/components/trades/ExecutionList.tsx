@@ -77,8 +77,9 @@ export default function ExecutionList({ positions }: ExecutionListProps) {
                     <div style={{
                       width: '36px',
                       height: '36px',
-                      borderRadius: '8px',
-                      background: 'var(--bg-elevated)',
+                      borderRadius: '12px',
+                      background: 'linear-gradient(135deg, var(--bg-elevated), var(--bg-hover))',
+                      border: '1px solid var(--border)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -174,4 +175,3 @@ export default function ExecutionList({ positions }: ExecutionListProps) {
 
 const thStyle = tableHeaderStyle;
 const tdStyle = tableCellStyle;
-

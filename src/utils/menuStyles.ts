@@ -6,7 +6,7 @@ export const menuItemStyle: React.CSSProperties = {
   padding: '10px 14px',
   background: 'transparent',
   border: 'none',
-  borderRadius: '8px',
+  borderRadius: 'var(--radius-btn)',
   color: 'var(--text-secondary)',
   fontSize: '14px',
   cursor: 'pointer',

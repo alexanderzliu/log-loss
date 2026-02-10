@@ -8,12 +8,13 @@ export const tableHeaderStyle: CSSProperties = {
   fontWeight: 600,
   color: 'var(--text-muted)',
   textTransform: 'uppercase',
-  letterSpacing: '0.8px',
+  letterSpacing: '1px',
+  fontFamily: "'Plus Jakarta Sans', sans-serif",
 };
 
 // Shared table cell style used in Dashboard and TradeList
 export const tableCellStyle: CSSProperties = {
-  padding: '18px 20px',
+  padding: '20px 24px',
   color: 'var(--text-secondary)',
   fontSize: '14px',
 };

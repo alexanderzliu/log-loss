@@ -12,14 +12,16 @@ function navLinkStyle({ isActive }: { isActive: boolean }): CSSProperties {
     alignItems: 'center',
     gap: '12px',
     padding: '12px 16px',
-    borderRadius: '8px',
+    borderRadius: '12px',
     fontSize: '14px',
     fontWeight: 500,
     textDecoration: 'none',
-    color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-    background: isActive ? 'var(--bg-elevated)' : 'transparent',
+    color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
+    background: isActive
+      ? 'linear-gradient(135deg, var(--accent-soft), rgba(139, 92, 246, 0.04))'
+      : 'transparent',
     borderLeft: isActive ? '3px solid var(--accent)' : '3px solid transparent',
-    transition: 'all 0.2s ease',
+    transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
   };
 }
 
@@ -41,7 +43,7 @@ function App() {
       <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-base)' }}>
         {/* Sidebar */}
         <aside className="sidebar" style={{
-          width: '200px',
+          width: '220px',
           borderRight: '1px solid var(--border)',
           display: 'flex',
           flexDirection: 'column',
@@ -53,9 +55,32 @@ function App() {
         }}>
           {/* Logo */}
           <div style={{ padding: '24px', borderBottom: '1px solid var(--border)' }}>
-            <h1 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)' }}>
-              Trading Journal
-            </h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, var(--accent), var(--accent-dim))',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: '14px',
+                color: '#000',
+                letterSpacing: '-0.5px',
+                boxShadow: '0 2px 8px var(--accent-glow)',
+              }}>
+                TJ
+              </div>
+              <div>
+                <h1 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+                  Trading Journal
+                </h1>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '1px' }}>
+                  Track & analyze
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Nav */}
@@ -84,13 +109,14 @@ function App() {
                 gap: '12px',
                 width: '100%',
                 padding: '12px 16px',
-                borderRadius: '8px',
+                borderRadius: '12px',
                 fontSize: '14px',
                 fontWeight: 500,
                 color: 'var(--text-secondary)',
-                background: 'transparent',
+                background: 'var(--bg-elevated)',
                 border: '1px solid var(--border)',
                 cursor: 'pointer',
+                transition: 'all 0.2s ease',
               }}
             >
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
@@ -100,7 +126,7 @@ function App() {
         </aside>
 
         {/* Main Content */}
-        <main style={{ marginLeft: '200px', flex: 1, padding: '40px 48px' }}>
+        <main style={{ marginLeft: '220px', flex: 1, padding: '40px 48px' }}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/journal" element={<Journal />} />
