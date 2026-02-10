@@ -1,72 +1,56 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { Plus, List, LayoutGrid } from 'lucide-react';
-import TradeList from '../components/trades/TradeList';
-import GroupedTradeList from '../components/trades/GroupedTradeList';
+import ExecutionList from '../components/trades/ExecutionList';
+import PositionList from '../components/trades/PositionList';
 import TradeForm from '../components/trades/TradeForm';
 import PageTransition from '../components/PageTransition';
-import { groupTradesByAsset } from '../utils/aggregatePositions';
-import type { Trade, TradeFormData } from '../types';
+import type { Position } from '../types';
 
 export default function Journal() {
-  const { trades, tradesLoading, fetchTrades } = useStore();
+  const { positions, positionsLoading, fetchPositions } = useStore();
   const [showForm, setShowForm] = useState(false);
-  const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
-  const [closingTrade, setClosingTrade] = useState<Trade | null>(null);
+  const [editingPosition, setEditingPosition] = useState<Position | null>(null);
+  const [closingPosition, setClosingPosition] = useState<Position | null>(null);
   const [filter, setFilter] = useState<'all' | 'open' | 'closed'>('all');
-  const [viewMode, setViewMode] = useState<'list' | 'grouped'>('list');
+  const [viewMode, setViewMode] = useState<'positions' | 'executions'>('positions');
 
   useEffect(() => {
-    fetchTrades();
-  }, [fetchTrades]);
+    fetchPositions();
+  }, [fetchPositions]);
 
-  const filteredTrades = trades.filter((trade) => {
-    if (filter === 'open' && trade.status !== 'open') return false;
-    if (filter === 'closed' && trade.status !== 'closed') return false;
+  const filteredPositions = positions.filter((pos) => {
+    if (filter === 'open' && pos.status !== 'open') return false;
+    if (filter === 'closed' && pos.status !== 'closed') return false;
     return true;
   });
 
   const handleNewTrade = () => {
-    setEditingTrade(null);
-    setClosingTrade(null);
+    setEditingPosition(null);
+    setClosingPosition(null);
     setShowForm(true);
   };
 
-  const handleEditTrade = (trade: Trade) => {
-    setEditingTrade(trade);
-    setClosingTrade(null);
+  const handleEditPosition = (position: Position) => {
+    setEditingPosition(position);
+    setClosingPosition(null);
     setShowForm(true);
   };
 
-  const handleClosePosition = (trade: Trade) => {
-    setEditingTrade(null);
-    setClosingTrade(trade);
+  const handleClosePosition = (position: Position) => {
+    setEditingPosition(null);
+    setClosingPosition(position);
     setShowForm(true);
   };
 
   const handleFormClose = () => {
     setShowForm(false);
-    setEditingTrade(null);
-    setClosingTrade(null);
+    setEditingPosition(null);
+    setClosingPosition(null);
   };
 
-  const getInitialFormData = (): Partial<TradeFormData> | undefined => {
-    if (closingTrade) {
-      // Use remainingQuantity if available (for partial exits)
-      const availableQty = closingTrade.remainingQuantity ?? closingTrade.quantity;
-      return {
-        assetType: closingTrade.assetType,
-        symbol: closingTrade.symbol,
-        side: 'sell',
-        quantity: availableQty,
-        linkedTradeId: closingTrade.id,
-      };
-    }
-    return undefined;
-  };
-
-  const openCount = trades.filter(t => t.status === 'open').length;
-  const closedCount = trades.filter(t => t.status === 'closed').length;
+  const openCount = positions.filter(p => p.status === 'open').length;
+  const closedCount = positions.filter(p => p.status === 'closed').length;
 
   return (
     <PageTransition>
@@ -78,7 +62,7 @@ export default function Journal() {
             Journal
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-            Track and manage your trades
+            Track and manage your positions
           </p>
         </div>
         <button onClick={handleNewTrade} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -91,7 +75,7 @@ export default function Journal() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
         <div style={{ display: 'flex', gap: '8px' }}>
           {[
-            { key: 'all', label: 'All', count: trades.length },
+            { key: 'all', label: 'All', count: positions.length },
             { key: 'open', label: 'Open', count: openCount },
             { key: 'closed', label: 'Closed', count: closedCount },
           ].map((f) => (
@@ -125,8 +109,8 @@ export default function Journal() {
           gap: '4px',
         }}>
           <button
-            onClick={() => setViewMode('list')}
-            title="Chronological view"
+            onClick={() => setViewMode('positions')}
+            title="Positions view"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -135,61 +119,57 @@ export default function Journal() {
               height: '32px',
               borderRadius: '8px',
               border: 'none',
-              background: viewMode === 'list' ? 'var(--bg-elevated)' : 'transparent',
-              color: viewMode === 'list' ? 'var(--text-primary)' : 'var(--text-muted)',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-            }}
-          >
-            <List size={16} />
-          </button>
-          <button
-            onClick={() => setViewMode('grouped')}
-            title="Grouped by asset"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '36px',
-              height: '32px',
-              borderRadius: '8px',
-              border: 'none',
-              background: viewMode === 'grouped' ? 'var(--bg-elevated)' : 'transparent',
-              color: viewMode === 'grouped' ? 'var(--text-primary)' : 'var(--text-muted)',
+              background: viewMode === 'positions' ? 'var(--bg-elevated)' : 'transparent',
+              color: viewMode === 'positions' ? 'var(--text-primary)' : 'var(--text-muted)',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
             }}
           >
             <LayoutGrid size={16} />
           </button>
+          <button
+            onClick={() => setViewMode('executions')}
+            title="Executions view"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '36px',
+              height: '32px',
+              borderRadius: '8px',
+              border: 'none',
+              background: viewMode === 'executions' ? 'var(--bg-elevated)' : 'transparent',
+              color: viewMode === 'executions' ? 'var(--text-primary)' : 'var(--text-muted)',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <List size={16} />
+          </button>
         </div>
       </div>
 
-      {/* Trade List */}
-      {tradesLoading ? (
+      {/* Content */}
+      {positionsLoading ? (
         <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
           <p style={{ color: 'var(--text-muted)' }}>Loading...</p>
         </div>
-      ) : viewMode === 'grouped' ? (
-        <GroupedTradeList
-          groups={groupTradesByAsset(filteredTrades)}
-          onEdit={handleEditTrade}
+      ) : viewMode === 'positions' ? (
+        <PositionList
+          positions={filteredPositions}
+          onEdit={handleEditPosition}
           onClosePosition={handleClosePosition}
         />
       ) : (
-        <TradeList
-          trades={filteredTrades}
-          onEdit={handleEditTrade}
-          onClosePosition={handleClosePosition}
-        />
+        <ExecutionList positions={filteredPositions} />
       )}
 
       {/* Trade Form Modal */}
       {showForm && (
         <TradeForm
-          trade={editingTrade}
-          initialData={getInitialFormData()}
-          isClosing={!!closingTrade}
+          position={editingPosition || closingPosition}
+          isClosing={!!closingPosition}
+          isEditing={!!editingPosition}
           onClose={handleFormClose}
         />
       )}

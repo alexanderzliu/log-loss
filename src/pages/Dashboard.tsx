@@ -1,19 +1,19 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { RefreshCw, ArrowUpRight, ArrowDownRight, ChevronDown, ChevronRight } from 'lucide-react';
-import { formatCurrency, formatPercent, formatQuantity, calculatePnl } from '../utils/format';
+import { formatCurrency, formatPercent, formatQuantity } from '../utils/format';
 import { tableHeaderStyle, tableCellStyle } from '../utils/styles';
-import { aggregatePositions, calculateAggregatedPnl } from '../utils/aggregatePositions';
+import { calculateUnrealizedPnl } from '../utils/aggregatePositions';
 import { useAnimatedNumber } from '../hooks/useAnimatedNumber';
 import PageTransition from '../components/PageTransition';
 
 export default function Dashboard() {
   const {
-    trades,
-    tradesLoading,
+    positions,
+    positionsLoading,
     prices,
     portfolioSummary,
-    fetchTrades,
+    fetchPositions,
     fetchPortfolioSummary,
     refreshPrices,
   } = useStore();
@@ -21,14 +21,13 @@ export default function Dashboard() {
   const [expandedPositions, setExpandedPositions] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    fetchTrades();
+    fetchPositions();
     fetchPortfolioSummary();
     const interval = setInterval(refreshPrices, 60000);
     return () => clearInterval(interval);
-  }, [fetchTrades, fetchPortfolioSummary, refreshPrices]);
+  }, [fetchPositions, fetchPortfolioSummary, refreshPrices]);
 
-  const openPositions = trades.filter((t) => t.status === 'open' && t.side === 'buy');
-  const aggregatedPositions = aggregatePositions(trades);
+  const openPositions = positions.filter((p) => p.status === 'open');
 
   const toggleExpanded = (key: string) => {
     setExpandedPositions((prev) => {
@@ -42,15 +41,15 @@ export default function Dashboard() {
     });
   };
 
-  const unrealizedPnl = openPositions.reduce((total, trade) => {
-    const priceKey = `${trade.symbol}-${trade.assetType}`;
+  const unrealizedPnl = openPositions.reduce((total, pos) => {
+    const priceKey = `${pos.symbol}-${pos.assetType}`;
     const currentPrice = prices[priceKey]?.price;
-    const { pnl } = calculatePnl(trade.entryPrice, currentPrice, trade.quantity);
+    const { pnl } = calculateUnrealizedPnl(pos, currentPrice);
     return total + (pnl ?? 0);
   }, 0);
 
   const totalInvested = openPositions.reduce(
-    (total, trade) => total + trade.entryPrice * (trade.remainingQuantity ?? trade.quantity),
+    (total, pos) => total + pos.avgEntryPrice * pos.remainingQuantity,
     0
   );
 
@@ -135,7 +134,7 @@ export default function Dashboard() {
             label="Win Rate"
             numericValue={portfolioSummary?.winRate || 0}
             formatter={(v) => `${v.toFixed(0)}%`}
-            subtext={`${portfolioSummary?.totalTrades || 0} trades`}
+            subtext={`${portfolioSummary?.totalExecutions || 0} executions`}
             style={stagger(3)}
           />
         </div>
@@ -150,7 +149,7 @@ export default function Dashboard() {
           }}>
             <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px' }}>
               Open Positions
-              {aggregatedPositions.length > 0 && (
+              {openPositions.length > 0 && (
                 <span style={{
                   display: 'inline-block',
                   width: '8px',
@@ -167,11 +166,11 @@ export default function Dashboard() {
             </button>
           </div>
 
-          {tradesLoading ? (
+          {positionsLoading ? (
             <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
               <p style={{ color: 'var(--text-muted)' }}>Loading...</p>
             </div>
-          ) : aggregatedPositions.length === 0 ? (
+          ) : openPositions.length === 0 ? (
             <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>No open positions</p>
               <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
@@ -192,30 +191,32 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {aggregatedPositions.map((position, idx) => {
+                  {openPositions.map((position, idx) => {
                     const priceKey = `${position.symbol}-${position.assetType}`;
                     const currentPrice = prices[priceKey]?.price;
                     const priceChange = prices[priceKey]?.changePercent24h;
-                    const { pnl, pnlPercent } = calculateAggregatedPnl(position, currentPrice);
+                    const { pnl, pnlPercent } = calculateUnrealizedPnl(position, currentPrice);
                     const value = currentPrice
-                      ? currentPrice * position.totalQuantity
-                      : position.totalCostBasis;
-                    const positionKey = `${position.symbol}-${position.assetType}`;
+                      ? currentPrice * position.remainingQuantity
+                      : position.avgEntryPrice * position.remainingQuantity;
+                    const positionKey = position.id;
                     const isExpanded = expandedPositions.has(positionKey);
+                    const buyExecutions = position.executions.filter(e => e.side === 'buy');
+                    const hasMultipleLots = buyExecutions.length > 1;
 
                     return (
                       <Fragment key={positionKey}>
                         <tr
                           style={{
                             borderBottom: isExpanded ? 'none' : '1px solid var(--border)',
-                            cursor: position.lotCount > 1 ? 'pointer' : 'default',
+                            cursor: hasMultipleLots ? 'pointer' : 'default',
                             animation: `slideUp 0.35s ease-out ${idx * 0.04}s both`,
                           }}
-                          onClick={() => position.lotCount > 1 && toggleExpanded(positionKey)}
+                          onClick={() => hasMultipleLots && toggleExpanded(positionKey)}
                         >
                           <td style={tdStyle}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                              {position.lotCount > 1 && (
+                              {hasMultipleLots && (
                                 <div style={{ color: 'var(--text-muted)', width: '16px' }}>
                                   {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                                 </div>
@@ -239,8 +240,8 @@ export default function Dashboard() {
                                   {position.symbol}
                                 </div>
                                 <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                                  {position.lotCount > 1
-                                    ? `${position.lotCount} lots`
+                                  {hasMultipleLots
+                                    ? `${buyExecutions.length} entries`
                                     : position.assetType}
                                 </div>
                               </div>
@@ -263,7 +264,7 @@ export default function Dashboard() {
                             )}
                           </td>
                           <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontVariantNumeric: 'tabular-nums' }}>
-                            {formatQuantity(position.totalQuantity)}
+                            {formatQuantity(position.remainingQuantity)}
                           </td>
                           <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>
                             {formatCurrency(value)}
@@ -283,7 +284,7 @@ export default function Dashboard() {
                                   fontSize: '12px',
                                   color: pnl >= 0 ? 'var(--profit)' : 'var(--loss)'
                                 }}>
-                                  {pnlPercent! >= 0 ? '+' : ''}{pnlPercent!.toFixed(2)}%
+                                  {pnlPercent !== null && (pnlPercent >= 0 ? '+' : '')}{pnlPercent?.toFixed(2)}%
                                 </div>
                               </div>
                             ) : (
@@ -291,76 +292,63 @@ export default function Dashboard() {
                             )}
                           </td>
                         </tr>
-                        {/* Expanded lot details */}
-                        {isExpanded && position.lots.map((lot, lotIdx) => {
-                          // Use remainingQuantity if available, fallback to quantity
-                          const lotQty = lot.remainingQuantity ?? lot.quantity;
-                          const hasPartialExit = lot.remainingQuantity !== null && lot.remainingQuantity < lot.quantity;
-                          const lotPnl = currentPrice
-                            ? (currentPrice - lot.entryPrice) * lotQty
+                        {/* Expanded execution details */}
+                        {isExpanded && buyExecutions.map((exec, execIdx) => {
+                          const execPnl = currentPrice
+                            ? (currentPrice - exec.price) * exec.quantity
                             : null;
-                          const lotPnlPercent = currentPrice
-                            ? ((currentPrice - lot.entryPrice) / lot.entryPrice) * 100
+                          const execPnlPercent = currentPrice
+                            ? ((currentPrice - exec.price) / exec.price) * 100
                             : null;
-                          const lotValue = currentPrice
-                            ? currentPrice * lotQty
-                            : lot.entryPrice * lotQty;
-                          const isLast = lotIdx === position.lots.length - 1;
+                          const execValue = currentPrice
+                            ? currentPrice * exec.quantity
+                            : exec.price * exec.quantity;
+                          const isLast = execIdx === buyExecutions.length - 1;
 
                           return (
                             <tr
-                              key={lot.id}
+                              key={exec.id}
                               style={{
                                 borderBottom: isLast ? '1px solid var(--border)' : 'none',
                                 background: 'var(--bg-tertiary)',
-                                animation: `slideUp 0.25s ease-out ${lotIdx * 0.03}s both`,
+                                animation: `slideUp 0.25s ease-out ${execIdx * 0.03}s both`,
                               }}
                             >
                               <td style={{ ...tdStyle, paddingLeft: '72px' }}>
                                 <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                  Lot {lotIdx + 1}
-                                  {hasPartialExit && (
-                                    <span style={{ color: 'var(--text-muted)', fontSize: '11px', marginLeft: '6px' }}>
-                                      (partial exit)
-                                    </span>
-                                  )}
+                                  Entry {execIdx + 1}
                                 </div>
                                 <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                  {new Date(lot.entryDate).toLocaleDateString()}
+                                  {new Date(exec.executedAt).toLocaleDateString()}
                                 </div>
                               </td>
                               <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                {formatCurrency(lot.entryPrice)}
+                                {formatCurrency(exec.price)}
                               </td>
                               <td style={{ ...tdStyle, textAlign: 'right' }}>
-                                {/* Empty for lots */}
+                                {/* Empty for entries */}
                               </td>
                               <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                {formatQuantity(lotQty)}
-                                {hasPartialExit && (
-                                  <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                                    of {formatQuantity(lot.quantity)}
-                                  </div>
-                                )}
+                                {formatQuantity(exec.quantity)}
                               </td>
                               <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                {formatCurrency(lotValue)}
+                                {formatCurrency(execValue)}
                               </td>
                               <td style={{ ...tdStyle, textAlign: 'right' }}>
-                                {lotPnl !== null ? (
+                                {execPnl !== null ? (
                                   <div>
                                     <div style={{
                                       fontFamily: "'DM Mono', monospace",
                                       fontSize: '13px',
-                                      color: lotPnl >= 0 ? 'var(--profit)' : 'var(--loss)'
+                                      color: execPnl >= 0 ? 'var(--profit)' : 'var(--loss)'
                                     }}>
-                                      {lotPnl >= 0 ? '+' : ''}{formatCurrency(lotPnl)}
+                                      {execPnl >= 0 ? '+' : ''}{formatCurrency(execPnl)}
                                     </div>
                                     <div style={{
                                       fontSize: '11px',
-                                      color: lotPnl >= 0 ? 'var(--profit)' : 'var(--loss)'
+                                      color: execPnl >= 0 ? 'var(--profit)' : 'var(--loss)'
                                     }}>
-                                      {lotPnlPercent! >= 0 ? '+' : ''}{lotPnlPercent!.toFixed(2)}%
+                                      {execPnlPercent !== null && (execPnlPercent >= 0 ? '+' : '')}{execPnlPercent?.toFixed(2)}%
                                     </div>
                                   </div>
                                 ) : (

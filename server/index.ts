@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { initDatabase, db } from './database';
-import tradesRouter from './routes/trades';
+import positionsRouter from './routes/positions';
 import pricesRouter from './routes/prices';
 
 const app = express();
@@ -14,7 +14,7 @@ app.use(express.json());
 initDatabase();
 
 // Routes
-app.use('/api/trades', tradesRouter);
+app.use('/api/positions', positionsRouter);
 app.use('/api/prices', pricesRouter);
 
 // Health check

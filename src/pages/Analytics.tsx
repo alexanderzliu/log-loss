@@ -17,7 +17,7 @@ import { formatCurrency, formatPercent } from '../utils/format';
 import PageTransition from '../components/PageTransition';
 
 export default function Analytics() {
-  const { trades, prices, fetchPrices } = useStore();
+  const { positions, prices, fetchPrices } = useStore();
   const [selectedSymbol, setSelectedSymbol] = useState<string>('');
   const [selectedAssetType, setSelectedAssetType] = useState<AssetType>('crypto');
   const [priceHistory, setPriceHistory] = useState<PriceHistory[]>([]);
@@ -25,22 +25,19 @@ export default function Analytics() {
   const [searchInput, setSearchInput] = useState('');
   const [timeRange, setTimeRange] = useState<number>(30);
 
-  // Get unique symbols from trades
+  // Get unique symbols from positions
   const trackedAssets = Array.from(
     new Map(
-      trades
-        .filter((t) => t.side === 'buy')
-        .map((t) => [`${t.symbol}-${t.assetType}`, { symbol: t.symbol, assetType: t.assetType }])
+      positions.map((p) => [`${p.symbol}-${p.assetType}`, { symbol: p.symbol, assetType: p.assetType }])
     ).values()
   );
 
   useEffect(() => {
-    // Fetch prices for all tracked assets
     if (trackedAssets.length > 0) {
       fetchPrices(trackedAssets);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trades, fetchPrices]);
+  }, [positions, fetchPrices]);
 
   useEffect(() => {
     if (selectedSymbol && selectedAssetType) {
@@ -65,7 +62,6 @@ export default function Analytics() {
   const handleSearch = () => {
     if (searchInput.trim()) {
       setSelectedSymbol(searchInput.toUpperCase());
-      // Fetch current price
       fetchPrices([{ symbol: searchInput.toUpperCase(), assetType: selectedAssetType }]);
     }
   };

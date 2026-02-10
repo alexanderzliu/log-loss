@@ -1,42 +1,62 @@
 export type AssetType = 'crypto' | 'stock';
-export type TradeSide = 'buy' | 'sell';
-export type TradeStatus = 'open' | 'closed';
+export type PositionStatus = 'open' | 'closed';
+export type ExecutionSide = 'buy' | 'sell';
 
-export interface Trade {
+export interface Execution {
   id: string;
-  assetType: AssetType;
-  symbol: string;
-  side: TradeSide;
-  entryDate: string;
-  entryPrice: number;
+  positionId: string;
+  side: ExecutionSide;
+  price: number;
   quantity: number;
-  remainingQuantity: number | null; // For buy trades: remaining after partial exits
-  stopLoss: number | null;
-  takeProfit: number | null;
-  hypothesis: string;
-  status: TradeStatus;
-  exitDate: string | null;
-  exitPrice: number | null;
+  executedAt: string;
   pnl: number | null;
   pnlPercent: number | null;
   notes: string;
-  linkedTradeId: string | null; // For sells linked to a buy
+  createdAt: string;
+}
+
+export interface Position {
+  id: string;
+  assetType: AssetType;
+  symbol: string;
+  direction: 'long' | 'short';
+  status: PositionStatus;
+  totalQuantity: number;
+  remainingQuantity: number;
+  avgEntryPrice: number;
+  totalCostBasis: number;
+  realizedPnl: number;
+  realizedPnlPercent: number | null;
+  stopLoss: number | null;
+  takeProfit: number | null;
+  hypothesis: string;
+  notes: string;
+  openedAt: string;
+  closedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  executions: Execution[];
 }
 
 export interface TradeFormData {
   assetType: AssetType;
   symbol: string;
-  side: TradeSide;
-  entryDate: string;
-  entryPrice: number;
+  side: ExecutionSide;
+  date: string;
+  price: number;
   quantity: number;
   stopLoss: number | null;
   takeProfit: number | null;
   hypothesis: string;
   notes: string;
-  linkedTradeId?: string | null;
+  positionId?: string;
+}
+
+export interface PositionUpdateData {
+  stopLoss: number | null;
+  takeProfit: number | null;
+  hypothesis: string;
+  notes: string;
 }
 
 export interface PriceData {
@@ -63,17 +83,5 @@ export interface PortfolioSummary {
   openPositions: number;
   closedPositions: number;
   winRate: number;
-  totalTrades: number;
-}
-
-export interface PositionGroup {
-  symbol: string;
-  assetType: AssetType;
-  totalQuantity: number;
-  avgEntryPrice: number;
-  totalInvested: number;
-  currentPrice: number | null;
-  unrealizedPnl: number | null;
-  unrealizedPnlPercent: number | null;
-  positions: Trade[];
+  totalExecutions: number;
 }
