@@ -336,20 +336,22 @@ router.post('/', (req, res) => {
         }
 
         const remainingQty = position.remaining_quantity as number;
-        const sellQty = Math.min(quantity, remainingQty);
-        if (sellQty <= 0) {
+        if (remainingQty <= 0) {
           throw new Error('No remaining quantity to sell');
+        }
+        if (quantity > remainingQty) {
+          throw new Error(`Sell quantity (${quantity}) exceeds remaining position quantity (${remainingQty})`);
         }
 
         const avgEntry = position.avg_entry_price as number;
-        const pnl = (price - avgEntry) * sellQty;
+        const pnl = (price - avgEntry) * quantity;
         const pnlPercent = avgEntry > 0 ? ((price - avgEntry) / avgEntry) * 100 : 0;
 
         // Insert sell execution
         db.prepare(`
           INSERT INTO executions (id, position_id, side, price, quantity, executed_at, pnl, pnl_percent, notes)
           VALUES (?, ?, 'sell', ?, ?, ?, ?, ?, ?)
-        `).run(execId, positionId, price, sellQty, date, pnl, pnlPercent, notes || '');
+        `).run(execId, positionId, price, quantity, date, pnl, pnlPercent, notes || '');
 
         // Recompute position aggregates (handles status change, P&L accumulation)
         recomputePositionAggregates(positionId);
@@ -365,7 +367,7 @@ router.post('/', (req, res) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to create trade';
     console.error('Error creating trade:', error);
-    if (message.includes('required') || message.includes('not found') || message.includes('No remaining')) {
+    if (message.includes('required') || message.includes('not found') || message.includes('No remaining') || message.includes('exceeds')) {
       return res.status(400).json({ error: message });
     }
     res.status(500).json({ error: 'Failed to create trade' });
@@ -401,19 +403,21 @@ router.post('/:id/executions', (req, res) => {
 
       if (side === 'sell') {
         const remainingQty = position.remaining_quantity as number;
-        const sellQty = Math.min(quantity, remainingQty);
-        if (sellQty <= 0) {
+        if (remainingQty <= 0) {
           throw new Error('No remaining quantity to sell');
+        }
+        if (quantity > remainingQty) {
+          throw new Error(`Sell quantity (${quantity}) exceeds remaining position quantity (${remainingQty})`);
         }
 
         const avgEntry = position.avg_entry_price as number;
-        const pnl = (price - avgEntry) * sellQty;
+        const pnl = (price - avgEntry) * quantity;
         const pnlPercent = avgEntry > 0 ? ((price - avgEntry) / avgEntry) * 100 : 0;
 
         db.prepare(`
           INSERT INTO executions (id, position_id, side, price, quantity, executed_at, pnl, pnl_percent, notes)
           VALUES (?, ?, 'sell', ?, ?, ?, ?, ?, ?)
-        `).run(execId, positionId, price, sellQty, date, pnl, pnlPercent, notes || '');
+        `).run(execId, positionId, price, quantity, date, pnl, pnlPercent, notes || '');
       } else {
         db.prepare(`
           INSERT INTO executions (id, position_id, side, price, quantity, executed_at, notes)
@@ -436,7 +440,7 @@ router.post('/:id/executions', (req, res) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to add execution';
     console.error('Error adding execution:', error);
-    if (message.includes('not found') || message.includes('No remaining')) {
+    if (message.includes('not found') || message.includes('No remaining') || message.includes('exceeds')) {
       return res.status(400).json({ error: message });
     }
     res.status(500).json({ error: 'Failed to add execution' });

@@ -30,7 +30,10 @@ export async function createTrade(data: TradeFormData): Promise<{ position: Posi
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
-  if (!response.ok) throw new Error('Failed to create trade');
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error || 'Failed to create trade');
+  }
   return response.json();
 }
 
