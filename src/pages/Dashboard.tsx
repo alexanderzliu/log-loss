@@ -11,8 +11,10 @@ export default function Dashboard() {
   const {
     positions,
     positionsLoading,
+    positionsError,
     prices,
     portfolioSummary,
+    portfolioError,
     fetchPositions,
     fetchPortfolioSummary,
     refreshPrices,
@@ -112,6 +114,18 @@ export default function Dashboard() {
         </div>
 
         {/* Stats Row */}
+        {portfolioError && (
+          <div className="card" style={{
+            padding: '16px 24px',
+            marginBottom: '20px',
+            background: 'rgba(239, 68, 68, 0.08)',
+            border: '1px solid rgba(239, 68, 68, 0.2)',
+            color: 'var(--loss)',
+            fontSize: '14px',
+          }}>
+            Failed to load portfolio summary. <button onClick={fetchPortfolioSummary} className="btn-ghost" style={{ color: 'var(--loss)', textDecoration: 'underline', padding: '0 4px' }}>Retry</button>
+          </div>
+        )}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(4, 1fr)',
@@ -168,7 +182,12 @@ export default function Dashboard() {
             </button>
           </div>
 
-          {positionsLoading ? (
+          {positionsError ? (
+            <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
+              <p style={{ color: 'var(--loss)', marginBottom: '8px' }}>Failed to load positions</p>
+              <button onClick={() => fetchPositions()} className="btn-ghost" style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Retry</button>
+            </div>
+          ) : positionsLoading ? (
             <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
               <p style={{ color: 'var(--text-muted)' }}>Loading...</p>
             </div>

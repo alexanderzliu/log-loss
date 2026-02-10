@@ -26,6 +26,7 @@ interface StoreState {
   // Portfolio
   portfolioSummary: PortfolioSummary | null;
   portfolioLoading: boolean;
+  portfolioError: string | null;
 
   // Actions
   fetchPositions: (filters?: { status?: string; assetType?: string; symbol?: string }) => Promise<void>;
@@ -48,6 +49,7 @@ export const useStore = create<StoreState>((set, get) => ({
   pricesError: null,
   portfolioSummary: null,
   portfolioLoading: false,
+  portfolioError: null,
 
   // Positions actions
   fetchPositions: async (filters) => {
@@ -110,12 +112,12 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   fetchPortfolioSummary: async () => {
-    set({ portfolioLoading: true });
+    set({ portfolioLoading: true, portfolioError: null });
     try {
       const summary = await positionsApi.fetchPortfolioSummary();
       set({ portfolioSummary: summary, portfolioLoading: false });
-    } catch {
-      set({ portfolioLoading: false });
+    } catch (error) {
+      set({ portfolioError: (error as Error).message, portfolioLoading: false });
     }
   },
 
