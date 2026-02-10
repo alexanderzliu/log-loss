@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Position, Execution } from '../../types';
 import { useStore } from '../../store/useStore';
 import { formatCurrency, formatPrice, formatQuantity, formatDate } from '../../utils/format';
+import PnlDisplay from '../PnlDisplay';
 import { tableHeaderStyle, tableCellStyle } from '../../utils/styles';
 import ConfirmDialog from '../ConfirmDialog';
 import DropdownMenu from '../DropdownMenu';
@@ -116,27 +117,7 @@ export default function ExecutionList({ positions }: ExecutionListProps) {
                   {formatCurrency(value)}
                 </td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>
-                  {exec.pnl !== null ? (
-                    <div>
-                      <div style={{
-                        fontFamily: "'DM Mono', monospace",
-                        fontWeight: 500,
-                        color: exec.pnl >= 0 ? 'var(--profit)' : 'var(--loss)'
-                      }}>
-                        {exec.pnl >= 0 ? '+' : ''}{formatCurrency(exec.pnl)}
-                      </div>
-                      {exec.pnlPercent !== null && (
-                        <div style={{
-                          fontSize: '12px',
-                          color: exec.pnlPercent >= 0 ? 'var(--profit)' : 'var(--loss)'
-                        }}>
-                          {exec.pnlPercent >= 0 ? '+' : ''}{exec.pnlPercent.toFixed(2)}%
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <span style={{ color: 'var(--text-muted)' }}>—</span>
-                  )}
+                  <PnlDisplay pnl={exec.pnl} pnlPercent={exec.pnlPercent} />
                 </td>
                 <td style={tdStyle}>
                   <DropdownMenu

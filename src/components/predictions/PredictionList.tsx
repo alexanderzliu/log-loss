@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Prediction } from '../../types';
 import { useStore } from '../../store/useStore';
 import { formatCurrency, formatDate } from '../../utils/format';
+import PnlDisplay from '../PnlDisplay';
 import { tableHeaderStyle, tableCellStyle } from '../../utils/styles';
 import { menuItemStyle } from '../../utils/menuStyles';
 import ConfirmDialog from '../ConfirmDialog';
@@ -142,27 +143,7 @@ export default function PredictionList({ predictions, onEdit, onClose }: Predict
                   {prediction.quantity}
                 </td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>
-                  {prediction.pnl !== null ? (
-                    <div>
-                      <div style={{
-                        fontFamily: "'DM Mono', monospace",
-                        fontWeight: 500,
-                        color: prediction.pnl >= 0 ? 'var(--profit)' : 'var(--loss)',
-                      }}>
-                        {prediction.pnl >= 0 ? '+' : ''}{formatCurrency(prediction.pnl)}
-                      </div>
-                      {prediction.pnlPercent !== null && (
-                        <div style={{
-                          fontSize: '12px',
-                          color: prediction.pnlPercent >= 0 ? 'var(--profit)' : 'var(--loss)',
-                        }}>
-                          {prediction.pnlPercent >= 0 ? '+' : ''}{prediction.pnlPercent.toFixed(2)}%
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <span style={{ color: 'var(--text-muted)' }}>---</span>
-                  )}
+                  <PnlDisplay pnl={prediction.pnl} pnlPercent={prediction.pnlPercent} fallback="---" />
                 </td>
                 <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
                   <DropdownMenu

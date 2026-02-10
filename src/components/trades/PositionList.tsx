@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react';
 import type { Position } from '../../types';
 import { useStore } from '../../store/useStore';
 import { formatCurrency, formatPrice, formatQuantity, formatDate } from '../../utils/format';
+import PnlDisplay from '../PnlDisplay';
 import { priceKey as getPriceKey } from '../../utils/priceKey';
 import { calculateUnrealizedPnl } from '../../utils/aggregatePositions';
 import { tableHeaderStyle, tableCellStyle } from '../../utils/styles';
@@ -154,27 +155,10 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
                     {formatCurrency(costBasis)}
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>
-                    {displayPnl !== null && displayPnl !== 0 ? (
-                      <div>
-                        <div style={{
-                          fontFamily: "'DM Mono', monospace",
-                          fontWeight: 500,
-                          color: displayPnl >= 0 ? 'var(--profit)' : 'var(--loss)'
-                        }}>
-                          {displayPnl >= 0 ? '+' : ''}{formatCurrency(displayPnl)}
-                        </div>
-                        {displayPnlPercent !== null && (
-                          <div style={{
-                            fontSize: '12px',
-                            color: displayPnlPercent >= 0 ? 'var(--profit)' : 'var(--loss)'
-                          }}>
-                            {displayPnlPercent >= 0 ? '+' : ''}{displayPnlPercent.toFixed(2)}%
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <span style={{ color: 'var(--text-muted)' }}>—</span>
-                    )}
+                    <PnlDisplay
+                      pnl={displayPnl !== null && displayPnl !== 0 ? displayPnl : null}
+                      pnlPercent={displayPnlPercent}
+                    />
                   </td>
                   <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu
@@ -251,27 +235,7 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
                         {formatCurrency(value)}
                       </td>
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
-                        {exec.pnl !== null ? (
-                          <div>
-                            <div style={{
-                              fontFamily: "'DM Mono', monospace",
-                              fontSize: '13px',
-                              color: exec.pnl >= 0 ? 'var(--profit)' : 'var(--loss)'
-                            }}>
-                              {exec.pnl >= 0 ? '+' : ''}{formatCurrency(exec.pnl)}
-                            </div>
-                            {exec.pnlPercent !== null && (
-                              <div style={{
-                                fontSize: '11px',
-                                color: exec.pnlPercent >= 0 ? 'var(--profit)' : 'var(--loss)'
-                              }}>
-                                {exec.pnlPercent >= 0 ? '+' : ''}{exec.pnlPercent.toFixed(2)}%
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
-                        )}
+                        <PnlDisplay pnl={exec.pnl} pnlPercent={exec.pnlPercent} size="sm" />
                       </td>
                       <td style={tdStyle}></td>
                     </tr>

@@ -8,6 +8,7 @@ import { priceKey as getPriceKey } from '../utils/priceKey';
 import { useAnimatedNumber } from '../hooks/useAnimatedNumber';
 import { useSetToggle } from '../hooks/useSetToggle';
 import PageTransition from '../components/PageTransition';
+import PnlDisplay from '../components/PnlDisplay';
 
 export default function Dashboard() {
   const {
@@ -338,26 +339,7 @@ export default function Dashboard() {
                             {formatCurrency(value)}
                           </td>
                           <td style={{ ...tdStyle, textAlign: 'right' }}>
-                            {pnl !== null ? (
-                              <div>
-                                <div style={{
-                                  fontFamily: "'DM Mono', monospace",
-                                  fontWeight: 500,
-                                  color: pnl >= 0 ? 'var(--profit)' : 'var(--loss)',
-                                  fontVariantNumeric: 'tabular-nums',
-                                }}>
-                                  {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
-                                </div>
-                                <div style={{
-                                  fontSize: '12px',
-                                  color: pnl >= 0 ? 'var(--profit)' : 'var(--loss)'
-                                }}>
-                                  {pnlPercent !== null && (pnlPercent >= 0 ? '+' : '')}{pnlPercent?.toFixed(2)}%
-                                </div>
-                              </div>
-                            ) : (
-                              <span style={{ color: 'var(--text-muted)' }}>—</span>
-                            )}
+                            <PnlDisplay pnl={pnl} pnlPercent={pnlPercent} />
                           </td>
                         </tr>
                         {/* Expanded execution details */}
@@ -403,25 +385,7 @@ export default function Dashboard() {
                                 {formatCurrency(execValue)}
                               </td>
                               <td style={{ ...tdStyle, textAlign: 'right' }}>
-                                {execPnl !== null ? (
-                                  <div>
-                                    <div style={{
-                                      fontFamily: "'DM Mono', monospace",
-                                      fontSize: '13px',
-                                      color: execPnl >= 0 ? 'var(--profit)' : 'var(--loss)'
-                                    }}>
-                                      {execPnl >= 0 ? '+' : ''}{formatCurrency(execPnl)}
-                                    </div>
-                                    <div style={{
-                                      fontSize: '11px',
-                                      color: execPnl >= 0 ? 'var(--profit)' : 'var(--loss)'
-                                    }}>
-                                      {execPnlPercent !== null && (execPnlPercent >= 0 ? '+' : '')}{execPnlPercent?.toFixed(2)}%
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <span style={{ color: 'var(--text-muted)' }}>—</span>
-                                )}
+                                <PnlDisplay pnl={execPnl} pnlPercent={execPnlPercent} size="sm" />
                               </td>
                             </tr>
                           );
