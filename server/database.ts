@@ -84,6 +84,9 @@ export function initDatabase() {
   // Add predictions table for Kalshi prediction market trades
   migrateCreatePredictions();
 
+  // Add token metrics columns to price_cache
+  migrateAddTokenMetrics();
+
   console.log('Database initialized successfully');
 }
 
@@ -264,6 +267,20 @@ function migrateAddChainColumns() {
     db.exec('ALTER TABLE positions ADD COLUMN contract_address TEXT DEFAULT NULL');
     db.exec('CREATE INDEX IF NOT EXISTS idx_positions_chain_address ON positions(chain, contract_address)');
     console.log('Added chain/contract_address columns to positions');
+  }
+}
+
+function migrateAddTokenMetrics() {
+  const columns = db.prepare('PRAGMA table_info(price_cache)').all() as { name: string }[];
+  const columnNames = columns.map(c => c.name);
+
+  if (!columnNames.includes('market_cap')) {
+    db.exec('ALTER TABLE price_cache ADD COLUMN market_cap REAL DEFAULT NULL');
+    db.exec('ALTER TABLE price_cache ADD COLUMN fdv REAL DEFAULT NULL');
+    db.exec('ALTER TABLE price_cache ADD COLUMN liquidity_usd REAL DEFAULT NULL');
+    db.exec('ALTER TABLE price_cache ADD COLUMN txn_count_24h INTEGER DEFAULT NULL');
+    db.exec('ALTER TABLE price_cache ADD COLUMN holder_count INTEGER DEFAULT NULL');
+    console.log('Added token metrics columns to price_cache');
   }
 }
 

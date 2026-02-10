@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { db } from '../database';
+import { fetchHolderCount } from './holders';
 
 const router = Router();
 
@@ -12,6 +13,11 @@ interface PriceData {
   high24h: number;
   low24h: number;
   volume24h: number;
+  marketCap: number | null;
+  fdv: number | null;
+  liquidityUsd: number | null;
+  txnCount24h: number | null;
+  holderCount: number | null;
 }
 
 // --- Cache helpers ---
@@ -35,8 +41,9 @@ function cachePriceData(key: string, assetType: string, priceData: PriceData): s
   const now = new Date().toISOString();
   db.prepare(`
     INSERT OR REPLACE INTO price_cache
-    (symbol, asset_type, price, change_24h, change_percent_24h, high_24h, low_24h, volume_24h, last_updated)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (symbol, asset_type, price, change_24h, change_percent_24h, high_24h, low_24h, volume_24h,
+     market_cap, fdv, liquidity_usd, txn_count_24h, holder_count, last_updated)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     key,
     assetType,
@@ -46,6 +53,11 @@ function cachePriceData(key: string, assetType: string, priceData: PriceData): s
     priceData.high24h,
     priceData.low24h,
     priceData.volume24h,
+    priceData.marketCap,
+    priceData.fdv,
+    priceData.liquidityUsd,
+    priceData.txnCount24h,
+    priceData.holderCount,
     now
   );
   return now;
@@ -61,6 +73,11 @@ function formatCachedPrice(cached: Record<string, unknown>, symbol: string, asse
     high24h: cached.high_24h as number,
     low24h: cached.low_24h as number,
     volume24h: cached.volume_24h as number,
+    marketCap: (cached.market_cap as number) ?? null,
+    fdv: (cached.fdv as number) ?? null,
+    liquidityUsd: (cached.liquidity_usd as number) ?? null,
+    txnCount24h: (cached.txn_count_24h as number) ?? null,
+    holderCount: (cached.holder_count as number) ?? null,
     lastUpdated: cached.last_updated as string,
   };
 }
@@ -94,7 +111,7 @@ async function fetchCryptoPrice(symbol: string): Promise<PriceData | null> {
   try {
     const coinId = cryptoIdMap[symbol.toUpperCase()] || symbol.toLowerCase();
     const response = await fetch(
-      `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_high_24h=true&include_low_24h=true`
+      `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_high_24h=true&include_low_24h=true&include_market_cap=true`
     );
 
     if (!response.ok) return null;
@@ -111,6 +128,11 @@ async function fetchCryptoPrice(symbol: string): Promise<PriceData | null> {
       high24h: coinData.usd_high_24h || coinData.usd,
       low24h: coinData.usd_low_24h || coinData.usd,
       volume24h: coinData.usd_24h_vol || 0,
+      marketCap: coinData.usd_market_cap || null,
+      fdv: null,
+      liquidityUsd: null,
+      txnCount24h: null,
+      holderCount: null,
     };
   } catch (error) {
     console.error(`Error fetching crypto price for ${symbol}:`, error);
@@ -145,6 +167,11 @@ async function fetchStockPrice(symbol: string): Promise<PriceData | null> {
       high24h: indicators?.high?.[0] || currentPrice,
       low24h: indicators?.low?.[0] || currentPrice,
       volume24h: indicators?.volume?.[0] || 0,
+      marketCap: null,
+      fdv: null,
+      liquidityUsd: null,
+      txnCount24h: null,
+      holderCount: null,
     };
   } catch (error) {
     console.error(`Error fetching stock price for ${symbol}:`, error);
@@ -164,6 +191,7 @@ interface DexScreenerPair {
   volume: { h24: number; h6: number; h1: number; m5: number };
   priceChange: { h24: number; h6: number; h1: number; m5: number };
   liquidity: { usd: number; base: number; quote: number };
+  txns: { h24: { buys: number; sells: number }; h6: { buys: number; sells: number }; h1: { buys: number; sells: number }; m5: { buys: number; sells: number } };
   fdv: number;
   marketCap: number;
   info?: { imageUrl?: string };
@@ -187,6 +215,9 @@ async function fetchDexScreenerPrice(chain: string, contractAddress: string): Pr
     const priceUsd = parseFloat(best.priceUsd);
     if (isNaN(priceUsd)) return null;
 
+    const txnBuys = best.txns?.h24?.buys || 0;
+    const txnSells = best.txns?.h24?.sells || 0;
+
     return {
       price: priceUsd,
       change24h: priceUsd * ((best.priceChange?.h24 || 0) / 100),
@@ -194,6 +225,11 @@ async function fetchDexScreenerPrice(chain: string, contractAddress: string): Pr
       high24h: priceUsd,
       low24h: priceUsd,
       volume24h: best.volume?.h24 || 0,
+      marketCap: best.marketCap || null,
+      fdv: best.fdv || null,
+      liquidityUsd: best.liquidity?.usd || null,
+      txnCount24h: txnBuys + txnSells || null,
+      holderCount: null, // populated separately via holder APIs
     };
   } catch (error) {
     console.error(`DexScreener price error for ${chain}/${contractAddress}:`, error);
@@ -219,6 +255,11 @@ async function getPrice(
   high24h?: number;
   low24h?: number;
   volume24h?: number;
+  marketCap?: number | null;
+  fdv?: number | null;
+  liquidityUsd?: number | null;
+  txnCount24h?: number | null;
+  holderCount?: number | null;
   lastUpdated?: string;
   error?: string;
 }> {
@@ -244,6 +285,16 @@ async function getPrice(
 
   if (!priceData) {
     return { symbol: upperSymbol, assetType, chain, contractAddress, error: 'Price not found' };
+  }
+
+  // Fetch holder count in parallel (non-blocking, best-effort)
+  if (contractAddress && chain && priceData.holderCount === null) {
+    fetchHolderCount(chain, contractAddress).then(count => {
+      if (count !== null) {
+        db.prepare('UPDATE price_cache SET holder_count = ? WHERE symbol = ? AND asset_type = ?')
+          .run(count, key, assetType);
+      }
+    }).catch(() => { /* silently ignore holder count failures */ });
   }
 
   const lastUpdated = cachePriceData(key, assetType, priceData);

@@ -72,6 +72,11 @@ export interface PriceData {
   high24h: number;
   low24h: number;
   volume24h: number;
+  marketCap?: number | null;
+  fdv?: number | null;
+  liquidityUsd?: number | null;
+  txnCount24h?: number | null;
+  holderCount?: number | null;
   chain?: string | null;
   contractAddress?: string | null;
   lastUpdated: string;

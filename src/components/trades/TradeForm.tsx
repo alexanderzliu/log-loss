@@ -33,6 +33,65 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
     positionId: isClosing ? position?.id : undefined,
   });
 
+  // Auto-calculation: raw strings for display, parsed numbers for math
+  const [priceStr, setPriceStr] = useState('');
+  const [quantityStr, setQuantityStr] = useState(isClosing && position?.remainingQuantity ? String(position.remainingQuantity) : '');
+  const [totalStr, setTotalStr] = useState('');
+  const [editedFields, setEditedFields] = useState<[string, string]>(['price', 'quantity']);
+
+  const calculatedField = ['price', 'quantity', 'total'].find(f => !editedFields.includes(f)) || 'total';
+
+  const parseNum = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
+
+  const updateEditedPair = (field: string): [string, string] => {
+    if (editedFields[1] === field) return editedFields;
+    const newPair: [string, string] = [editedFields[1], field];
+    setEditedFields(newPair);
+    return newPair;
+  };
+
+  const recalculate = (price: number, quantity: number, total: number, pair: [string, string]) => {
+    const calc = ['price', 'quantity', 'total'].find(f => !pair.includes(f));
+    if (calc === 'total') {
+      const v = price * quantity;
+      setTotalStr(v ? String(v) : '');
+    } else if (calc === 'quantity' && price > 0) {
+      const v = total / price;
+      setQuantityStr(v ? String(v) : '');
+      setFormData(prev => ({ ...prev, quantity: v }));
+    } else if (calc === 'price' && quantity > 0) {
+      const v = total / quantity;
+      setPriceStr(v ? String(v) : '');
+      setFormData(prev => ({ ...prev, price: v }));
+    }
+  };
+
+  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setPriceStr(raw);
+    const val = parseNum(raw);
+    setFormData(prev => ({ ...prev, price: val }));
+    const pair = updateEditedPair('price');
+    recalculate(val, parseNum(quantityStr), parseNum(totalStr), pair);
+  };
+
+  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setQuantityStr(raw);
+    const val = parseNum(raw);
+    setFormData(prev => ({ ...prev, quantity: val }));
+    const pair = updateEditedPair('quantity');
+    recalculate(parseNum(priceStr), val, parseNum(totalStr), pair);
+  };
+
+  const handleTotalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setTotalStr(raw);
+    const val = parseNum(raw);
+    const pair = updateEditedPair('total');
+    recalculate(parseNum(priceStr), parseNum(quantityStr), val, pair);
+  };
+
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -87,8 +146,6 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
     : isEditing
     ? 'Edit Position'
     : 'New Trade';
-
-  const totalValue = formData.price && formData.quantity ? formData.price * formData.quantity : 0;
 
   return (
     <div
@@ -434,52 +491,43 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
                   />
                 </FieldGroup>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <FieldGroup label={isClosing ? 'Exit Price' : 'Entry Price'}>
+                <div className="grid grid-cols-3 gap-3">
+                  <FieldGroup label={`${isClosing ? 'Exit Price' : 'Entry Price'}${calculatedField === 'price' ? ' (calc)' : ''}`}>
                     <PrefixInput
                       prefix="$"
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       name="price"
-                      value={formData.price || ''}
-                      onChange={handleChange}
-                      step="any"
-                      min="0"
+                      value={priceStr}
+                      onChange={handlePriceChange}
                       placeholder="0.00"
                       required
                     />
                   </FieldGroup>
-                  <FieldGroup label="Quantity">
+                  <FieldGroup label={`Quantity${calculatedField === 'quantity' ? ' (calc)' : ''}`}>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       name="quantity"
-                      value={formData.quantity || ''}
-                      onChange={handleChange}
-                      step="any"
-                      min="0"
+                      value={quantityStr}
+                      onChange={handleQuantityChange}
                       placeholder="0"
                       className="w-full"
                       required
                     />
                   </FieldGroup>
+                  <FieldGroup label={`Total${calculatedField === 'total' ? ' (calc)' : ''}`}>
+                    <PrefixInput
+                      prefix="$"
+                      type="text"
+                      inputMode="decimal"
+                      name="total"
+                      value={totalStr}
+                      onChange={handleTotalChange}
+                      placeholder="0.00"
+                    />
+                  </FieldGroup>
                 </div>
-
-                {/* Total value inline */}
-                {totalValue > 0 && (
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '10px 14px',
-                    borderRadius: '10px',
-                    background: 'var(--bg-elevated)',
-                    border: '1px solid var(--border)',
-                  }}>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total</span>
-                    <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', fontFamily: "'DM Mono', monospace" }}>
-                      ${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                )}
               </FieldSection>
 
               {/* Risk Management (only for new buys) */}

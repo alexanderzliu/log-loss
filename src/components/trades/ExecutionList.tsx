@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Position, Execution } from '../../types';
 import { useStore } from '../../store/useStore';
-import { formatCurrency, formatQuantity, formatDate } from '../../utils/format';
+import { formatCurrency, formatPrice, formatQuantity, formatDate } from '../../utils/format';
 import { tableHeaderStyle, tableCellStyle } from '../../utils/styles';
 import ConfirmDialog from '../ConfirmDialog';
 import DropdownMenu from '../DropdownMenu';
@@ -107,7 +107,7 @@ export default function ExecutionList({ positions }: ExecutionListProps) {
                   {formatDate(exec.executedAt)}
                 </td>
                 <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace" }}>
-                  {formatCurrency(exec.price)}
+                  {formatPrice(exec.price)}
                 </td>
                 <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace" }}>
                   {formatQuantity(exec.quantity)}

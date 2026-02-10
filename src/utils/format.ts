@@ -45,7 +45,12 @@ export function formatMicroPrice(value: number): string {
 
 // Smart price formatter: uses subscript notation for micro-prices, standard for normal
 export function formatPrice(value: number): string {
-  if (value > 0 && value < 0.01) return formatMicroPrice(value);
+  if (value === 0) return '$0.00';
+  const abs = Math.abs(value);
+  if (abs > 0 && abs < 0.01) {
+    const formatted = formatMicroPrice(abs);
+    return value < 0 ? `-${formatted}` : formatted;
+  }
   return formatCurrency(value);
 }
 
@@ -55,6 +60,14 @@ export function formatCompactNumber(value: number): string {
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
   if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
   return `$${value.toFixed(0)}`;
+}
+
+// Format large numbers compactly without dollar sign: 1234567 => "1.23M"
+export function formatCompactCount(value: number): string {
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)}B`;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return value.toLocaleString();
 }
 
 export function formatDate(dateString: string): string {

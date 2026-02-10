@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import { format } from 'date-fns';
 import { Search, TrendingUp, TrendingDown } from 'lucide-react';
-import { formatCurrency, formatPercent } from '../utils/format';
+import { formatPrice, formatPercent, formatCompactNumber, formatCompactCount } from '../utils/format';
 import PageTransition from '../components/PageTransition';
 
 export default function Analytics() {
@@ -161,7 +161,7 @@ export default function Analytics() {
                   {price && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
                       <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontFamily: "'DM Mono', monospace" }}>
-                        {formatCurrency(price.price)}
+                        {formatPrice(price.price)}
                       </span>
                       <span style={{
                         fontSize: '12px',
@@ -208,7 +208,7 @@ export default function Analytics() {
                     fontFamily: "'DM Mono', monospace",
                     letterSpacing: '-1px',
                   }}>
-                    {formatCurrency(currentPrice.price)}
+                    {formatPrice(currentPrice.price)}
                   </span>
                   <span style={{
                     display: 'flex',
@@ -270,11 +270,11 @@ export default function Analytics() {
                   tick={{ fontSize: 12, fill: 'var(--text-muted)' }}
                   tickLine={false}
                   axisLine={{ stroke: 'var(--border)' }}
-                  tickFormatter={(value) => `$${value.toLocaleString()}`}
+                  tickFormatter={(value) => formatPrice(value)}
                   domain={['auto', 'auto']}
                 />
                 <Tooltip
-                  formatter={(value) => [formatCurrency(value as number), 'Price']}
+                  formatter={(value) => [formatPrice(value as number), 'Price']}
                   contentStyle={{
                     borderRadius: '12px',
                     border: '1px solid var(--border-light)',
@@ -302,55 +302,75 @@ export default function Analytics() {
           )}
 
           {/* Price Stats */}
-          {currentPrice && (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(4, 1fr)',
-              gap: '16px',
-              marginTop: '24px',
-              paddingTop: '24px',
-              borderTop: '1px solid var(--border)',
-            }}>
-              <div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
-                  24h High
+          {currentPrice && (() => {
+            const hasExtendedMetrics = currentPrice.marketCap || currentPrice.fdv || currentPrice.liquidityUsd || currentPrice.txnCount24h || currentPrice.holderCount;
+            const labelStyle = { fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.5px', marginBottom: '6px' };
+            const valueStyle = { fontWeight: 500, color: 'var(--text-primary)', fontFamily: "'DM Mono', monospace" };
+            return (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: hasExtendedMetrics ? 'repeat(4, 1fr)' : 'repeat(4, 1fr)',
+                gap: '16px',
+                marginTop: '24px',
+                paddingTop: '24px',
+                borderTop: '1px solid var(--border)',
+              }}>
+                <div>
+                  <div style={labelStyle}>24h High</div>
+                  <div style={valueStyle}>{formatPrice(currentPrice.high24h)}</div>
                 </div>
-                <div style={{ fontWeight: 500, color: 'var(--text-primary)', fontFamily: "'DM Mono', monospace" }}>
-                  {formatCurrency(currentPrice.high24h)}
+                <div>
+                  <div style={labelStyle}>24h Low</div>
+                  <div style={valueStyle}>{formatPrice(currentPrice.low24h)}</div>
                 </div>
+                <div>
+                  <div style={labelStyle}>24h Change</div>
+                  <div style={{
+                    ...valueStyle,
+                    color: currentPrice.change24h >= 0 ? 'var(--profit)' : 'var(--loss)',
+                  }}>
+                    {currentPrice.change24h >= 0 ? '+' : ''}{formatPrice(currentPrice.change24h)}
+                  </div>
+                </div>
+                <div>
+                  <div style={labelStyle}>24h Volume</div>
+                  <div style={valueStyle}>
+                    {currentPrice.volume24h ? formatCompactNumber(currentPrice.volume24h) : 'N/A'}
+                  </div>
+                </div>
+                {currentPrice.marketCap ? (
+                  <div>
+                    <div style={labelStyle}>Market Cap</div>
+                    <div style={valueStyle}>{formatCompactNumber(currentPrice.marketCap)}</div>
+                  </div>
+                ) : null}
+                {currentPrice.fdv ? (
+                  <div>
+                    <div style={labelStyle}>FDV</div>
+                    <div style={valueStyle}>{formatCompactNumber(currentPrice.fdv)}</div>
+                  </div>
+                ) : null}
+                {currentPrice.liquidityUsd ? (
+                  <div>
+                    <div style={labelStyle}>Liquidity</div>
+                    <div style={valueStyle}>{formatCompactNumber(currentPrice.liquidityUsd)}</div>
+                  </div>
+                ) : null}
+                {currentPrice.txnCount24h ? (
+                  <div>
+                    <div style={labelStyle}>24h Txns</div>
+                    <div style={valueStyle}>{formatCompactCount(currentPrice.txnCount24h)}</div>
+                  </div>
+                ) : null}
+                {currentPrice.holderCount ? (
+                  <div>
+                    <div style={labelStyle}>Holders</div>
+                    <div style={valueStyle}>{formatCompactCount(currentPrice.holderCount)}</div>
+                  </div>
+                ) : null}
               </div>
-              <div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
-                  24h Low
-                </div>
-                <div style={{ fontWeight: 500, color: 'var(--text-primary)', fontFamily: "'DM Mono', monospace" }}>
-                  {formatCurrency(currentPrice.low24h)}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
-                  24h Change
-                </div>
-                <div style={{
-                  fontWeight: 500,
-                  color: currentPrice.change24h >= 0 ? 'var(--profit)' : 'var(--loss)',
-                  fontFamily: "'DM Mono', monospace",
-                }}>
-                  {currentPrice.change24h >= 0 ? '+' : ''}{formatCurrency(currentPrice.change24h)}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
-                  24h Volume
-                </div>
-                <div style={{ fontWeight: 500, color: 'var(--text-primary)', fontFamily: "'DM Mono', monospace" }}>
-                  ${currentPrice.volume24h?.toLocaleString(undefined, {
-                    maximumFractionDigits: 0,
-                  }) || 'N/A'}
-                </div>
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
