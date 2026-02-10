@@ -14,6 +14,7 @@ import {
 import { format } from 'date-fns';
 import { Search, TrendingUp, TrendingDown } from 'lucide-react';
 import { formatPrice, formatPercent, formatCompactNumber, formatCompactCount } from '../utils/format';
+import { priceKey as getPriceKey } from '../utils/priceKey';
 import PageTransition from '../components/PageTransition';
 
 export default function Analytics() {
@@ -28,7 +29,7 @@ export default function Analytics() {
   // Get unique symbols from positions
   const trackedAssets = Array.from(
     new Map(
-      positions.map((p) => [`${p.symbol}-${p.assetType}`, { symbol: p.symbol, assetType: p.assetType }])
+      positions.map((p) => [getPriceKey(p), { symbol: p.symbol, assetType: p.assetType, chain: p.chain, contractAddress: p.contractAddress }])
     ).values()
   );
 
@@ -72,7 +73,10 @@ export default function Analytics() {
     setSearchInput(symbol);
   };
 
-  const currentPrice = prices[`${selectedSymbol}-${selectedAssetType}`];
+  const selectedAsset = trackedAssets.find((a) => a.symbol === selectedSymbol && a.assetType === selectedAssetType);
+  const currentPrice = selectedAsset
+    ? prices[getPriceKey(selectedAsset)]
+    : prices[`${selectedSymbol}-${selectedAssetType}`];
 
   const chartData = priceHistory.map((p) => ({
     date: format(new Date(p.timestamp), 'MMM d'),
@@ -133,8 +137,9 @@ export default function Analytics() {
             Your Assets
           </h3>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            {trackedAssets.map(({ symbol, assetType }) => {
-              const price = prices[`${symbol}-${assetType}`];
+            {trackedAssets.map((asset) => {
+              const { symbol, assetType } = asset;
+              const price = prices[getPriceKey(asset)];
               const isSelected = selectedSymbol === symbol && selectedAssetType === assetType;
               return (
                 <button
@@ -303,13 +308,12 @@ export default function Analytics() {
 
           {/* Price Stats */}
           {currentPrice && (() => {
-            const hasExtendedMetrics = currentPrice.marketCap || currentPrice.fdv || currentPrice.liquidityUsd || currentPrice.txnCount24h || currentPrice.holderCount;
             const labelStyle = { fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.5px', marginBottom: '6px' };
             const valueStyle = { fontWeight: 500, color: 'var(--text-primary)', fontFamily: "'DM Mono', monospace" };
             return (
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: hasExtendedMetrics ? 'repeat(4, 1fr)' : 'repeat(4, 1fr)',
+                gridTemplateColumns: 'repeat(4, 1fr)',
                 gap: '16px',
                 marginTop: '24px',
                 paddingTop: '24px',
