@@ -200,6 +200,12 @@ body {
   box-shadow: var(--shadow-lg), var(--shadow-glow);
 }
 
+/* Modal close button */
+.modal-close-btn:hover {
+  background: var(--bg-hover) !important;
+  border-color: var(--border-light) !important;
+}
+
 /* Buttons */
 .btn-primary {
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dim) 100%);

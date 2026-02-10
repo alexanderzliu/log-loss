@@ -1,3 +1,5 @@
+import Modal from './Modal';
+
 interface ConfirmDialogProps {
   title: string;
   message: string;
@@ -7,18 +9,8 @@ interface ConfirmDialogProps {
 
 export default function ConfirmDialog({ title, message, onConfirm, onCancel }: ConfirmDialogProps) {
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'var(--overlay-bg)',
-      backdropFilter: 'blur(4px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 50,
-      animation: 'overlayIn 0.25s ease-out',
-    }}>
-      <div className="card" style={{ padding: '24px', maxWidth: '400px', width: '100%', margin: '16px', animation: 'modalIn 0.35s var(--spring)' }}>
+    <Modal onClose={onCancel} maxWidth="400px">
+      <div style={{ padding: '24px' }}>
         <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>
           {title}
         </h3>
@@ -46,6 +38,6 @@ export default function ConfirmDialog({ title, message, onConfirm, onCancel }: C
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

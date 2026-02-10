@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import { X, CircleDot, Zap, Target } from 'lucide-react';
+import { useState } from 'react';
+import { CircleDot, Zap, Target } from 'lucide-react';
 import { useStore } from '../../store/useStore';
+import Modal from '../Modal';
 import { FieldSection, FieldGroup, PrefixInput } from '../form';
 import type { Prediction, PredictionFormData, PredictionUpdateData } from '../../types';
 
@@ -26,14 +27,6 @@ export default function PredictionForm({ prediction, isEditing, onClose }: Predi
     hypothesis: prediction?.hypothesis || '',
     notes: prediction?.notes || '',
   });
-
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,103 +77,39 @@ export default function PredictionForm({ prediction, isEditing, onClose }: Predi
     ? Math.round(formData.entryPrice * 100)
     : 0;
 
+  const headerContent = (
+    <div className="flex items-center gap-3">
+      <div style={{
+        width: '36px',
+        height: '36px',
+        borderRadius: '12px',
+        background: 'var(--accent-glow)',
+        border: '1px solid rgba(16, 185, 129, 0.15)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <CircleDot size={18} style={{ color: 'var(--accent)' }} />
+      </div>
+      <div>
+        <h2 style={{ fontSize: '17px', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.2 }}>{title}</h2>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+          {isEditing ? `Editing prediction` : 'Enter your prediction details'}
+        </p>
+      </div>
+    </div>
+  );
+
   return (
-    <div
-      className="fixed inset-0 flex items-center justify-center z-50 p-6"
-      style={{
-        background: 'var(--overlay-bg)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-        animation: 'overlayIn 0.25s ease-out',
-      }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+    <Modal
+      onClose={onClose}
+      accentBar={isEditing
+        ? 'linear-gradient(90deg, var(--accent-warm), rgba(245, 158, 11, 0.1))'
+        : 'linear-gradient(90deg, var(--accent), rgba(16, 185, 129, 0.1))'}
+      header={headerContent}
+      error={error}
     >
-      <div
-        className="w-full max-w-[520px] max-h-[85vh] overflow-hidden flex flex-col"
-        style={{
-          background: 'var(--bg-surface)',
-          borderRadius: '20px',
-          border: '1px solid var(--border-light)',
-          boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.6), 0 0 40px rgba(16, 185, 129, 0.04), 0 0 0 1px rgba(255,255,255,0.03)',
-          animation: 'modalIn 0.35s var(--spring)',
-        }}
-      >
-        {/* Accent bar */}
-        <div style={{
-          height: '3px',
-          background: isEditing
-            ? 'linear-gradient(90deg, var(--accent-warm), rgba(245, 158, 11, 0.1))'
-            : 'linear-gradient(90deg, var(--accent), rgba(16, 185, 129, 0.1))',
-          borderRadius: '20px 20px 0 0',
-        }} />
-
-        {/* Header */}
-        <div
-          className="flex items-center justify-between"
-          style={{ padding: '20px 24px 16px' }}
-        >
-          <div className="flex items-center gap-3">
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '12px',
-              background: 'var(--accent-glow)',
-              border: '1px solid rgba(16, 185, 129, 0.15)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <CircleDot size={18} style={{ color: 'var(--accent)' }} />
-            </div>
-            <div>
-              <h2 style={{ fontSize: '17px', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.2 }}>{title}</h2>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                {isEditing ? `Editing prediction` : 'Enter your prediction details'}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '10px',
-              background: 'var(--bg-elevated)',
-              border: '1px solid var(--border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.background = 'var(--bg-hover)';
-              e.currentTarget.style.borderColor = 'var(--border-light)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.background = 'var(--bg-elevated)';
-              e.currentTarget.style.borderColor = 'var(--border)';
-            }}
-          >
-            <X size={14} style={{ color: 'var(--text-muted)' }} />
-          </button>
-        </div>
-
-        {/* Form */}
         <form onSubmit={handleSubmit} className="overflow-y-auto flex-1" style={{ padding: '0 24px 24px' }}>
-          {error && (
-            <div style={{
-              padding: '10px 14px',
-              borderRadius: '12px',
-              fontSize: '13px',
-              background: 'rgba(248, 113, 113, 0.06)',
-              border: '1px solid rgba(248, 113, 113, 0.12)',
-              color: 'var(--loss)',
-              marginBottom: '16px',
-            }}>
-              {error}
-            </div>
-          )}
 
           <div className="flex flex-col" style={{ gap: '16px' }}>
             {/* Market Section */}
@@ -403,7 +332,6 @@ export default function PredictionForm({ prediction, isEditing, onClose }: Predi
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
