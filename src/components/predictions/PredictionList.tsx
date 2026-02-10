@@ -68,7 +68,7 @@ export default function PredictionList({ predictions, onEdit, onClose }: Predict
   }
 
   return (
-    <div className="card" style={{ overflow: 'hidden' }}>
+    <div className="card" style={{ overflow: 'visible' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ borderBottom: '1px solid var(--border)' }}>

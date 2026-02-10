@@ -62,6 +62,11 @@ export default function Dashboard() {
 
   const isUp = totalPnl >= 0;
 
+  // Glow intensity scales with P&L magnitude (saturates at ±50%)
+  const intensity = Math.min(1, Math.sqrt(Math.abs(totalPnlPercent) / 50));
+  const ga = (base: number) => +(base * (0.2 + 0.8 * intensity)).toFixed(3);
+  const gc = isUp ? '52, 211, 153' : '248, 113, 113';
+
   const stagger = (index: number) => ({
     animation: `slideUp 0.4s ease-out ${index * 0.06}s both`,
   });
@@ -80,9 +85,7 @@ export default function Dashboard() {
             width: '110%',
             height: '200%',
             borderRadius: '50%',
-            background: isUp
-              ? 'radial-gradient(ellipse, rgba(52, 211, 153, 0.1) 0%, rgba(52, 211, 153, 0.03) 40%, transparent 70%)'
-              : 'radial-gradient(ellipse, rgba(248, 113, 113, 0.1) 0%, rgba(248, 113, 113, 0.03) 40%, transparent 70%)',
+            background: `radial-gradient(ellipse, rgba(${gc}, ${ga(0.12)}) 0%, rgba(${gc}, ${ga(0.04)}) 40%, transparent 70%)`,
             pointerEvents: 'none',
             transition: 'background 0.8s ease',
           }} />
@@ -92,12 +95,10 @@ export default function Dashboard() {
             padding: '36px 40px',
             borderRadius: '24px',
             background: 'var(--gradient-card)',
-            border: `1px solid ${isUp ? 'rgba(52, 211, 153, 0.12)' : 'rgba(248, 113, 113, 0.12)'}`,
+            border: `1px solid rgba(${gc}, ${ga(0.15)})`,
             position: 'relative',
             overflow: 'hidden',
-            boxShadow: isUp
-              ? 'var(--shadow-card), 0 0 60px rgba(52, 211, 153, 0.06), 0 0 0 1px rgba(52, 211, 153, 0.05)'
-              : 'var(--shadow-card), 0 0 60px rgba(248, 113, 113, 0.06), 0 0 0 1px rgba(248, 113, 113, 0.05)',
+            boxShadow: `var(--shadow-card), 0 0 60px rgba(${gc}, ${ga(0.08)}), 0 0 0 1px rgba(${gc}, ${ga(0.06)})`,
             transition: 'border-color 0.5s ease, box-shadow 0.5s ease',
           }}>
             {/* Inner atmospheric glow */}
@@ -108,9 +109,7 @@ export default function Dashboard() {
               width: '300px',
               height: '300px',
               borderRadius: '50%',
-              background: isUp
-                ? 'radial-gradient(circle, rgba(52, 211, 153, 0.1) 0%, transparent 70%)'
-                : 'radial-gradient(circle, rgba(248, 113, 113, 0.1) 0%, transparent 70%)',
+              background: `radial-gradient(circle, rgba(${gc}, ${ga(0.12)}) 0%, transparent 70%)`,
               pointerEvents: 'none',
               transition: 'background 0.8s ease',
             }} />
@@ -143,8 +142,8 @@ export default function Dashboard() {
                 gap: '6px',
                 padding: '6px 14px',
                 borderRadius: '9999px',
-                background: isUp ? 'rgba(52, 211, 153, 0.1)' : 'rgba(248, 113, 113, 0.1)',
-                border: `1px solid ${isUp ? 'rgba(52, 211, 153, 0.2)' : 'rgba(248, 113, 113, 0.2)'}`,
+                background: `rgba(${gc}, ${ga(0.12)})`,
+                border: `1px solid rgba(${gc}, ${ga(0.25)})`,
               }}>
                 {isUp ? (
                   <ArrowUpRight size={18} style={{ color: 'var(--profit)' }} />
@@ -156,9 +155,7 @@ export default function Dashboard() {
                   fontSize: '15px',
                   fontWeight: 600,
                   fontVariantNumeric: 'tabular-nums',
-                  textShadow: isUp
-                    ? '0 0 20px rgba(52, 211, 153, 0.4)'
-                    : '0 0 20px rgba(248, 113, 113, 0.4)',
+                  textShadow: `0 0 20px rgba(${gc}, ${ga(0.5)})`,
                 }}>
                   {animatedTotalPnl >= 0 ? '+' : ''}{formatCurrency(animatedTotalPnl)} ({formatPercent(totalPnlPercent)})
                 </span>
@@ -195,6 +192,7 @@ export default function Dashboard() {
             numericValue={unrealizedPnl}
             subtext={formatPercent(unrealizedPnlPercent)}
             positive={unrealizedPnl >= 0}
+            glowIntensity={intensity}
             style={stagger(1)}
           />
           {(() => {
@@ -204,6 +202,7 @@ export default function Dashboard() {
                 label="Realized P&L"
                 numericValue={realizedPnl}
                 positive={realizedPnl >= 0}
+                glowIntensity={intensity}
                 style={stagger(2)}
               />
             );
@@ -475,6 +474,7 @@ function StatCard({
   formatter,
   subtext,
   positive,
+  glowIntensity: t = 1,
   style,
 }: {
   label: string;
@@ -482,6 +482,7 @@ function StatCard({
   formatter?: (v: number) => string;
   subtext?: string;
   positive?: boolean;
+  glowIntensity?: number;
   style?: React.CSSProperties;
 }) {
   const animated = useAnimatedNumber(numericValue);
@@ -495,11 +496,14 @@ function StatCard({
     ? (positive ? 'stat-gradient-profit' : 'stat-gradient-loss')
     : 'stat-gradient-neutral';
 
-  // Dynamic glow on the card border based on value
+  // Dynamic glow on the card border scaled by intensity
+  const sga = (base: number) => +(base * (0.2 + 0.8 * t)).toFixed(3);
+  const sgc = positive ? '52, 211, 153' : '248, 113, 113';
   const glowBorder = positive !== undefined
-    ? (positive
-      ? { borderColor: 'rgba(52, 211, 153, 0.1)', boxShadow: 'var(--shadow-card), 0 0 20px rgba(52, 211, 153, 0.04)' }
-      : { borderColor: 'rgba(248, 113, 113, 0.1)', boxShadow: 'var(--shadow-card), 0 0 20px rgba(248, 113, 113, 0.04)' })
+    ? {
+        borderColor: `rgba(${sgc}, ${sga(0.12)})`,
+        boxShadow: `var(--shadow-card), 0 0 20px rgba(${sgc}, ${sga(0.05)})`,
+      }
     : {};
 
   return (
@@ -520,9 +524,7 @@ function StatCard({
           width: '3px',
           borderRadius: '0 3px 3px 0',
           background: positive ? 'var(--profit)' : 'var(--loss)',
-          boxShadow: positive
-            ? '0 0 8px rgba(52, 211, 153, 0.5)'
-            : '0 0 8px rgba(248, 113, 113, 0.5)',
+          boxShadow: `0 0 8px rgba(${sgc}, ${sga(0.5)})`,
         }} />
       )}
       <p style={{
@@ -541,9 +543,7 @@ function StatCard({
         letterSpacing: '-1.5px',
         fontVariantNumeric: 'tabular-nums',
         textShadow: positive !== undefined
-          ? (positive
-            ? '0 0 30px rgba(52, 211, 153, 0.2)'
-            : '0 0 30px rgba(248, 113, 113, 0.2)')
+          ? `0 0 30px rgba(${sgc}, ${sga(0.25)})`
           : 'none',
       }}>
         {displayValue}
