@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, TrendingUp, TrendingDown, Shield, Target, Zap } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import TokenSearch from './TokenSearch';
+import { FieldSection, FieldGroup, PrefixInput } from '../form';
 import type { Position, TradeFormData, PositionUpdateData } from '../../types';
 
 interface TradeFormProps {
@@ -567,83 +568,6 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
           </div>
         </form>
       </div>
-    </div>
-  );
-}
-
-
-/* ---------- Subcomponents ---------- */
-
-function FieldSection({ label, icon, children }: {
-  label: string;
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div style={{
-      padding: '14px',
-      borderRadius: '16px',
-      background: 'rgba(255, 255, 255, 0.02)',
-      border: '1px solid var(--border)',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '12px',
-    }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        color: 'var(--text-muted)',
-        fontSize: '11px',
-        fontWeight: 600,
-        textTransform: 'uppercase',
-        letterSpacing: '0.8px',
-      }}>
-        {icon}
-        {label}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function FieldGroup({ label, optional, children }: {
-  label: string;
-  optional?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label
-        className="block mb-1.5"
-        style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)' }}
-      >
-        {label}
-        {optional && (
-          <span style={{ color: 'var(--text-muted)', fontWeight: 400, marginLeft: '4px' }}>
-            (opt)
-          </span>
-        )}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-function PrefixInput({ prefix, ...props }: { prefix: string } & React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <div className="relative">
-      <span
-        className="absolute left-3.5 top-1/2 -translate-y-1/2"
-        style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: 500 }}
-      >
-        {prefix}
-      </span>
-      <input
-        {...props}
-        className={`w-full ${props.className || ''}`}
-        style={{ paddingLeft: '28px', ...props.style }}
-      />
     </div>
   );
 }

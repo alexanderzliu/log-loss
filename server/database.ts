@@ -81,6 +81,9 @@ export function initDatabase() {
   // Add chain/contract_address support for DexScreener tokens
   migrateAddChainColumns();
 
+  // Add predictions table for Kalshi prediction market trades
+  migrateCreatePredictions();
+
   console.log('Database initialized successfully');
 }
 
@@ -262,4 +265,36 @@ function migrateAddChainColumns() {
     db.exec('CREATE INDEX IF NOT EXISTS idx_positions_chain_address ON positions(chain, contract_address)');
     console.log('Added chain/contract_address columns to positions');
   }
+}
+
+function migrateCreatePredictions() {
+  // Idempotent: CREATE TABLE IF NOT EXISTS
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS predictions (
+      id TEXT PRIMARY KEY,
+      market TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT '',
+      side TEXT NOT NULL CHECK(side IN ('yes', 'no')),
+      status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'closed')),
+      resolution TEXT CHECK(resolution IN ('yes', 'no')),
+      entry_price REAL NOT NULL,
+      exit_price REAL,
+      quantity REAL NOT NULL CHECK(quantity > 0),
+      cost_basis REAL NOT NULL,
+      pnl REAL,
+      pnl_percent REAL,
+      hypothesis TEXT DEFAULT '',
+      notes TEXT DEFAULT '',
+      expires_at TEXT,
+      opened_at TEXT NOT NULL,
+      closed_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_predictions_status ON predictions(status);
+    CREATE INDEX IF NOT EXISTS idx_predictions_side ON predictions(side);
+  `);
 }

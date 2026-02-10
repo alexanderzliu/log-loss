@@ -1,7 +1,8 @@
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { useState, useEffect, type CSSProperties } from 'react';
-import { BookOpen, LayoutDashboard, TrendingUp, Sun, Moon } from 'lucide-react';
+import { BookOpen, LayoutDashboard, TrendingUp, CircleDot, Sun, Moon } from 'lucide-react';
 import Journal from './pages/Journal';
+import Predictions from './pages/Predictions';
 import Dashboard from './pages/Dashboard';
 import Analytics from './pages/Analytics';
 import './index.css';
@@ -89,9 +90,13 @@ function App() {
               <LayoutDashboard size={18} />
               Dashboard
             </NavLink>
-            <NavLink to="/journal" style={navLinkStyle}>
+            <NavLink to="/trades" style={navLinkStyle}>
               <BookOpen size={18} />
-              Journal
+              Trades
+            </NavLink>
+            <NavLink to="/predictions" style={navLinkStyle}>
+              <CircleDot size={18} />
+              Predictions
             </NavLink>
             <NavLink to="/analytics" style={navLinkStyle}>
               <TrendingUp size={18} />
@@ -129,7 +134,9 @@ function App() {
         <main style={{ marginLeft: '220px', flex: 1, padding: '40px 48px' }}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/journal" element={<Journal />} />
+            <Route path="/trades" element={<Journal />} />
+            <Route path="/journal" element={<Navigate to="/trades" replace />} />
+            <Route path="/predictions" element={<Predictions />} />
             <Route path="/analytics" element={<Analytics />} />
           </Routes>
         </main>

@@ -17,8 +17,11 @@ export default function Dashboard() {
     prices,
     portfolioSummary,
     portfolioError,
+    predictionsSummary,
+    predictionsSummaryError,
     fetchPositions,
     fetchPortfolioSummary,
+    fetchPredictionsSummary,
     refreshPrices,
   } = useStore();
 
@@ -27,9 +30,10 @@ export default function Dashboard() {
   useEffect(() => {
     fetchPositions();
     fetchPortfolioSummary();
+    fetchPredictionsSummary();
     const interval = setInterval(refreshPrices, 60000);
     return () => clearInterval(interval);
-  }, [fetchPositions, fetchPortfolioSummary, refreshPrices]);
+  }, [fetchPositions, fetchPortfolioSummary, fetchPredictionsSummary, refreshPrices]);
 
   const openPositions = positions.filter((p) => p.status === 'open');
 
@@ -39,14 +43,17 @@ export default function Dashboard() {
     return total + (pnl ?? 0);
   }, 0);
 
-  const totalInvested = openPositions.reduce(
+  const positionsInvested = openPositions.reduce(
     (total, pos) => total + pos.avgEntryPrice * pos.remainingQuantity,
     0
   );
+  const predictionsInvested = predictionsSummary?.openPredictionsCost || 0;
+  const totalInvested = positionsInvested + predictionsInvested;
 
-  const unrealizedPnlPercent = totalInvested > 0 ? (unrealizedPnl / totalInvested) * 100 : 0;
-  const totalPnl = (portfolioSummary?.realizedPnl || 0) + unrealizedPnl;
-  const totalCostBasis = portfolioSummary?.totalCostBasis || 0;
+  const unrealizedPnlPercent = positionsInvested > 0 ? (unrealizedPnl / positionsInvested) * 100 : 0;
+  const predictionsPnl = predictionsSummary?.predictionsPnl || 0;
+  const totalPnl = (portfolioSummary?.realizedPnl || 0) + unrealizedPnl + predictionsPnl;
+  const totalCostBasis = (portfolioSummary?.totalCostBasis || 0) + (predictionsSummary?.predictionsCostBasis || 0);
   const totalPnlPercent = totalCostBasis > 0 ? (totalPnl / totalCostBasis) * 100 : 0;
 
   const animatedPortfolioValue = useAnimatedNumber(totalInvested + unrealizedPnl);
@@ -123,7 +130,7 @@ export default function Dashboard() {
         </div>
 
         {/* Stats Row */}
-        {portfolioError && (
+        {(portfolioError || predictionsSummaryError) && (
           <div className="card" style={{
             padding: '16px 24px',
             marginBottom: '20px',
@@ -132,7 +139,9 @@ export default function Dashboard() {
             color: 'var(--loss)',
             fontSize: '14px',
           }}>
-            Failed to load portfolio summary. <button onClick={fetchPortfolioSummary} className="btn-ghost" style={{ color: 'var(--loss)', textDecoration: 'underline', padding: '0 4px' }}>Retry</button>
+            {portfolioError && <>Failed to load portfolio summary. <button onClick={fetchPortfolioSummary} className="btn-ghost" style={{ color: 'var(--loss)', textDecoration: 'underline', padding: '0 4px' }}>Retry</button></>}
+            {portfolioError && predictionsSummaryError && <br />}
+            {predictionsSummaryError && <>Failed to load predictions summary. <button onClick={fetchPredictionsSummary} className="btn-ghost" style={{ color: 'var(--loss)', textDecoration: 'underline', padding: '0 4px' }}>Retry</button></>}
           </div>
         )}
         <div style={{
@@ -149,19 +158,34 @@ export default function Dashboard() {
             positive={unrealizedPnl >= 0}
             style={stagger(1)}
           />
-          <StatCard
-            label="Realized P&L"
-            numericValue={portfolioSummary?.realizedPnl || 0}
-            positive={(portfolioSummary?.realizedPnl || 0) >= 0}
-            style={stagger(2)}
-          />
-          <StatCard
-            label="Win Rate"
-            numericValue={portfolioSummary?.winRate || 0}
-            formatter={(v) => `${v.toFixed(0)}%`}
-            subtext={`${portfolioSummary?.totalExecutions || 0} executions`}
-            style={stagger(3)}
-          />
+          {(() => {
+            const realizedPnl = (portfolioSummary?.realizedPnl || 0) + predictionsPnl;
+            return (
+              <StatCard
+                label="Realized P&L"
+                numericValue={realizedPnl}
+                positive={realizedPnl >= 0}
+                style={stagger(2)}
+              />
+            );
+          })()}
+          {(() => {
+            const tradesWins = portfolioSummary ? (portfolioSummary.winRate / 100) * portfolioSummary.closedPositions : 0;
+            const tradesTotal = portfolioSummary?.closedPositions || 0;
+            const predictionsWins = predictionsSummary ? (predictionsSummary.predictionsWinRate / 100) * predictionsSummary.closedPredictions : 0;
+            const predictionsTotal = predictionsSummary?.closedPredictions || 0;
+            const combinedTotal = tradesTotal + predictionsTotal;
+            const combinedWinRate = combinedTotal > 0 ? ((tradesWins + predictionsWins) / combinedTotal) * 100 : 0;
+            return (
+              <StatCard
+                label="Win Rate"
+                numericValue={combinedWinRate}
+                formatter={(v) => `${v.toFixed(0)}%`}
+                subtext={`${combinedTotal} closed`}
+                style={stagger(3)}
+              />
+            );
+          })()}
         </div>
 
         {/* Open Positions Table */}

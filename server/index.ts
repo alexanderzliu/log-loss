@@ -3,6 +3,7 @@ import cors from 'cors';
 import { initDatabase, db } from './database';
 import positionsRouter from './routes/positions';
 import pricesRouter from './routes/prices';
+import predictionsRouter from './routes/predictions';
 
 const app = express();
 const PORT = 3001;
@@ -16,6 +17,7 @@ initDatabase();
 // Routes
 app.use('/api/positions', positionsRouter);
 app.use('/api/prices', pricesRouter);
+app.use('/api/predictions', predictionsRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {

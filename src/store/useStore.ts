@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import type { Position, PriceData, PortfolioSummary, AssetType, TradeFormData, PositionUpdateData } from '../types';
+import type { Position, PriceData, PortfolioSummary, AssetType, TradeFormData, PositionUpdateData, Prediction, PredictionFormData, PredictionCloseData, PredictionUpdateData, PredictionsSummary } from '../types';
 import * as positionsApi from '../api/positions';
 import * as pricesApi from '../api/prices';
+import * as predictionsApi from '../api/predictions';
 import { priceKey } from '../utils/priceKey';
 
 // Extract unique assets from open positions
@@ -29,7 +30,15 @@ interface StoreState {
   portfolioLoading: boolean;
   portfolioError: string | null;
 
-  // Actions
+  // Predictions
+  predictions: Prediction[];
+  predictionsLoading: boolean;
+  predictionsError: string | null;
+  predictionsSummary: PredictionsSummary | null;
+  predictionsSummaryLoading: boolean;
+  predictionsSummaryError: string | null;
+
+  // Position Actions
   fetchPositions: (filters?: { status?: string; assetType?: string; symbol?: string }) => Promise<void>;
   createTrade: (data: TradeFormData) => Promise<Position>;
   updatePosition: (id: string, data: PositionUpdateData) => Promise<Position>;
@@ -38,6 +47,14 @@ interface StoreState {
   fetchPortfolioSummary: () => Promise<void>;
   fetchPrices: (assets: { symbol: string; assetType: AssetType; chain?: string | null; contractAddress?: string | null }[]) => Promise<void>;
   refreshPrices: () => Promise<void>;
+
+  // Prediction Actions
+  fetchPredictions: (filters?: { status?: string }) => Promise<void>;
+  createPrediction: (data: PredictionFormData) => Promise<Prediction>;
+  updatePrediction: (id: string, data: PredictionUpdateData) => Promise<Prediction>;
+  closePrediction: (id: string, data: PredictionCloseData) => Promise<Prediction>;
+  deletePrediction: (id: string) => Promise<void>;
+  fetchPredictionsSummary: () => Promise<void>;
 }
 
 export const useStore = create<StoreState>((set, get) => ({
@@ -51,6 +68,12 @@ export const useStore = create<StoreState>((set, get) => ({
   portfolioSummary: null,
   portfolioLoading: false,
   portfolioError: null,
+  predictions: [],
+  predictionsLoading: false,
+  predictionsError: null,
+  predictionsSummary: null,
+  predictionsSummaryLoading: false,
+  predictionsSummaryError: null,
 
   // Positions actions
   fetchPositions: async (filters) => {
@@ -144,6 +167,59 @@ export const useStore = create<StoreState>((set, get) => ({
     const uniqueAssets = getUniqueOpenAssets(get().positions);
     if (uniqueAssets.length > 0) {
       await get().fetchPrices(uniqueAssets);
+    }
+  },
+
+  // Prediction actions
+  fetchPredictions: async (filters) => {
+    set({ predictionsLoading: true, predictionsError: null });
+    try {
+      const predictions = await predictionsApi.fetchPredictions(filters);
+      set({ predictions, predictionsLoading: false });
+    } catch (error) {
+      set({ predictionsError: (error as Error).message, predictionsLoading: false });
+    }
+  },
+
+  createPrediction: async (data) => {
+    const prediction = await predictionsApi.createPrediction(data);
+    set((state) => ({ predictions: [prediction, ...state.predictions] }));
+    get().fetchPredictionsSummary();
+    return prediction;
+  },
+
+  updatePrediction: async (id, data) => {
+    const prediction = await predictionsApi.updatePrediction(id, data);
+    set((state) => ({
+      predictions: state.predictions.map((p) => (p.id === id ? prediction : p)),
+    }));
+    return prediction;
+  },
+
+  closePrediction: async (id, data) => {
+    const prediction = await predictionsApi.closePrediction(id, data);
+    set((state) => ({
+      predictions: state.predictions.map((p) => (p.id === id ? prediction : p)),
+    }));
+    get().fetchPredictionsSummary();
+    return prediction;
+  },
+
+  deletePrediction: async (id) => {
+    await predictionsApi.deletePrediction(id);
+    set((state) => ({
+      predictions: state.predictions.filter((p) => p.id !== id),
+    }));
+    get().fetchPredictionsSummary();
+  },
+
+  fetchPredictionsSummary: async () => {
+    set({ predictionsSummaryLoading: true, predictionsSummaryError: null });
+    try {
+      const summary = await predictionsApi.fetchPredictionsSummary();
+      set({ predictionsSummary: summary, predictionsSummaryLoading: false });
+    } catch (error) {
+      set({ predictionsSummaryError: (error as Error).message, predictionsSummaryLoading: false });
     }
   },
 }));

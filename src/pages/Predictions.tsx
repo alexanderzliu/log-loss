@@ -1,0 +1,133 @@
+import { useEffect, useState } from 'react';
+import { useStore } from '../store/useStore';
+import { Plus } from 'lucide-react';
+import PredictionList from '../components/predictions/PredictionList';
+import PredictionForm from '../components/predictions/PredictionForm';
+import PredictionCloseModal from '../components/predictions/PredictionCloseModal';
+import PageTransition from '../components/PageTransition';
+import type { Prediction } from '../types';
+
+export default function Predictions() {
+  const { predictions, predictionsLoading, fetchPredictions } = useStore();
+  const [showForm, setShowForm] = useState(false);
+  const [editingPrediction, setEditingPrediction] = useState<Prediction | null>(null);
+  const [closingPrediction, setClosingPrediction] = useState<Prediction | null>(null);
+  const [filter, setFilter] = useState<'all' | 'open' | 'closed'>('all');
+
+  useEffect(() => {
+    fetchPredictions();
+  }, [fetchPredictions]);
+
+  const filteredPredictions = predictions.filter((p) => {
+    if (filter === 'open' && p.status !== 'open') return false;
+    if (filter === 'closed' && p.status !== 'closed') return false;
+    return true;
+  });
+
+  const handleNewPrediction = () => {
+    setEditingPrediction(null);
+    setClosingPrediction(null);
+    setShowForm(true);
+  };
+
+  const handleEditPrediction = (prediction: Prediction) => {
+    setEditingPrediction(prediction);
+    setClosingPrediction(null);
+    setShowForm(true);
+  };
+
+  const handleClosePrediction = (prediction: Prediction) => {
+    setClosingPrediction(prediction);
+    setEditingPrediction(null);
+    setShowForm(false);
+  };
+
+  const handleFormClose = () => {
+    setShowForm(false);
+    setEditingPrediction(null);
+    setClosingPrediction(null);
+  };
+
+  const openCount = predictions.filter(p => p.status === 'open').length;
+  const closedCount = predictions.filter(p => p.status === 'closed').length;
+
+  return (
+    <PageTransition>
+    <div style={{ maxWidth: '1200px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
+        <div>
+          <h1 style={{ fontSize: '28px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+            Predictions
+          </h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+            Track your prediction market bets
+          </p>
+        </div>
+        <button onClick={handleNewPrediction} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Plus size={18} />
+          New Prediction
+        </button>
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '28px' }}>
+        {[
+          { key: 'all', label: 'All', count: predictions.length },
+          { key: 'open', label: 'Open', count: openCount },
+          { key: 'closed', label: 'Closed', count: closedCount },
+        ].map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key as typeof filter)}
+            style={{
+              padding: '10px 18px',
+              borderRadius: '9999px',
+              border: filter === f.key ? '1px solid var(--border-accent)' : '1px solid transparent',
+              background: filter === f.key ? 'var(--accent-soft)' : 'transparent',
+              color: filter === f.key ? 'var(--accent)' : 'var(--text-muted)',
+              fontSize: '14px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            {f.label} <span style={{ opacity: 0.6, marginLeft: '4px' }}>{f.count}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Content */}
+      {predictionsLoading ? (
+        <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
+          <p style={{ color: 'var(--text-muted)' }}>Loading...</p>
+        </div>
+      ) : (
+        <PredictionList
+          predictions={filteredPredictions}
+          onEdit={handleEditPrediction}
+          onClose={handleClosePrediction}
+        />
+      )}
+
+      {/* New/Edit Form Modal */}
+      {showForm && (
+        <PredictionForm
+          prediction={editingPrediction}
+          isEditing={!!editingPrediction}
+          onClose={handleFormClose}
+        />
+      )}
+
+      {/* Close Modal */}
+      {closingPrediction && (
+        <PredictionCloseModal
+          prediction={closingPrediction}
+          onClose={handleFormClose}
+        />
+      )}
+    </div>
+    </PageTransition>
+  );
+}

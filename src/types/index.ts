@@ -105,3 +105,65 @@ export interface PortfolioSummary {
   winRate: number;
   totalExecutions: number;
 }
+
+// --- Prediction Markets ---
+
+export type PredictionSide = 'yes' | 'no';
+export type PredictionStatus = 'open' | 'closed';
+
+export interface Prediction {
+  id: string;
+  market: string;
+  category: string;
+  side: PredictionSide;
+  status: PredictionStatus;
+  resolution: 'yes' | 'no' | null;
+  entryPrice: number;
+  exitPrice: number | null;
+  quantity: number;
+  costBasis: number;
+  pnl: number | null;
+  pnlPercent: number | null;
+  hypothesis: string;
+  notes: string;
+  expiresAt: string | null;
+  openedAt: string;
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PredictionFormData {
+  market: string;
+  category: string;
+  side: PredictionSide;
+  entryPrice: number;
+  quantity: number;
+  date: string;
+  expiresAt: string | null;
+  hypothesis: string;
+  notes: string;
+}
+
+export interface PredictionCloseData {
+  exitPrice?: number;
+  resolution?: 'yes' | 'no';
+  date: string;
+  notes?: string;
+}
+
+export interface PredictionUpdateData {
+  market?: string;
+  category?: string;
+  hypothesis?: string;
+  notes?: string;
+}
+
+export interface PredictionsSummary {
+  openPredictions: number;
+  closedPredictions: number;
+  predictionsPnl: number;
+  predictionsCostBasis: number;
+  predictionsWinRate: number;
+  openPredictionsCost: number;
+}
