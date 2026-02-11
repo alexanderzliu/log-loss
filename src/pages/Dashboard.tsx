@@ -44,20 +44,19 @@ export default function Dashboard() {
     return total + (pnl ?? 0);
   }, 0);
 
-  const positionsInvested = openPositions.reduce(
+  const openPositionsInvested = openPositions.reduce(
     (total, pos) => total + pos.avgEntryPrice * pos.remainingQuantity,
     0
   );
-  const predictionsInvested = predictionsSummary?.openPredictionsCost || 0;
-  const totalInvested = positionsInvested + predictionsInvested;
 
-  const unrealizedPnlPercent = positionsInvested > 0 ? (unrealizedPnl / positionsInvested) * 100 : 0;
+  const unrealizedPnlPercent = openPositionsInvested > 0 ? (unrealizedPnl / openPositionsInvested) * 100 : 0;
   const predictionsPnl = predictionsSummary?.predictionsPnl || 0;
   const totalPnl = (portfolioSummary?.realizedPnl || 0) + unrealizedPnl + predictionsPnl;
   const totalCostBasis = (portfolioSummary?.totalCostBasis || 0) + (predictionsSummary?.predictionsCostBasis || 0);
   const totalPnlPercent = totalCostBasis > 0 ? (totalPnl / totalCostBasis) * 100 : 0;
+  const totalInvested = totalCostBasis;
 
-  const animatedPortfolioValue = useAnimatedNumber(totalInvested + unrealizedPnl);
+  const animatedPortfolioValue = useAnimatedNumber(totalInvested + totalPnl);
   const animatedTotalPnl = useAnimatedNumber(totalPnl);
 
   const isUp = totalPnl >= 0;
