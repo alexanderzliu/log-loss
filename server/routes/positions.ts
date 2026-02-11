@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../database';
 import { v4 as uuidv4 } from 'uuid';
-import type { Position, Execution } from '../../src/types';
+import type { Position, Execution } from '../../shared/types.ts';
 
 const router = Router();
 
