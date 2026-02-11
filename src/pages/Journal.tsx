@@ -60,16 +60,12 @@ export default function Journal() {
 
   return (
     <PageTransition>
-    <div style={{ maxWidth: '1200px' }}>
+    <div className="page-container">
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
+      <div className="flex justify-between items-center mb-10">
         <div>
-          <h1 style={{ fontSize: '32px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '6px', letterSpacing: '-0.5px' }}>
-            Journal
-          </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-            Track and manage your positions
-          </p>
+          <h1 className="page-header">Journal</h1>
+          <p className="page-subtitle">Track and manage your positions</p>
         </div>
         <button onClick={handleNewTrade} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Plus size={18} />
@@ -78,7 +74,7 @@ export default function Journal() {
       </div>
 
       {/* Filters and View Toggle */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
+      <div className="flex justify-between items-center mb-7">
         <FilterPills
           options={[
             { key: 'all', label: 'All', count: positions.length },
@@ -140,8 +136,8 @@ export default function Journal() {
 
       {/* Content */}
       {positionsLoading ? (
-        <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-          <p style={{ color: 'var(--text-muted)' }}>Loading...</p>
+        <div className="card empty-state">
+          <p className="empty-state-text">Loading...</p>
         </div>
       ) : viewMode === 'positions' ? (
         <PositionList

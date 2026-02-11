@@ -43,11 +43,9 @@ export default function ExecutionList({ positions }: ExecutionListProps) {
 
   if (executions.length === 0) {
     return (
-      <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>No executions yet</p>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-          Click "New Trade" to record your first trade
-        </p>
+      <div className="card empty-state">
+        <p className="empty-state-title">No executions yet</p>
+        <p className="empty-state-text">Click "New Trade" to record your first trade</p>
       </div>
     );
   }
@@ -75,19 +73,7 @@ export default function ExecutionList({ positions }: ExecutionListProps) {
               <tr key={exec.id} style={{ borderBottom: '1px solid var(--border)', animation: `slideUp 0.35s ease-out ${idx * 0.04}s both` }}>
                 <td style={tdStyle}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: '12px',
-                      background: 'linear-gradient(135deg, var(--bg-elevated), var(--bg-hover))',
-                      border: '1px solid var(--border)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 600,
-                      fontSize: '12px',
-                      color: 'var(--text-primary)'
-                    }}>
+                    <div className="asset-icon asset-icon-sm">
                       {exec.symbol.slice(0, 2)}
                     </div>
                     <div>
@@ -107,13 +93,13 @@ export default function ExecutionList({ positions }: ExecutionListProps) {
                 <td style={tdStyle}>
                   {formatDate(exec.executedAt)}
                 </td>
-                <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace" }}>
+                <td className="font-mono text-right" style={tdStyle}>
                   {formatPrice(exec.price)}
                 </td>
-                <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace" }}>
+                <td className="font-mono text-right" style={tdStyle}>
                   {formatQuantity(exec.quantity)}
                 </td>
-                <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontWeight: 500 }}>
+                <td className="font-mono text-right font-medium" style={tdStyle}>
                   {formatCurrency(value)}
                 </td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>

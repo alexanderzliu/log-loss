@@ -128,6 +128,82 @@ body {
 .text-profit { color: var(--profit); }
 .text-loss { color: var(--loss); }
 
+/* Page layout */
+.page-container {
+  max-width: 1200px;
+}
+
+.page-header {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+  letter-spacing: -0.5px;
+}
+
+.page-subtitle {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* Asset icon avatar */
+.asset-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--bg-elevated), var(--bg-hover));
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.asset-icon-sm {
+  width: 36px;
+  height: 36px;
+  font-size: 12px;
+}
+
+/* Chain/contract badge */
+.chain-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  text-transform: capitalize;
+}
+
+/* Muted label (used in stats, form sections) */
+.stat-label {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 600;
+}
+
+/* Empty state */
+.empty-state {
+  padding: 48px;
+  text-align: center;
+}
+
+.empty-state-title {
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.empty-state-text {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
 /* Card with gradient border glow on hover */
 .card {
   background: var(--gradient-card);

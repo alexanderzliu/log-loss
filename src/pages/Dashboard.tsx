@@ -86,7 +86,7 @@ export default function Dashboard() {
 
   return (
     <PageTransition>
-      <div style={{ maxWidth: '1200px' }}>
+      <div className="page-container">
         {/* Portfolio Value Header with Ambient Glow */}
         <div style={{ position: 'relative', marginBottom: '56px' }}>
           {/* Ambient glow halo behind the card */}
@@ -275,20 +275,18 @@ export default function Dashboard() {
           </div>
 
           {positionsError ? (
-            <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
+            <div className="card empty-state">
               <p style={{ color: 'var(--loss)', marginBottom: '8px' }}>Failed to load positions</p>
               <button onClick={() => fetchPositions()} className="btn-ghost" style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Retry</button>
             </div>
           ) : positionsLoading ? (
-            <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-              <p style={{ color: 'var(--text-muted)' }}>Loading...</p>
+            <div className="card empty-state">
+              <p className="empty-state-text">Loading...</p>
             </div>
           ) : openPositions.length === 0 ? (
-            <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '8px', fontSize: '16px', fontWeight: 600 }}>No open positions</p>
-              <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-                Add a trade in the Journal to get started
-              </p>
+            <div className="card empty-state">
+              <p className="empty-state-title" style={{ fontSize: '16px', fontWeight: 600 }}>No open positions</p>
+              <p className="empty-state-text">Add a trade in the Journal to get started</p>
             </div>
           ) : (
             <div className="card" style={{ overflow: 'hidden' }}>
@@ -351,19 +349,7 @@ export default function Dashboard() {
                                   {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                                 </div>
                               )}
-                              <div style={{
-                                width: '40px',
-                                height: '40px',
-                                borderRadius: '12px',
-                                background: 'linear-gradient(135deg, var(--bg-elevated), var(--bg-hover))',
-                                border: '1px solid var(--border)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontWeight: 600,
-                                fontSize: '14px',
-                                color: 'var(--text-primary)'
-                              }}>
+                              <div className="asset-icon">
                                 {position.symbol.slice(0, 2)}
                               </div>
                               <div>
@@ -373,11 +359,7 @@ export default function Dashboard() {
                                 <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                   {position.chain ? (
                                     <>
-                                      <span style={{
-                                        fontSize: '10px', padding: '1px 5px', borderRadius: '4px',
-                                        background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-                                        textTransform: 'capitalize',
-                                      }}>
+                                      <span className="chain-badge">
                                         {position.chain}
                                       </span>
                                       <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px' }}>
@@ -391,11 +373,11 @@ export default function Dashboard() {
                               </div>
                             </div>
                           </td>
-                          <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontVariantNumeric: 'tabular-nums' }}>
+                          <td className="font-mono text-right" style={tdStyle}>
                             {formatPrice(position.avgEntryPrice)}
                           </td>
                           <td style={{ ...tdStyle, textAlign: 'right' }}>
-                            <div style={{ fontFamily: "'DM Mono', monospace", color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                            <div className="font-mono" style={{ color: 'var(--text-primary)' }}>
                               {currentPrice ? formatPrice(currentPrice) : '—'}
                             </div>
                             {priceChange !== undefined && (
@@ -407,10 +389,10 @@ export default function Dashboard() {
                               </div>
                             )}
                           </td>
-                          <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontVariantNumeric: 'tabular-nums' }}>
+                          <td className="font-mono text-right" style={tdStyle}>
                             {formatQuantity(position.remainingQuantity)}
                           </td>
-                          <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>
+                          <td className="font-mono text-right font-medium" style={tdStyle}>
                             {formatCurrency(value)}
                           </td>
                           <td style={{ ...tdStyle, textAlign: 'right' }}>
@@ -540,14 +522,7 @@ function StatCard({
           boxShadow: `0 0 8px rgba(${sgc}, ${sga(0.5)})`,
         }} />
       )}
-      <p style={{
-        color: 'var(--text-muted)',
-        fontSize: '12px',
-        marginBottom: '12px',
-        textTransform: 'uppercase',
-        letterSpacing: '0.8px',
-        fontWeight: 600,
-      }}>{label}</p>
+      <p className="stat-label" style={{ marginBottom: '12px' }}>{label}</p>
       <p style={{
         fontSize: '30px',
         fontWeight: 700,

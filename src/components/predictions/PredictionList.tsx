@@ -62,11 +62,9 @@ export default function PredictionList({ predictions, onEdit, onClose }: Predict
 
   if (predictions.length === 0) {
     return (
-      <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>No predictions yet</p>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-          Click "New Prediction" to log your first bet
-        </p>
+      <div className="card empty-state">
+        <p className="empty-state-title">No predictions yet</p>
+        <p className="empty-state-text">Click "New Prediction" to log your first bet</p>
       </div>
     );
   }
@@ -111,16 +109,7 @@ export default function PredictionList({ predictions, onEdit, onClose }: Predict
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
                       {prediction.category && (
-                        <span style={{
-                          fontSize: '10px',
-                          padding: '1px 6px',
-                          borderRadius: '4px',
-                          background: 'var(--bg-elevated)',
-                          color: 'var(--text-muted)',
-                          border: '1px solid var(--border)',
-                        }}>
-                          {prediction.category}
-                        </span>
+                        <span className="chain-badge">{prediction.category}</span>
                       )}
                       <StatusBadge prediction={prediction} />
                     </div>
@@ -134,16 +123,16 @@ export default function PredictionList({ predictions, onEdit, onClose }: Predict
                 <td style={{ ...tdStyle, textAlign: 'right', fontSize: '13px', color: 'var(--text-muted)' }}>
                   {formatDate(prediction.openedAt)}
                 </td>
-                <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace" }}>
+                <td className="font-mono text-right" style={tdStyle}>
                   ${prediction.entryPrice.toFixed(2)}
                 </td>
-                <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace" }}>
+                <td className="font-mono text-right" style={tdStyle}>
                   {prediction.exitPrice !== null
                     ? `$${prediction.exitPrice.toFixed(2)}`
                     : <span style={{ color: 'var(--text-muted)' }}>---</span>
                   }
                 </td>
-                <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace" }}>
+                <td className="font-mono text-right" style={tdStyle}>
                   {prediction.quantity}
                 </td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>

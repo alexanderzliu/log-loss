@@ -44,11 +44,9 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
 
   if (positions.length === 0) {
     return (
-      <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>No positions yet</p>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-          Click "New Trade" to open your first position
-        </p>
+      <div className="card empty-state">
+        <p className="empty-state-title">No positions yet</p>
+        <p className="empty-state-text">Click "New Trade" to open your first position</p>
       </div>
     );
   }
@@ -103,19 +101,7 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
                       <div style={{ color: 'var(--text-muted)', width: '16px' }}>
                         {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                       </div>
-                      <div style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '12px',
-                        background: 'linear-gradient(135deg, var(--bg-elevated), var(--bg-hover))',
-                        border: '1px solid var(--border)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 600,
-                        fontSize: '14px',
-                        color: 'var(--text-primary)'
-                      }}>
+                      <div className="asset-icon">
                         {position.symbol.slice(0, 2)}
                       </div>
                       <div>
@@ -124,13 +110,7 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
                             {position.symbol}
                           </span>
                           {position.chain && (
-                            <span style={{
-                              fontSize: '10px', padding: '1px 6px', borderRadius: '4px',
-                              background: 'var(--bg-elevated)', color: 'var(--text-muted)',
-                              border: '1px solid var(--border)', textTransform: 'capitalize',
-                            }}>
-                              {position.chain}
-                            </span>
+                            <span className="chain-badge">{position.chain}</span>
                           )}
                         </div>
                         <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
@@ -147,15 +127,15 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
                       {position.status.toUpperCase()}
                     </span>
                   </td>
-                  <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace" }}>
+                  <td className="font-mono text-right" style={tdStyle}>
                     {formatPrice(position.avgEntryPrice)}
                   </td>
-                  <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace" }}>
+                  <td className="font-mono text-right" style={tdStyle}>
                     {isOpen
                       ? formatQuantity(position.remainingQuantity)
                       : formatQuantity(position.totalQuantity)}
                   </td>
-                  <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontWeight: 500 }}>
+                  <td className="font-mono text-right font-medium" style={tdStyle}>
                     {formatCurrency(costBasis)}
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>

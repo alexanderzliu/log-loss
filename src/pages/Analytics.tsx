@@ -90,15 +90,11 @@ export default function Analytics() {
 
   return (
     <PageTransition>
-    <div style={{ maxWidth: '1200px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="page-container flex flex-col gap-6">
       {/* Header */}
       <div>
-        <h1 style={{ fontSize: '32px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '6px', letterSpacing: '-0.5px' }}>
-          Price Analytics
-        </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-          Track asset performance and price history
-        </p>
+        <h1 className="page-header">Price Analytics</h1>
+        <p className="page-subtitle">Track asset performance and price history</p>
       </div>
 
       {/* Search Bar */}
@@ -385,7 +381,7 @@ export default function Analytics() {
 
       {/* Empty State */}
       {!selectedSymbol && trackedAssets.length === 0 && (
-        <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
+        <div className="card empty-state">
           <div style={{
             width: '64px',
             height: '64px',
@@ -402,7 +398,7 @@ export default function Analytics() {
           <h3 style={{ fontSize: '18px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '8px' }}>
             Search for an asset
           </h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px', maxWidth: '320px', margin: '0 auto' }}>
+          <p className="empty-state-text" style={{ maxWidth: '320px', margin: '0 auto' }}>
             Enter a symbol above to view price data and charts.
           </p>
         </div>

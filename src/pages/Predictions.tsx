@@ -59,16 +59,12 @@ export default function Predictions() {
 
   return (
     <PageTransition>
-    <div style={{ maxWidth: '1200px' }}>
+    <div className="page-container">
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
+      <div className="flex justify-between items-center mb-10">
         <div>
-          <h1 style={{ fontSize: '32px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '6px', letterSpacing: '-0.5px' }}>
-            Predictions
-          </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-            Track your prediction market bets
-          </p>
+          <h1 className="page-header">Predictions</h1>
+          <p className="page-subtitle">Track your prediction market bets</p>
         </div>
         <button onClick={handleNewPrediction} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Plus size={18} />
@@ -91,8 +87,8 @@ export default function Predictions() {
 
       {/* Content */}
       {predictionsLoading ? (
-        <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-          <p style={{ color: 'var(--text-muted)' }}>Loading...</p>
+        <div className="card empty-state">
+          <p className="empty-state-text">Loading...</p>
         </div>
       ) : (
         <PredictionList
