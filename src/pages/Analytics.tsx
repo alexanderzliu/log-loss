@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useStore } from '../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
 import { fetchPriceHistory } from '../api/prices';
@@ -30,40 +30,46 @@ export default function Analytics() {
   const [loading, setLoading] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const [timeRange, setTimeRange] = useState<number>(30);
+  const requestIdRef = useRef(0);
 
-  // Get unique symbols from positions
-  const trackedAssets = Array.from(
+  // Get unique symbols from positions - memoized to avoid new array refs each render
+  const trackedAssets = useMemo(() => Array.from(
     new Map(
       positions.map((p) => [getPriceKey(p), { symbol: p.symbol, assetType: p.assetType, chain: p.chain, contractAddress: p.contractAddress }])
     ).values()
-  );
+  ), [positions]);
 
   useEffect(() => {
     if (trackedAssets.length > 0) {
       fetchPrices(trackedAssets);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [positions, fetchPrices]);
+  }, [trackedAssets, fetchPrices]);
+
+  const loadPriceHistory = useCallback(async (symbol: string, assetType: AssetType, days: number) => {
+    if (!symbol) return;
+    const currentRequestId = ++requestIdRef.current;
+    setLoading(true);
+    try {
+      const data = await fetchPriceHistory(symbol, assetType, days);
+      if (currentRequestId === requestIdRef.current) {
+        setPriceHistory(data.history);
+      }
+    } catch (error) {
+      if (currentRequestId === requestIdRef.current) {
+        console.error('Failed to load price history:', error);
+      }
+    } finally {
+      if (currentRequestId === requestIdRef.current) {
+        setLoading(false);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (selectedSymbol && selectedAssetType) {
-      loadPriceHistory();
+      loadPriceHistory(selectedSymbol, selectedAssetType, timeRange);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSymbol, selectedAssetType, timeRange]);
-
-  const loadPriceHistory = async () => {
-    if (!selectedSymbol) return;
-    setLoading(true);
-    try {
-      const data = await fetchPriceHistory(selectedSymbol, selectedAssetType, timeRange);
-      setPriceHistory(data.history);
-    } catch (error) {
-      console.error('Failed to load price history:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [selectedSymbol, selectedAssetType, timeRange, loadPriceHistory]);
 
   const handleSearch = () => {
     if (searchInput.trim()) {

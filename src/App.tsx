@@ -1,8 +1,7 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
-import { useEffect, type CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
 import { BookOpen, LayoutDashboard, TrendingUp, CircleDot } from 'lucide-react';
 import { useStore } from './store/useStore';
-import { useShallow } from 'zustand/react/shallow';
 import { formatCurrency } from './utils/format';
 import Journal from './pages/Journal';
 import Predictions from './pages/Predictions';
@@ -30,35 +29,54 @@ function navLinkStyle({ isActive }: { isActive: boolean }): CSSProperties {
   };
 }
 
-function App() {
-  const {
-    positions,
-    predictions,
-    portfolioSummary,
-    predictionsSummary,
-    fetchPositions,
-    fetchPortfolioSummary,
-    fetchPredictionsSummary,
-  } = useStore(useShallow((s) => ({
-    positions: s.positions,
-    predictions: s.predictions,
-    portfolioSummary: s.portfolioSummary,
-    predictionsSummary: s.predictionsSummary,
-    fetchPositions: s.fetchPositions,
-    fetchPortfolioSummary: s.fetchPortfolioSummary,
-    fetchPredictionsSummary: s.fetchPredictionsSummary,
-  })));
+function useSidebarBadges() {
+  const openPositionsCount = useStore(s => s.positions.filter(p => p.status === 'open').length);
+  const openPredictionsCount = useStore(s => s.predictions.filter(p => p.status === 'open').length);
 
-  useEffect(() => {
-    fetchPositions();
-    fetchPortfolioSummary();
-    fetchPredictionsSummary();
-  }, [fetchPositions, fetchPortfolioSummary, fetchPredictionsSummary]);
+  return { openPositionsCount, openPredictionsCount };
+}
 
-  const openPositionsCount = positions.filter(p => p.status === 'open').length;
-  const openPredictionsCount = predictions.filter(p => p.status === 'open').length;
+function SidebarPnl() {
+  const portfolioSummary = useStore(s => s.portfolioSummary);
+  const predictionsSummary = useStore(s => s.predictionsSummary);
   const totalPnl = (portfolioSummary?.realizedPnl || 0) + (predictionsSummary?.predictionsPnl || 0);
   const isPositive = totalPnl >= 0;
+
+  return (
+    <div style={{
+      padding: '10px 12px',
+      borderRadius: '10px',
+      background: isPositive ? 'rgba(52, 211, 153, 0.06)' : 'rgba(248, 113, 113, 0.06)',
+      border: `1px solid ${isPositive ? 'rgba(52, 211, 153, 0.12)' : 'rgba(248, 113, 113, 0.12)'}`,
+    }}>
+      <div style={{
+        fontSize: '10px',
+        color: 'var(--text-muted)',
+        textTransform: 'uppercase',
+        letterSpacing: '0.8px',
+        marginBottom: '4px',
+        fontWeight: 600,
+      }}>
+        Realized P&L
+      </div>
+      <div style={{
+        fontFamily: "'DM Mono', monospace",
+        fontSize: '16px',
+        fontWeight: 500,
+        fontVariantNumeric: 'tabular-nums',
+        color: isPositive ? 'var(--profit)' : 'var(--loss)',
+        textShadow: isPositive
+          ? '0 0 20px rgba(52, 211, 153, 0.3)'
+          : '0 0 20px rgba(248, 113, 113, 0.3)',
+      }}>
+        {totalPnl >= 0 ? '+' : ''}{formatCurrency(totalPnl)}
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const { openPositionsCount, openPredictionsCount } = useSidebarBadges();
 
   return (
     <BrowserRouter>
@@ -105,35 +123,7 @@ function App() {
             </div>
 
             {/* Mini P&L Card */}
-            <div style={{
-              padding: '10px 12px',
-              borderRadius: '10px',
-              background: isPositive ? 'rgba(52, 211, 153, 0.06)' : 'rgba(248, 113, 113, 0.06)',
-              border: `1px solid ${isPositive ? 'rgba(52, 211, 153, 0.12)' : 'rgba(248, 113, 113, 0.12)'}`,
-            }}>
-              <div style={{
-                fontSize: '10px',
-                color: 'var(--text-muted)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.8px',
-                marginBottom: '4px',
-                fontWeight: 600,
-              }}>
-                Realized P&L
-              </div>
-              <div style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '16px',
-                fontWeight: 500,
-                fontVariantNumeric: 'tabular-nums',
-                color: isPositive ? 'var(--profit)' : 'var(--loss)',
-                textShadow: isPositive
-                  ? '0 0 20px rgba(52, 211, 153, 0.3)'
-                  : '0 0 20px rgba(248, 113, 113, 0.3)',
-              }}>
-                {totalPnl >= 0 ? '+' : ''}{formatCurrency(totalPnl)}
-              </div>
-            </div>
+            <SidebarPnl />
           </div>
 
           {/* Nav */}
