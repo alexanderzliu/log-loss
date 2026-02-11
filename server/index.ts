@@ -5,6 +5,10 @@ import positionsRouter from './routes/positions';
 import pricesRouter from './routes/prices';
 import predictionsRouter from './routes/predictions';
 
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection:', reason);
+});
+
 const app = express();
 const PORT = 3001;
 
@@ -22,6 +26,20 @@ app.use('/api/predictions', predictionsRouter);
 // Health check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Error-handling middleware for malformed JSON and unexpected errors
+app.use((err: Error & { type?: string }, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err.type === 'entity.parse.failed') {
+    res.status(400).json({ error: 'Invalid JSON' });
+    return;
+  }
+  next(err);
+});
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.use((_err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 app.listen(PORT, () => {

@@ -133,16 +133,21 @@ router.get('/', (req, res) => {
     const rows = db.prepare(query).all(...params) as Record<string, unknown>[];
     const positions = rows.map(rowToPosition);
 
-    // Fetch executions for all positions
-    const allExecRows = db.prepare(
-      'SELECT * FROM executions ORDER BY executed_at ASC, created_at ASC'
-    ).all() as Record<string, unknown>[];
-
+    // Fetch executions only for the returned positions
+    const positionIds = positions.map(p => p.id);
     const execsByPosition = new Map<string, Execution[]>();
-    for (const row of allExecRows) {
-      const posId = row.position_id as string;
-      if (!execsByPosition.has(posId)) execsByPosition.set(posId, []);
-      execsByPosition.get(posId)!.push(rowToExecution(row));
+
+    if (positionIds.length > 0) {
+      const placeholders = positionIds.map(() => '?').join(',');
+      const allExecRows = db.prepare(
+        `SELECT * FROM executions WHERE position_id IN (${placeholders}) ORDER BY executed_at ASC, created_at ASC`
+      ).all(...positionIds) as Record<string, unknown>[];
+
+      for (const row of allExecRows) {
+        const posId = row.position_id as string;
+        if (!execsByPosition.has(posId)) execsByPosition.set(posId, []);
+        execsByPosition.get(posId)!.push(rowToExecution(row));
+      }
     }
 
     for (const pos of positions) {
