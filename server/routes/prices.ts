@@ -107,6 +107,14 @@ const cryptoIdMap: Record<string, string> = {
   OP: 'optimism',
 };
 
+const majorCoinNames: Record<string, string> = {
+  BTC: 'Bitcoin', ETH: 'Ethereum', SOL: 'Solana', ADA: 'Cardano',
+  DOT: 'Polkadot', DOGE: 'Dogecoin', XRP: 'Ripple', AVAX: 'Avalanche',
+  MATIC: 'Polygon', LINK: 'Chainlink', UNI: 'Uniswap', ATOM: 'Cosmos',
+  LTC: 'Litecoin', BCH: 'Bitcoin Cash', ALGO: 'Algorand', FIL: 'Filecoin',
+  NEAR: 'NEAR Protocol', APT: 'Aptos', ARB: 'Arbitrum', OP: 'Optimism',
+};
+
 async function fetchCryptoPrice(symbol: string): Promise<PriceData | null> {
   try {
     const coinId = cryptoIdMap[symbol.toUpperCase()] || symbol.toLowerCase();
@@ -291,8 +299,12 @@ async function getPrice(
   if (contractAddress && chain && priceData.holderCount === null) {
     fetchHolderCount(chain, contractAddress).then(count => {
       if (count !== null) {
-        db.prepare('UPDATE price_cache SET holder_count = ? WHERE symbol = ? AND asset_type = ?')
-          .run(count, key, assetType);
+        try {
+          db.prepare('UPDATE price_cache SET holder_count = ? WHERE symbol = ? AND asset_type = ?')
+            .run(count, key, assetType);
+        } catch (e) {
+          console.error('Failed to update holder count cache:', e);
+        }
       }
     }).catch(() => { /* silently ignore holder count failures */ });
   }
@@ -362,10 +374,35 @@ router.get('/search', async (req, res) => {
       }
     }
 
-    // Sort by liquidity descending, limit to 20
-    const tokens = Array.from(tokenMap.values())
-      .sort((a, b) => b.liquidity - a.liquidity)
-      .slice(0, 20);
+    // Sort by liquidity descending
+    const dexTokens = Array.from(tokenMap.values())
+      .sort((a, b) => b.liquidity - a.liquidity);
+
+    // Match major coins from cryptoIdMap and prepend them
+    const upperQ = q.toUpperCase();
+    const lowerQ = q.toLowerCase();
+    const majorMatches = Object.keys(cryptoIdMap)
+      .filter(symbol => {
+        const name = (majorCoinNames[symbol] || symbol).toLowerCase();
+        return symbol.startsWith(upperQ) || name.startsWith(lowerQ);
+      })
+      .map(symbol => {
+        const cached = getCachedPrice(symbol, 'crypto');
+        return {
+          symbol,
+          name: majorCoinNames[symbol] || symbol,
+          chain: '',
+          contractAddress: '',
+          priceUsd: cached ? String((cached as Record<string, unknown>).price) : '',
+          liquidity: -1, // sentinel: not a DEX token
+          volume24h: cached ? Number((cached as Record<string, unknown>).volume_24h) || 0 : 0,
+          priceChange24h: cached ? Number((cached as Record<string, unknown>).change_percent_24h) || 0 : 0,
+          imageUrl: null,
+          pairAddress: '',
+        };
+      });
+
+    const tokens = [...majorMatches, ...dexTokens].slice(0, 20);
 
     res.json({ tokens });
   } catch (error) {
@@ -403,6 +440,9 @@ router.post('/batch', async (req, res) => {
     }
     if (assets.length === 0) {
       return res.json([]);
+    }
+    if (assets.length > 50) {
+      return res.status(400).json({ error: 'Batch size limit exceeded (max 50)' });
     }
 
     const results = await Promise.all(

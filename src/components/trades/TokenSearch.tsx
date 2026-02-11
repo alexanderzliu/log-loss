@@ -59,8 +59,8 @@ export default function TokenSearch({ value, chain, contractAddress, disabled, o
     setQuery(token.symbol.toUpperCase());
     onChange({
       symbol: token.symbol.toUpperCase(),
-      chain: token.chain,
-      contractAddress: token.contractAddress,
+      chain: token.chain || null,
+      contractAddress: token.contractAddress || null,
     });
     setIsOpen(false);
   };
@@ -130,7 +130,7 @@ export default function TokenSearch({ value, chain, contractAddress, disabled, o
         }}>
           {results.map((token) => (
             <button
-              key={`${token.chain}:${token.contractAddress}`}
+              key={token.chain ? `${token.chain}:${token.contractAddress}` : `major:${token.symbol}`}
               type="button"
               onClick={() => handleSelect(token)}
               style={{
@@ -157,16 +157,28 @@ export default function TokenSearch({ value, chain, contractAddress, disabled, o
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{
-                  fontSize: '10px', padding: '1px 6px', borderRadius: '4px',
-                  background: 'var(--bg-elevated)', color: 'var(--text-muted)',
-                  border: '1px solid var(--border)', textTransform: 'capitalize',
-                }}>
-                  {token.chain}
-                </span>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                  Liq: {formatCompactNumber(token.liquidity)}
-                </span>
+                {token.chain ? (
+                  <>
+                    <span style={{
+                      fontSize: '10px', padding: '1px 6px', borderRadius: '4px',
+                      background: 'var(--bg-elevated)', color: 'var(--text-muted)',
+                      border: '1px solid var(--border)', textTransform: 'capitalize',
+                    }}>
+                      {token.chain}
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      Liq: {formatCompactNumber(token.liquidity)}
+                    </span>
+                  </>
+                ) : (
+                  <span style={{
+                    fontSize: '10px', padding: '1px 6px', borderRadius: '4px',
+                    background: 'var(--accent-glow)', color: 'var(--accent)',
+                    border: '1px solid var(--accent)', fontWeight: 600,
+                  }}>
+                    Major
+                  </span>
+                )}
                 <span style={{
                   fontSize: '11px',
                   color: token.priceChange24h >= 0 ? 'var(--profit)' : 'var(--loss)',
