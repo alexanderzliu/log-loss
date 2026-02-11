@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Position, PriceData, PortfolioSummary, AssetType, TradeFormData, PositionUpdateData, Prediction, PredictionFormData, PredictionCloseData, PredictionUpdateData, PredictionsSummary } from '../types';
+import type { Position, PriceData, PortfolioSummary, AssetType, TradeFormData, PositionUpdateData, Prediction, PredictionFormData, PredictionCloseData, PredictionUpdateData, PredictionsSummary, RecentActivity } from '../types';
 import * as positionsApi from '../api/positions';
 import * as pricesApi from '../api/prices';
 import * as predictionsApi from '../api/predictions';
@@ -30,6 +30,10 @@ interface StoreState {
   portfolioLoading: boolean;
   portfolioError: string | null;
 
+  // Recent Activity
+  recentActivity: RecentActivity[];
+  recentActivityLoading: boolean;
+
   // Predictions
   predictions: Prediction[];
   predictionsLoading: boolean;
@@ -45,6 +49,7 @@ interface StoreState {
   deletePosition: (id: string) => Promise<void>;
   deleteExecution: (positionId: string, executionId: string) => Promise<void>;
   fetchPortfolioSummary: () => Promise<void>;
+  fetchRecentActivity: () => Promise<void>;
   fetchPrices: (assets: { symbol: string; assetType: AssetType; chain?: string | null; contractAddress?: string | null }[]) => Promise<void>;
   refreshPrices: () => Promise<void>;
 
@@ -68,6 +73,8 @@ export const useStore = create<StoreState>((set, get) => ({
   portfolioSummary: null,
   portfolioLoading: false,
   portfolioError: null,
+  recentActivity: [],
+  recentActivityLoading: false,
   predictions: [],
   predictionsLoading: false,
   predictionsError: null,
@@ -142,6 +149,16 @@ export const useStore = create<StoreState>((set, get) => ({
       set({ portfolioSummary: summary, portfolioLoading: false });
     } catch (error) {
       set({ portfolioError: (error as Error).message, portfolioLoading: false });
+    }
+  },
+
+  fetchRecentActivity: async () => {
+    set({ recentActivityLoading: true });
+    try {
+      const activity = await positionsApi.fetchRecentActivity();
+      set({ recentActivity: activity, recentActivityLoading: false });
+    } catch {
+      set({ recentActivityLoading: false });
     }
   },
 

@@ -2,7 +2,7 @@ import { Fragment, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
 import { RefreshCw, ArrowUpRight, ArrowDownRight, ChevronDown, ChevronRight } from 'lucide-react';
-import { formatCurrency, formatPercent, formatQuantity, formatPrice } from '../utils/format';
+import { formatCurrency, formatPercent, formatQuantity, formatPrice, formatDate } from '../utils/format';
 import { tableHeaderStyle, tableCellStyle } from '../utils/styles';
 import { calculateUnrealizedPnl } from '../utils/aggregatePositions';
 import { priceKey as getPriceKey } from '../utils/priceKey';
@@ -21,9 +21,12 @@ export default function Dashboard() {
     portfolioError,
     predictionsSummary,
     predictionsSummaryError,
+    recentActivity,
+    recentActivityLoading,
     fetchPositions,
     fetchPortfolioSummary,
     fetchPredictionsSummary,
+    fetchRecentActivity,
     refreshPrices,
   } = useStore(useShallow((s) => ({
     positions: s.positions,
@@ -34,9 +37,12 @@ export default function Dashboard() {
     portfolioError: s.portfolioError,
     predictionsSummary: s.predictionsSummary,
     predictionsSummaryError: s.predictionsSummaryError,
+    recentActivity: s.recentActivity,
+    recentActivityLoading: s.recentActivityLoading,
     fetchPositions: s.fetchPositions,
     fetchPortfolioSummary: s.fetchPortfolioSummary,
     fetchPredictionsSummary: s.fetchPredictionsSummary,
+    fetchRecentActivity: s.fetchRecentActivity,
     refreshPrices: s.refreshPrices,
   })));
 
@@ -46,9 +52,10 @@ export default function Dashboard() {
     fetchPositions();
     fetchPortfolioSummary();
     fetchPredictionsSummary();
+    fetchRecentActivity();
     const interval = setInterval(refreshPrices, 60000);
     return () => clearInterval(interval);
-  }, [fetchPositions, fetchPortfolioSummary, fetchPredictionsSummary, refreshPrices]);
+  }, [fetchPositions, fetchPortfolioSummary, fetchPredictionsSummary, fetchRecentActivity, refreshPrices]);
 
   const openPositions = positions.filter((p) => p.status === 'open');
 
@@ -450,6 +457,98 @@ export default function Dashboard() {
                       </Fragment>
                     );
                   })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Recent Activity */}
+        <div style={{ marginTop: '56px' }}>
+          <h2 style={{
+            fontSize: '20px',
+            fontWeight: 700,
+            color: 'var(--text-primary)',
+            marginBottom: '20px',
+          }}>
+            Recent Activity
+          </h2>
+
+          {recentActivityLoading ? (
+            <div className="card empty-state">
+              <p className="empty-state-text">Loading...</p>
+            </div>
+          ) : recentActivity.length === 0 ? (
+            <div className="card empty-state">
+              <p className="empty-state-title" style={{ fontSize: '16px', fontWeight: 600 }}>No trades yet</p>
+            </div>
+          ) : (
+            <div className="card" style={{ overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    <th style={thStyle}>Date</th>
+                    <th style={thStyle}>Asset</th>
+                    <th style={thStyle}>Side</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>Price</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>Quantity</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>P&L</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentActivity.map((activity, idx) => (
+                    <tr
+                      key={activity.id}
+                      style={{
+                        borderBottom: '1px solid var(--border)',
+                        animation: `slideUp 0.35s ease-out ${idx * 0.04}s both`,
+                      }}
+                    >
+                      <td style={{ ...tdStyle, color: 'var(--text-muted)', fontSize: '13px' }}>
+                        {formatDate(activity.executedAt)}
+                      </td>
+                      <td style={tdStyle}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {activity.symbol}
+                          </span>
+                          {activity.chain && (
+                            <span className="chain-badge">{activity.chain}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '2px 10px',
+                          borderRadius: '9999px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          background: activity.side === 'buy'
+                            ? 'rgba(52, 211, 153, 0.1)'
+                            : 'rgba(248, 113, 113, 0.1)',
+                          color: activity.side === 'buy'
+                            ? 'var(--profit)'
+                            : 'var(--loss)',
+                        }}>
+                          {activity.side === 'buy' ? 'Buy' : 'Sell'}
+                        </span>
+                      </td>
+                      <td className="font-mono text-right" style={tdStyle}>
+                        {formatPrice(activity.price)}
+                      </td>
+                      <td className="font-mono text-right" style={tdStyle}>
+                        {formatQuantity(activity.quantity)}
+                      </td>
+                      <td style={{ ...tdStyle, textAlign: 'right' }}>
+                        {activity.side === 'sell' && activity.pnl !== null ? (
+                          <PnlDisplay pnl={activity.pnl} pnlPercent={activity.pnlPercent} />
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
