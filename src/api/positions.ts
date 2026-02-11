@@ -1,4 +1,4 @@
-import type { Position, TradeFormData, PositionUpdateData, PortfolioSummary } from '../types';
+import type { Position, TradeFormData, PositionUpdateData, PortfolioSummary, EquityCurvePoint, TradingAnalytics, RecentActivity } from '../types';
 
 const API_BASE = '/api/positions';
 
@@ -65,5 +65,23 @@ export async function deleteExecution(positionId: string, executionId: string): 
 export async function fetchPortfolioSummary(): Promise<PortfolioSummary> {
   const response = await fetch(`${API_BASE}/stats/summary`);
   if (!response.ok) throw new Error('Failed to fetch portfolio summary');
+  return response.json();
+}
+
+export async function fetchEquityCurve(): Promise<EquityCurvePoint[]> {
+  const response = await fetch(`${API_BASE}/stats/equity-curve`);
+  if (!response.ok) throw new Error('Failed to fetch equity curve');
+  return response.json();
+}
+
+export async function fetchTradingAnalytics(): Promise<TradingAnalytics> {
+  const response = await fetch(`${API_BASE}/stats/analytics`);
+  if (!response.ok) throw new Error('Failed to fetch trading analytics');
+  return response.json();
+}
+
+export async function fetchRecentActivity(): Promise<RecentActivity[]> {
+  const response = await fetch(`${API_BASE}/stats/recent-activity`);
+  if (!response.ok) throw new Error('Failed to fetch recent activity');
   return response.json();
 }

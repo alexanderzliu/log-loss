@@ -95,6 +95,38 @@ export interface DexScreenerToken {
   pairAddress: string;
 }
 
+export interface EquityCurvePoint {
+  date: string;
+  dailyPnl: number;
+  cumulativePnl: number;
+  tradeCount: number;
+}
+
+export interface TradingAnalytics {
+  pnlBySymbol: { symbol: string; assetType: string; pnl: number; tradeCount: number }[];
+  monthlyPnl: { month: string; pnl: number; wins: number; losses: number }[];
+  bestTrade: { pnl: number; pnlPercent: number; date: string; symbol: string } | null;
+  worstTrade: { pnl: number; pnlPercent: number; date: string; symbol: string } | null;
+  avgWin: number | null;
+  avgLoss: number | null;
+  profitFactor: number;
+  avgHoldDays: number | null;
+}
+
+export interface RecentActivity {
+  id: string;
+  symbol: string;
+  assetType: string;
+  side: string;
+  price: number;
+  quantity: number;
+  executedAt: string;
+  pnl: number | null;
+  pnlPercent: number | null;
+  chain: string | null;
+  contractAddress: string | null;
+}
+
 export interface PriceHistory {
   timestamp: string;
   price: number;

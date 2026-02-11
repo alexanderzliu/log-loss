@@ -60,39 +60,34 @@ function getPositionWithExecutions(id: string): Position | null {
   return position;
 }
 
-// Recompute all derived fields on a position from its executions
+// Recompute all derived fields on a position from its executions (single query)
 function recomputePositionAggregates(positionId: string): void {
-  const buyAgg = db.prepare(`
+  const agg = db.prepare(`
     SELECT
-      COALESCE(SUM(quantity), 0) as total_buy_qty,
-      COALESCE(SUM(price * quantity), 0) as total_cost_basis
+      COALESCE(SUM(CASE WHEN side = 'buy' THEN quantity ELSE 0 END), 0) as total_buy_qty,
+      COALESCE(SUM(CASE WHEN side = 'buy' THEN price * quantity ELSE 0 END), 0) as total_cost_basis,
+      COALESCE(SUM(CASE WHEN side = 'sell' THEN quantity ELSE 0 END), 0) as total_sell_qty,
+      COALESCE(SUM(CASE WHEN side = 'sell' THEN pnl ELSE 0 END), 0) as realized_pnl,
+      MAX(CASE WHEN side = 'sell' THEN executed_at END) as last_sell_date
     FROM executions
-    WHERE position_id = ? AND side = 'buy'
-  `).get(positionId) as { total_buy_qty: number; total_cost_basis: number };
+    WHERE position_id = ?
+  `).get(positionId) as {
+    total_buy_qty: number;
+    total_cost_basis: number;
+    total_sell_qty: number;
+    realized_pnl: number;
+    last_sell_date: string | null;
+  };
 
-  const sellAgg = db.prepare(`
-    SELECT
-      COALESCE(SUM(quantity), 0) as total_sell_qty,
-      COALESCE(SUM(pnl), 0) as realized_pnl
-    FROM executions
-    WHERE position_id = ? AND side = 'sell'
-  `).get(positionId) as { total_sell_qty: number; realized_pnl: number };
-
-  const totalQuantity = buyAgg.total_buy_qty;
-  const totalCostBasis = buyAgg.total_cost_basis;
+  const totalQuantity = agg.total_buy_qty;
+  const totalCostBasis = agg.total_cost_basis;
   const avgEntryPrice = totalQuantity > 0 ? totalCostBasis / totalQuantity : 0;
-  const remainingQuantity = totalQuantity - sellAgg.total_sell_qty;
-  const realizedPnl = sellAgg.realized_pnl;
+  const remainingQuantity = totalQuantity - agg.total_sell_qty;
+  const realizedPnl = agg.realized_pnl;
   const realizedPnlPercent = totalCostBasis > 0 ? (realizedPnl / totalCostBasis) * 100 : null;
 
   const status = remainingQuantity <= 0 ? 'closed' : 'open';
-  const closedAt = status === 'closed'
-    ? (db.prepare(`
-        SELECT executed_at FROM executions
-        WHERE position_id = ? AND side = 'sell'
-        ORDER BY executed_at DESC LIMIT 1
-      `).get(positionId) as { executed_at: string } | undefined)?.executed_at ?? null
-    : null;
+  const closedAt = status === 'closed' ? agg.last_sell_date : null;
 
   db.prepare(`
     UPDATE positions SET
@@ -223,6 +218,156 @@ router.get('/stats/summary', (_req, res) => {
   } catch (error) {
     console.error('Error fetching summary:', error);
     res.status(500).json({ error: 'Failed to fetch summary' });
+  }
+});
+
+// GET /stats/equity-curve - Cumulative P&L over time from sell executions
+router.get('/stats/equity-curve', (_req, res) => {
+  try {
+    const rows = db.prepare(`
+      SELECT
+        date(e.executed_at) as date,
+        SUM(e.pnl) as daily_pnl,
+        COUNT(*) as trade_count
+      FROM executions e
+      WHERE e.side = 'sell' AND e.pnl IS NOT NULL
+      GROUP BY date(e.executed_at)
+      ORDER BY date(e.executed_at) ASC
+    `).all() as { date: string; daily_pnl: number; trade_count: number }[];
+
+    let cumulative = 0;
+    const curve = rows.map((row) => {
+      cumulative += row.daily_pnl;
+      return {
+        date: row.date,
+        dailyPnl: row.daily_pnl,
+        cumulativePnl: cumulative,
+        tradeCount: row.trade_count,
+      };
+    });
+
+    res.json(curve);
+  } catch (error) {
+    console.error('Error fetching equity curve:', error);
+    res.status(500).json({ error: 'Failed to fetch equity curve' });
+  }
+});
+
+// GET /stats/analytics - Detailed trading analytics
+router.get('/stats/analytics', (_req, res) => {
+  try {
+    // P&L by symbol
+    const pnlBySymbol = db.prepare(`
+      SELECT
+        p.symbol,
+        p.asset_type as assetType,
+        SUM(p.realized_pnl) as pnl,
+        COUNT(*) as tradeCount
+      FROM positions p
+      WHERE p.status = 'closed'
+      GROUP BY p.symbol, p.asset_type
+      ORDER BY SUM(p.realized_pnl) DESC
+    `).all() as { symbol: string; assetType: string; pnl: number; tradeCount: number }[];
+
+    // Monthly P&L
+    const monthlyPnl = db.prepare(`
+      SELECT
+        strftime('%Y-%m', e.executed_at) as month,
+        SUM(e.pnl) as pnl,
+        COUNT(CASE WHEN e.pnl > 0 THEN 1 END) as wins,
+        COUNT(CASE WHEN e.pnl < 0 THEN 1 END) as losses
+      FROM executions e
+      WHERE e.side = 'sell' AND e.pnl IS NOT NULL
+      GROUP BY strftime('%Y-%m', e.executed_at)
+      ORDER BY month ASC
+    `).all() as { month: string; pnl: number; wins: number; losses: number }[];
+
+    // Best and worst trades (sell executions)
+    const bestTrade = db.prepare(`
+      SELECT e.pnl, e.pnl_percent, e.executed_at, p.symbol
+      FROM executions e
+      JOIN positions p ON p.id = e.position_id
+      WHERE e.side = 'sell' AND e.pnl IS NOT NULL
+      ORDER BY e.pnl DESC LIMIT 1
+    `).get() as { pnl: number; pnl_percent: number; executed_at: string; symbol: string } | undefined;
+
+    const worstTrade = db.prepare(`
+      SELECT e.pnl, e.pnl_percent, e.executed_at, p.symbol
+      FROM executions e
+      JOIN positions p ON p.id = e.position_id
+      WHERE e.side = 'sell' AND e.pnl IS NOT NULL
+      ORDER BY e.pnl ASC LIMIT 1
+    `).get() as { pnl: number; pnl_percent: number; executed_at: string; symbol: string } | undefined;
+
+    // Average win/loss
+    const avgStats = db.prepare(`
+      SELECT
+        AVG(CASE WHEN e.pnl > 0 THEN e.pnl END) as avg_win,
+        AVG(CASE WHEN e.pnl < 0 THEN e.pnl END) as avg_loss,
+        SUM(CASE WHEN e.pnl > 0 THEN e.pnl ELSE 0 END) as total_wins,
+        ABS(SUM(CASE WHEN e.pnl < 0 THEN e.pnl ELSE 0 END)) as total_losses
+      FROM executions e
+      WHERE e.side = 'sell' AND e.pnl IS NOT NULL
+    `).get() as { avg_win: number | null; avg_loss: number | null; total_wins: number; total_losses: number };
+
+    // Average hold time (days between position open and close)
+    const avgHoldTime = db.prepare(`
+      SELECT AVG(julianday(closed_at) - julianday(opened_at)) as avg_days
+      FROM positions
+      WHERE status = 'closed' AND closed_at IS NOT NULL
+    `).get() as { avg_days: number | null };
+
+    const profitFactor = avgStats.total_losses > 0
+      ? avgStats.total_wins / avgStats.total_losses
+      : avgStats.total_wins > 0 ? Infinity : 0;
+
+    res.json({
+      pnlBySymbol,
+      monthlyPnl,
+      bestTrade: bestTrade ? { pnl: bestTrade.pnl, pnlPercent: bestTrade.pnl_percent, date: bestTrade.executed_at, symbol: bestTrade.symbol } : null,
+      worstTrade: worstTrade ? { pnl: worstTrade.pnl, pnlPercent: worstTrade.pnl_percent, date: worstTrade.executed_at, symbol: worstTrade.symbol } : null,
+      avgWin: avgStats.avg_win,
+      avgLoss: avgStats.avg_loss,
+      profitFactor,
+      avgHoldDays: avgHoldTime.avg_days,
+    });
+  } catch (error) {
+    console.error('Error fetching analytics:', error);
+    res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+});
+
+// GET /stats/recent-activity - Last 10 executions with position data
+router.get('/stats/recent-activity', (_req, res) => {
+  try {
+    const rows = db.prepare(`
+      SELECT
+        e.id, e.side, e.price, e.quantity, e.executed_at, e.pnl, e.pnl_percent,
+        p.symbol, p.asset_type, p.chain, p.contract_address
+      FROM executions e
+      JOIN positions p ON p.id = e.position_id
+      ORDER BY e.executed_at DESC, e.created_at DESC
+      LIMIT 10
+    `).all() as Record<string, unknown>[];
+
+    const activity = rows.map((row) => ({
+      id: row.id as string,
+      symbol: row.symbol as string,
+      assetType: row.asset_type as string,
+      side: row.side as string,
+      price: row.price as number,
+      quantity: row.quantity as number,
+      executedAt: row.executed_at as string,
+      pnl: row.pnl as number | null,
+      pnlPercent: row.pnl_percent as number | null,
+      chain: (row.chain as string) || null,
+      contractAddress: (row.contract_address as string) || null,
+    }));
+
+    res.json(activity);
+  } catch (error) {
+    console.error('Error fetching recent activity:', error);
+    res.status(500).json({ error: 'Failed to fetch recent activity' });
   }
 });
 
