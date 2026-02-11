@@ -22,7 +22,11 @@ import {
   ArrowUpDown,
   ChevronDown,
   ChevronRight,
+  Lightbulb,
+  StickyNote,
+  MessageSquare,
 } from 'lucide-react';
+import ReflectionList from './ReflectionList';
 
 interface PositionListProps {
   positions: Position[];
@@ -34,10 +38,11 @@ interface PositionListProps {
 }
 
 export default function PositionList({ positions, onEdit, onClosePosition, sortField, sortDir, onSort }: PositionListProps) {
-  const { deletePosition, prices, addToast } = useStore(useShallow((s) => ({
+  const { deletePosition, prices, addToast, reflections } = useStore(useShallow((s) => ({
     deletePosition: s.deletePosition,
     prices: s.prices,
     addToast: s.addToast,
+    reflections: s.reflections,
   })));
   const [expandedPositions, toggleExpanded] = useSetToggle();
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
@@ -102,6 +107,7 @@ export default function PositionList({ positions, onEdit, onClosePosition, sortF
             }
 
             const costBasis = position.avgEntryPrice * (isOpen ? position.remainingQuantity : position.totalQuantity);
+            const reflectionCount = (reflections[position.id] || []).length;
 
             return (
               <Fragment key={position.id}>
@@ -131,11 +137,25 @@ export default function PositionList({ positions, onEdit, onClosePosition, sortF
                             <span className="chain-badge">{position.chain}</span>
                           )}
                         </div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
-                          {position.contractAddress
-                            ? `${position.contractAddress.slice(0, 6)}...${position.contractAddress.slice(-4)}`
-                            : position.assetType
-                          } · {position.executions.length} execution{position.executions.length !== 1 ? 's' : ''}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                          <span>
+                            {position.contractAddress
+                              ? `${position.contractAddress.slice(0, 6)}...${position.contractAddress.slice(-4)}`
+                              : position.assetType
+                            } · {position.executions.length} execution{position.executions.length !== 1 ? 's' : ''}
+                          </span>
+                          {position.hypothesis && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: 'var(--accent-warm)', fontSize: '11px', textTransform: 'none' }}>
+                              <Lightbulb size={11} />
+                              thesis
+                            </span>
+                          )}
+                          {reflectionCount > 0 && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: 'var(--accent-violet)', fontSize: '11px', textTransform: 'none' }}>
+                              <MessageSquare size={11} />
+                              {reflectionCount}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -191,6 +211,79 @@ export default function PositionList({ positions, onEdit, onClosePosition, sortF
                     </DropdownMenu>
                   </td>
                 </tr>
+
+                {/* Expanded hypothesis/notes */}
+                {isExpanded && (position.hypothesis || position.notes) && (
+                  <tr style={{ background: 'var(--bg-tertiary)', borderBottom: 'none' }}>
+                    <td colSpan={7} style={{ padding: '0 24px 0 72px' }}>
+                      <div style={{
+                        padding: '14px 16px',
+                        borderLeft: '3px solid var(--accent-violet)',
+                        background: 'rgba(139, 92, 246, 0.06)',
+                        borderRadius: '0 8px 8px 0',
+                        margin: '12px 0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                      }}>
+                        {position.hypothesis && (
+                          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                            <Lightbulb size={15} style={{ color: 'var(--accent-warm)', flexShrink: 0, marginTop: '2px' }} />
+                            <div>
+                              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Hypothesis</div>
+                              <div style={{ fontSize: '13.5px', color: 'var(--text-primary)', lineHeight: 1.5, fontWeight: 500 }}>
+                                {position.hypothesis}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {position.notes && (
+                          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                            <StickyNote size={15} style={{ color: 'var(--text-muted)', flexShrink: 0, marginTop: '2px' }} />
+                            <div>
+                              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Notes</div>
+                              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                                {position.notes}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onEdit(position); }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: 'var(--accent-violet)',
+                              fontSize: '12px',
+                              fontWeight: 500,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              transition: 'background 0.15s',
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                          >
+                            <Edit2 size={12} /> Edit
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+
+                {/* Expanded reflections */}
+                {isExpanded && (
+                  <tr style={{ background: 'var(--bg-tertiary)', borderBottom: 'none' }}>
+                    <td colSpan={7} style={{ padding: '4px 24px 12px 72px' }}>
+                      <ReflectionList positionId={position.id} />
+                    </td>
+                  </tr>
+                )}
 
                 {/* Expanded executions */}
                 {isExpanded && position.executions.map((exec, execIdx) => {

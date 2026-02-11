@@ -1,8 +1,9 @@
 import { create } from 'zustand';
-import type { Position, PriceData, PortfolioSummary, AssetType, TradeFormData, PositionUpdateData, Prediction, PredictionFormData, PredictionCloseData, PredictionUpdateData, PredictionsSummary, RecentActivity } from '../types';
+import type { Position, PriceData, PortfolioSummary, AssetType, TradeFormData, PositionUpdateData, Prediction, PredictionFormData, PredictionCloseData, PredictionUpdateData, PredictionsSummary, RecentActivity, Reflection } from '../types';
 import * as positionsApi from '../api/positions';
 import * as pricesApi from '../api/prices';
 import * as predictionsApi from '../api/predictions';
+import * as reflectionsApi from '../api/reflections';
 import { priceKey } from '../utils/priceKey';
 
 // Extract unique assets from open positions
@@ -54,6 +55,13 @@ interface StoreState {
   predictionsSummaryLoading: boolean;
   predictionsSummaryError: string | null;
 
+  // Reflections
+  reflections: Record<string, Reflection[]>; // keyed by positionId
+  createReflection: (data: { positionId: string; type?: Reflection['type']; content: string; tags?: string[] }) => Promise<Reflection>;
+  updateReflection: (id: string, data: { content?: string; type?: Reflection['type']; tags?: string[] }) => Promise<Reflection>;
+  deleteReflection: (id: string, positionId: string) => Promise<void>;
+  fetchReflections: (positionId: string) => Promise<void>;
+
   // Position Actions
   fetchPositions: (filters?: { status?: string; assetType?: string; symbol?: string }) => Promise<void>;
   createTrade: (data: TradeFormData) => Promise<Position>;
@@ -104,6 +112,47 @@ export const useStore = create<StoreState>((set, get) => ({
   predictionsSummary: null,
   predictionsSummaryLoading: false,
   predictionsSummaryError: null,
+
+  reflections: {},
+
+  fetchReflections: async (positionId) => {
+    try {
+      const list = await reflectionsApi.fetchReflections({ positionId });
+      set((state) => ({ reflections: { ...state.reflections, [positionId]: list } }));
+    } catch (error) {
+      console.error('Failed to fetch reflections:', error);
+    }
+  },
+
+  createReflection: async (data) => {
+    const reflection = await reflectionsApi.createReflection(data);
+    set((state) => {
+      const existing = state.reflections[data.positionId] || [];
+      return { reflections: { ...state.reflections, [data.positionId]: [reflection, ...existing] } };
+    });
+    get().addToast({ type: 'success', title: 'Reflection Added' });
+    return reflection;
+  },
+
+  updateReflection: async (id, data) => {
+    const reflection = await reflectionsApi.updateReflection(id, data);
+    set((state) => {
+      const posId = reflection.positionId;
+      const existing = state.reflections[posId] || [];
+      return { reflections: { ...state.reflections, [posId]: existing.map((r) => (r.id === id ? reflection : r)) } };
+    });
+    get().addToast({ type: 'success', title: 'Reflection Updated' });
+    return reflection;
+  },
+
+  deleteReflection: async (id, positionId) => {
+    await reflectionsApi.deleteReflection(id);
+    set((state) => {
+      const existing = state.reflections[positionId] || [];
+      return { reflections: { ...state.reflections, [positionId]: existing.filter((r) => r.id !== id) } };
+    });
+    get().addToast({ type: 'success', title: 'Reflection Deleted' });
+  },
 
   // Positions actions
   fetchPositions: async (filters) => {

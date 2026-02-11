@@ -88,6 +88,9 @@ export function initDatabase() {
   // Add token metrics columns to price_cache
   migrateAddTokenMetrics();
 
+  // Add reflections table
+  migrateCreateReflections();
+
   console.log('Database initialized successfully');
 }
 
@@ -315,5 +318,25 @@ function migrateCreatePredictions() {
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_predictions_status ON predictions(status);
     CREATE INDEX IF NOT EXISTS idx_predictions_side ON predictions(side);
+  `);
+}
+
+function migrateCreateReflections() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS reflections (
+      id TEXT PRIMARY KEY,
+      position_id TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'reflection' CHECK(type IN ('reflection', 'lesson', 'mistake')),
+      content TEXT NOT NULL,
+      tags TEXT DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (position_id) REFERENCES positions(id) ON DELETE CASCADE
+    )
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_reflections_position_id ON reflections(position_id);
+    CREATE INDEX IF NOT EXISTS idx_reflections_type ON reflections(type);
   `);
 }

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../database';
 import { v4 as uuidv4 } from 'uuid';
-import type { Position, Execution } from '../../shared/types.ts';
+import type { Position, Execution, Reflection } from '../../shared/types.ts';
 
 const router = Router();
 
@@ -48,6 +48,19 @@ function rowToExecution(row: Record<string, unknown>): Execution {
   };
 }
 
+function rowToReflection(row: Record<string, unknown>): Reflection {
+  const tags = (row.tags as string) || '';
+  return {
+    id: row.id as string,
+    positionId: row.position_id as string,
+    type: row.type as Reflection['type'],
+    content: row.content as string,
+    tags: tags ? tags.split(',').map(t => t.trim()) : [],
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+  };
+}
+
 function getPositionWithExecutions(id: string): Position | null {
   const row = db.prepare('SELECT * FROM positions WHERE id = ?').get(id) as Record<string, unknown> | undefined;
   if (!row) return null;
@@ -57,6 +70,12 @@ function getPositionWithExecutions(id: string): Position | null {
     'SELECT * FROM executions WHERE position_id = ? ORDER BY executed_at ASC, created_at ASC'
   ).all(id) as Record<string, unknown>[];
   position.executions = execRows.map(rowToExecution);
+
+  const reflectionRows = db.prepare(
+    'SELECT * FROM reflections WHERE position_id = ? ORDER BY created_at DESC'
+  ).all(id) as Record<string, unknown>[];
+  position.reflections = reflectionRows.map(rowToReflection);
+
   return position;
 }
 
@@ -145,8 +164,23 @@ router.get('/', (req, res) => {
       }
     }
 
+    // Fetch reflection counts for the returned positions
+    const reflectionCountByPosition = new Map<string, number>();
+
+    if (positionIds.length > 0) {
+      const placeholders = positionIds.map(() => '?').join(',');
+      const countRows = db.prepare(
+        `SELECT position_id, COUNT(*) as count FROM reflections WHERE position_id IN (${placeholders}) GROUP BY position_id`
+      ).all(...positionIds) as { position_id: string; count: number }[];
+
+      for (const row of countRows) {
+        reflectionCountByPosition.set(row.position_id, row.count);
+      }
+    }
+
     for (const pos of positions) {
       pos.executions = execsByPosition.get(pos.id) ?? [];
+      pos.reflectionCount = reflectionCountByPosition.get(pos.id) ?? 0;
     }
 
     res.json(positions);

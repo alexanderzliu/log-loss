@@ -38,6 +38,8 @@ export interface Position {
   createdAt: string;
   updatedAt: string;
   executions: Execution[];
+  reflections?: Reflection[];
+  reflectionCount?: number;
 }
 
 export interface TradeFormData {
@@ -125,6 +127,38 @@ export interface RecentActivity {
   pnlPercent: number | null;
   chain: string | null;
   contractAddress: string | null;
+}
+
+// --- Reflections ---
+
+export type ReflectionType = 'reflection' | 'lesson' | 'mistake';
+
+export interface Reflection {
+  id: string;
+  positionId: string;
+  type: ReflectionType;
+  content: string;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+  // Joined fields (when fetched via /api/reflections)
+  symbol?: string;
+  assetType?: string;
+}
+
+export interface InsightFeedItem {
+  id: string;
+  type: 'hypothesis' | 'reflection' | 'lesson' | 'mistake';
+  content: string;
+  tags: string[];
+  date: string;
+  positionId: string;
+  symbol: string;
+  assetType: string;
+  direction: string;
+  status: string;
+  realizedPnl: number;
+  realizedPnlPercent: number | null;
 }
 
 export interface PriceHistory {

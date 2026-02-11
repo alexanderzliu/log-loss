@@ -1,12 +1,13 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import type { CSSProperties } from 'react';
-import { BookOpen, LayoutDashboard, TrendingUp, CircleDot } from 'lucide-react';
+import { BookOpen, LayoutDashboard, TrendingUp, CircleDot, Sparkles } from 'lucide-react';
 import { useStore } from './store/useStore';
 import { formatCurrency } from './utils/format';
 import Journal from './pages/Journal';
 import Predictions from './pages/Predictions';
 import Dashboard from './pages/Dashboard';
 import Analytics from './pages/Analytics';
+import Insights from './pages/Insights';
 import ToastContainer from './components/Toast';
 import './index.css';
 
@@ -167,6 +168,10 @@ function App() {
                 </span>
               )}
             </NavLink>
+            <NavLink to="/insights" style={navLinkStyle}>
+              <Sparkles size={18} />
+              Insights
+            </NavLink>
             <NavLink to="/analytics" style={navLinkStyle}>
               <TrendingUp size={18} />
               Analytics
@@ -181,6 +186,7 @@ function App() {
             <Route path="/trades" element={<Journal />} />
             <Route path="/journal" element={<Navigate to="/trades" replace />} />
             <Route path="/predictions" element={<Predictions />} />
+            <Route path="/insights" element={<Insights />} />
             <Route path="/analytics" element={<Analytics />} />
           </Routes>
         </main>

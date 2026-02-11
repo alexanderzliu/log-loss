@@ -4,6 +4,7 @@ import { initDatabase, db } from './database';
 import positionsRouter from './routes/positions';
 import pricesRouter from './routes/prices';
 import predictionsRouter from './routes/predictions';
+import reflectionsRouter from './routes/reflections';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled rejection:', reason);
@@ -22,6 +23,7 @@ initDatabase();
 app.use('/api/positions', positionsRouter);
 app.use('/api/prices', pricesRouter);
 app.use('/api/predictions', predictionsRouter);
+app.use('/api/reflections', reflectionsRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {
