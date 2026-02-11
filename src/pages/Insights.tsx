@@ -85,14 +85,9 @@ export default function Insights() {
   };
 
   useEffect(() => {
-    loadFeed();
-  }, [typeFilter]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(loadFeed, 300);
+    const timer = setTimeout(loadFeed, search ? 300 : 0);
     return () => clearTimeout(timer);
-  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [search, typeFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filterCounts = useMemo(() => {
     // Show counts based on unfiltered data when filter is 'all', otherwise just show current
