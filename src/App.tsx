@@ -7,6 +7,7 @@ import Journal from './pages/Journal';
 import Predictions from './pages/Predictions';
 import Dashboard from './pages/Dashboard';
 import Analytics from './pages/Analytics';
+import ToastContainer from './components/Toast';
 import './index.css';
 
 function navLinkStyle({ isActive }: { isActive: boolean }): CSSProperties {
@@ -183,6 +184,7 @@ function App() {
             <Route path="/analytics" element={<Analytics />} />
           </Routes>
         </main>
+        <ToastContainer />
       </div>
     </BrowserRouter>
   );

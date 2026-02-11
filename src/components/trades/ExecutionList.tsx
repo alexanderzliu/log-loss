@@ -20,6 +20,7 @@ interface ExecutionListProps {
 
 export default function ExecutionList({ positions }: ExecutionListProps) {
   const deleteExecution = useStore((s) => s.deleteExecution);
+  const addToast = useStore((s) => s.addToast);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ positionId: string; executionId: string } | null>(null);
 
@@ -40,7 +41,7 @@ export default function ExecutionList({ positions }: ExecutionListProps) {
       await deleteExecution(deleteConfirm.positionId, deleteConfirm.executionId);
     } catch (err) {
       console.error('Failed to delete execution:', err);
-      window.alert('Failed to delete execution. Please try again.');
+      addToast({ type: 'error', title: 'Delete Failed', message: 'Failed to delete execution. Please try again.' });
     }
     setDeleteConfirm(null);
     setMenuOpen(null);
@@ -75,7 +76,7 @@ export default function ExecutionList({ positions }: ExecutionListProps) {
             const value = exec.price * exec.quantity;
 
             return (
-              <tr key={exec.id} style={{ borderBottom: '1px solid var(--border)', animation: `slideUp 0.35s ease-out ${idx * 0.04}s both` }}>
+              <tr key={exec.id} style={{ borderBottom: '1px solid var(--border)', animation: `slideUp 0.35s ease-out ${Math.min(idx * 0.04, 0.4)}s both` }}>
                 <td style={tdStyle}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div className="asset-icon asset-icon-sm">

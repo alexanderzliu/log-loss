@@ -14,7 +14,19 @@ function getUniqueOpenAssets(positions: Position[]): { symbol: string; assetType
   );
 }
 
+export interface Toast {
+  id: string;
+  type: 'success' | 'error' | 'info';
+  title: string;
+  message?: string;
+}
+
 interface StoreState {
+  // Toasts
+  toasts: Toast[];
+  addToast: (toast: Omit<Toast, 'id'>) => void;
+  removeToast: (id: string) => void;
+
   // Positions
   positions: Position[];
   positionsLoading: boolean;
@@ -63,6 +75,17 @@ interface StoreState {
 }
 
 export const useStore = create<StoreState>((set, get) => ({
+  // Toasts
+  toasts: [],
+  addToast: (toast) => {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+    set((state) => ({ toasts: [...state.toasts, { ...toast, id }] }));
+    setTimeout(() => get().removeToast(id), 4000);
+  },
+  removeToast: (id) => {
+    set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }));
+  },
+
   // Initial state
   positions: [],
   positionsLoading: false,
@@ -104,13 +127,12 @@ export const useStore = create<StoreState>((set, get) => ({
     set((state) => {
       const exists = state.positions.some((p) => p.id === position.id);
       if (exists) {
-        // Update existing position (scaled in or partial close)
         return { positions: state.positions.map((p) => (p.id === position.id ? position : p)) };
       }
-      // New position
       return { positions: [position, ...state.positions] };
     });
     get().fetchPortfolioSummary();
+    get().addToast({ type: 'success', title: 'Trade Created', message: `${data.side === 'sell' ? 'Sold' : 'Bought'} ${data.symbol}` });
     return position;
   },
 
@@ -128,6 +150,7 @@ export const useStore = create<StoreState>((set, get) => ({
       positions: state.positions.filter((p) => p.id !== id),
     }));
     get().fetchPortfolioSummary();
+    get().addToast({ type: 'success', title: 'Position Deleted' });
   },
 
   deleteExecution: async (positionId, executionId) => {
@@ -219,6 +242,7 @@ export const useStore = create<StoreState>((set, get) => ({
       predictions: state.predictions.map((p) => (p.id === id ? prediction : p)),
     }));
     get().fetchPredictionsSummary();
+    get().addToast({ type: 'success', title: 'Prediction Closed', message: prediction.market });
     return prediction;
   },
 
@@ -228,6 +252,7 @@ export const useStore = create<StoreState>((set, get) => ({
       predictions: state.predictions.filter((p) => p.id !== id),
     }));
     get().fetchPredictionsSummary();
+    get().addToast({ type: 'success', title: 'Prediction Deleted' });
   },
 
   fetchPredictionsSummary: async () => {

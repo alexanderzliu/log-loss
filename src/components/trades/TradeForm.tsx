@@ -5,6 +5,7 @@ import { useShallow } from 'zustand/react/shallow';
 import TokenSearch from './TokenSearch';
 import Modal from '../Modal';
 import { FieldSection, FieldGroup, PrefixInput } from '../form';
+import { priceKey as getPriceKey } from '../../utils/priceKey';
 import type { Position, TradeFormData, PositionUpdateData } from '../../types';
 
 interface TradeFormProps {
@@ -15,19 +16,23 @@ interface TradeFormProps {
 }
 
 export default function TradeForm({ position, isClosing, isEditing, onClose }: TradeFormProps) {
-  const { createTrade, updatePosition } = useStore(useShallow((s) => ({
+  const { createTrade, updatePosition, prices } = useStore(useShallow((s) => ({
     createTrade: s.createTrade,
     updatePosition: s.updatePosition,
+    prices: s.prices,
   })));
+  const currentPrice = position ? prices[getPriceKey(position)]?.price : undefined;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const initialPrice = isClosing && currentPrice ? currentPrice : 0;
 
   const [formData, setFormData] = useState<TradeFormData>({
     assetType: position?.assetType || 'crypto',
     symbol: position?.symbol || '',
     side: isClosing ? 'sell' : 'buy',
     date: new Date().toISOString().split('T')[0],
-    price: 0,
+    price: initialPrice,
     quantity: isClosing ? (position?.remainingQuantity || 0) : 0,
     stopLoss: position?.stopLoss ?? null,
     takeProfit: position?.takeProfit ?? null,
@@ -39,9 +44,12 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
   });
 
   // Auto-calculation: raw strings for display, parsed numbers for math
-  const [priceStr, setPriceStr] = useState('');
+  const [priceStr, setPriceStr] = useState(isClosing && currentPrice ? String(currentPrice) : '');
   const [quantityStr, setQuantityStr] = useState(isClosing && position?.remainingQuantity ? String(position.remainingQuantity) : '');
-  const [totalStr, setTotalStr] = useState('');
+  const initialTotal = isClosing && currentPrice && position?.remainingQuantity
+    ? String(currentPrice * position.remainingQuantity)
+    : '';
+  const [totalStr, setTotalStr] = useState(initialTotal);
   const [editedFields, setEditedFields] = useState<[string, string]>(['price', 'quantity']);
 
   const calculatedField = ['price', 'quantity', 'total'].find(f => !editedFields.includes(f)) || 'total';
@@ -439,6 +447,41 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
                       placeholder="0.00"
                       required
                     />
+                    {isClosing && currentPrice !== undefined && (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginTop: '6px',
+                        fontSize: '11px',
+                        color: 'var(--text-muted)',
+                      }}>
+                        <span>Mkt: ${currentPrice < 0.01 ? currentPrice.toPrecision(4) : currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const p = String(currentPrice);
+                            setPriceStr(p);
+                            setFormData(prev => ({ ...prev, price: currentPrice }));
+                            const pair = updateEditedPair('price');
+                            recalculate(currentPrice, parseNum(quantityStr), parseNum(totalStr), pair);
+                          }}
+                          style={{
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            border: '1px solid rgba(16, 185, 129, 0.2)',
+                            borderRadius: '6px',
+                            padding: '2px 8px',
+                            fontSize: '10px',
+                            fontWeight: 600,
+                            color: 'var(--accent)',
+                            cursor: 'pointer',
+                            fontFamily: 'inherit',
+                          }}
+                        >
+                          Use market price
+                        </button>
+                      </div>
+                    )}
                   </FieldGroup>
                   <FieldGroup label={`Quantity${calculatedField === 'quantity' ? ' (calc)' : ''}`}>
                     <input

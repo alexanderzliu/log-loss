@@ -499,8 +499,9 @@ router.post('/', (req, res) => {
         }
 
         const avgEntry = position.avg_entry_price as number;
-        const pnl = (price - avgEntry) * quantity;
-        const pnlPercent = avgEntry > 0 ? ((price - avgEntry) / avgEntry) * 100 : 0;
+        const directionMultiplier = (position.direction as string) === 'short' ? -1 : 1;
+        const pnl = directionMultiplier * (price - avgEntry) * quantity;
+        const pnlPercent = avgEntry > 0 ? directionMultiplier * ((price - avgEntry) / avgEntry) * 100 : 0;
 
         // Insert sell execution
         db.prepare(`
@@ -566,8 +567,9 @@ router.post('/:id/executions', (req, res) => {
         }
 
         const avgEntry = position.avg_entry_price as number;
-        const pnl = (price - avgEntry) * quantity;
-        const pnlPercent = avgEntry > 0 ? ((price - avgEntry) / avgEntry) * 100 : 0;
+        const directionMultiplier = (position.direction as string) === 'short' ? -1 : 1;
+        const pnl = directionMultiplier * (price - avgEntry) * quantity;
+        const pnlPercent = avgEntry > 0 ? directionMultiplier * ((price - avgEntry) / avgEntry) * 100 : 0;
 
         db.prepare(`
           INSERT INTO executions (id, position_id, side, price, quantity, executed_at, pnl, pnl_percent, notes)
@@ -606,20 +608,23 @@ router.post('/:id/executions', (req, res) => {
 router.put('/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { stopLoss, takeProfit, hypothesis, notes } = req.body;
 
-    const result = db.prepare(`
-      UPDATE positions SET
-        stop_loss = ?, take_profit = ?, hypothesis = ?, notes = ?,
-        updated_at = datetime('now')
-      WHERE id = ?
-    `).run(
-      stopLoss ?? null,
-      takeProfit ?? null,
-      hypothesis ?? '',
-      notes ?? '',
-      id
-    );
+    const updates: string[] = [];
+    const params: unknown[] = [];
+
+    if ('stopLoss' in req.body) { updates.push('stop_loss = ?'); params.push(req.body.stopLoss ?? null); }
+    if ('takeProfit' in req.body) { updates.push('take_profit = ?'); params.push(req.body.takeProfit ?? null); }
+    if ('hypothesis' in req.body) { updates.push('hypothesis = ?'); params.push(req.body.hypothesis ?? ''); }
+    if ('notes' in req.body) { updates.push('notes = ?'); params.push(req.body.notes ?? ''); }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    updates.push("updated_at = datetime('now')");
+    params.push(id);
+
+    const result = db.prepare(`UPDATE positions SET ${updates.join(', ')} WHERE id = ?`).run(...params);
 
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Position not found' });

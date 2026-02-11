@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
-import { Plus, List, LayoutGrid } from 'lucide-react';
+import { Plus, List, LayoutGrid, Search } from 'lucide-react';
 import ExecutionList from '../components/trades/ExecutionList';
 import PositionList from '../components/trades/PositionList';
 import TradeForm from '../components/trades/TradeForm';
@@ -20,16 +20,49 @@ export default function Journal() {
   const [closingPosition, setClosingPosition] = useState<Position | null>(null);
   const [filter, setFilter] = useState<'all' | 'open' | 'closed'>('all');
   const [viewMode, setViewMode] = useState<'positions' | 'executions'>('positions');
+  const [search, setSearch] = useState('');
+  const [sortField, setSortField] = useState<'date' | 'symbol' | 'pnl' | 'costBasis'>('date');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     fetchPositions();
   }, [fetchPositions]);
 
+  const handleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('desc');
+    }
+  };
+
   const filteredPositions = useMemo(() => positions.filter((pos) => {
     if (filter === 'open' && pos.status !== 'open') return false;
     if (filter === 'closed' && pos.status !== 'closed') return false;
+    if (search && !pos.symbol.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
-  }), [positions, filter]);
+  }), [positions, filter, search]);
+
+  const sortedPositions = useMemo(() => {
+    const sorted = [...filteredPositions];
+    sorted.sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'date': cmp = new Date(a.openedAt).getTime() - new Date(b.openedAt).getTime(); break;
+        case 'symbol': cmp = a.symbol.localeCompare(b.symbol); break;
+        case 'pnl': cmp = (a.realizedPnl || 0) - (b.realizedPnl || 0); break;
+        case 'costBasis': {
+          const aCost = a.avgEntryPrice * (a.status === 'open' ? a.remainingQuantity : a.totalQuantity);
+          const bCost = b.avgEntryPrice * (b.status === 'open' ? b.remainingQuantity : b.totalQuantity);
+          cmp = aCost - bCost;
+          break;
+        }
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return sorted;
+  }, [filteredPositions, sortField, sortDir]);
 
   const handleNewTrade = () => {
     setEditingPosition(null);
@@ -73,7 +106,7 @@ export default function Journal() {
         </button>
       </div>
 
-      {/* Filters and View Toggle */}
+      {/* Filters, Search, and View Toggle */}
       <div className="flex justify-between items-center mb-7">
         <FilterPills
           options={[
@@ -84,6 +117,36 @@ export default function Journal() {
           active={filter}
           onChange={(key) => setFilter(key as typeof filter)}
         />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Search */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border)',
+            borderRadius: '12px',
+            padding: '8px 14px',
+            minWidth: '200px',
+          }}>
+            <Search size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search symbol..."
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-primary)',
+                fontSize: '14px',
+                outline: 'none',
+                width: '100%',
+                padding: 0,
+              }}
+            />
+          </div>
 
         {/* View Toggle */}
         <div style={{
@@ -132,6 +195,7 @@ export default function Journal() {
             <List size={16} />
           </button>
         </div>
+        </div>
       </div>
 
       {/* Content */}
@@ -141,12 +205,15 @@ export default function Journal() {
         </div>
       ) : viewMode === 'positions' ? (
         <PositionList
-          positions={filteredPositions}
+          positions={sortedPositions}
           onEdit={handleEditPosition}
           onClosePosition={handleClosePosition}
+          sortField={sortField}
+          sortDir={sortDir}
+          onSort={(field) => handleSort(field as typeof sortField)}
         />
       ) : (
-        <ExecutionList positions={filteredPositions} />
+        <ExecutionList positions={sortedPositions} />
       )}
 
       {/* Trade Form Modal */}

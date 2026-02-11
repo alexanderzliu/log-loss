@@ -23,9 +23,10 @@ interface PredictionListProps {
 }
 
 export default function PredictionList({ predictions, onEdit, onClose }: PredictionListProps) {
-  const { closePrediction, deletePrediction } = useStore(useShallow((s) => ({
+  const { closePrediction, deletePrediction, addToast } = useStore(useShallow((s) => ({
     closePrediction: s.closePrediction,
     deletePrediction: s.deletePrediction,
+    addToast: s.addToast,
   })));
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -36,7 +37,7 @@ export default function PredictionList({ predictions, onEdit, onClose }: Predict
       await deletePrediction(id);
     } catch (err) {
       console.error('Failed to delete prediction:', err);
-      window.alert('Failed to delete prediction. Please try again.');
+      addToast({ type: 'error', title: 'Delete Failed', message: 'Failed to delete prediction. Please try again.' });
     }
     setDeleteConfirm(null);
     setMenuOpen(null);
@@ -53,7 +54,7 @@ export default function PredictionList({ predictions, onEdit, onClose }: Predict
       });
     } catch (err) {
       console.error('Failed to resolve prediction:', err);
-      window.alert('Failed to resolve prediction. Please try again.');
+      addToast({ type: 'error', title: 'Resolve Failed', message: 'Failed to resolve prediction. Please try again.' });
     }
     setResolveConfirm(null);
     setMenuOpen(null);
@@ -103,7 +104,7 @@ export default function PredictionList({ predictions, onEdit, onClose }: Predict
                 key={prediction.id}
                 style={{
                   borderBottom: '1px solid var(--border)',
-                  animation: `slideUp 0.35s ease-out ${idx * 0.04}s both`,
+                  animation: `slideUp 0.35s ease-out ${Math.min(idx * 0.04, 0.4)}s both`,
                 }}
               >
                 <td style={{ ...tdStyle, maxWidth: '300px' }}>

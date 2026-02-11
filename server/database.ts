@@ -73,7 +73,6 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_positions_symbol ON positions(symbol);
     CREATE INDEX IF NOT EXISTS idx_positions_status ON positions(status);
     CREATE INDEX IF NOT EXISTS idx_positions_asset_type ON positions(asset_type);
-    CREATE INDEX IF NOT EXISTS idx_positions_lookup ON positions(symbol, asset_type, status, chain, contract_address);
     CREATE INDEX IF NOT EXISTS idx_executions_position_id ON executions(position_id);
   `);
 
@@ -268,6 +267,7 @@ function migrateAddChainColumns() {
     db.exec('ALTER TABLE positions ADD COLUMN chain TEXT DEFAULT NULL');
     db.exec('ALTER TABLE positions ADD COLUMN contract_address TEXT DEFAULT NULL');
     db.exec('CREATE INDEX IF NOT EXISTS idx_positions_chain_address ON positions(chain, contract_address)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_positions_lookup ON positions(symbol, asset_type, status, chain, contract_address)');
     console.log('Added chain/contract_address columns to positions');
   }
 }

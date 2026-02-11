@@ -17,6 +17,9 @@ import {
   X,
   ArrowUpRight,
   ArrowDownRight,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
@@ -25,12 +28,16 @@ interface PositionListProps {
   positions: Position[];
   onEdit: (position: Position) => void;
   onClosePosition: (position: Position) => void;
+  sortField?: string;
+  sortDir?: 'asc' | 'desc';
+  onSort?: (field: string) => void;
 }
 
-export default function PositionList({ positions, onEdit, onClosePosition }: PositionListProps) {
-  const { deletePosition, prices } = useStore(useShallow((s) => ({
+export default function PositionList({ positions, onEdit, onClosePosition, sortField, sortDir, onSort }: PositionListProps) {
+  const { deletePosition, prices, addToast } = useStore(useShallow((s) => ({
     deletePosition: s.deletePosition,
     prices: s.prices,
+    addToast: s.addToast,
   })));
   const [expandedPositions, toggleExpanded] = useSetToggle();
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
@@ -41,7 +48,7 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
       await deletePosition(id);
     } catch (err) {
       console.error('Failed to delete position:', err);
-      window.alert('Failed to delete position. Please try again.');
+      addToast({ type: 'error', title: 'Delete Failed', message: 'Failed to delete position. Please try again.' });
     }
     setDeleteConfirm(null);
     setMenuOpen(null);
@@ -61,12 +68,18 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ borderBottom: '1px solid var(--border)' }}>
-            <th style={thStyle}>Asset</th>
+            <th style={thStyle}>
+              <SortHeader field="symbol" label="Asset" sortField={sortField} sortDir={sortDir} onSort={onSort} />
+            </th>
             <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
             <th style={{ ...thStyle, textAlign: 'right' }}>Avg Entry</th>
             <th style={{ ...thStyle, textAlign: 'right' }}>Quantity</th>
-            <th style={{ ...thStyle, textAlign: 'right' }}>Cost Basis</th>
-            <th style={{ ...thStyle, textAlign: 'right' }}>P&L</th>
+            <th style={{ ...thStyle, textAlign: 'right' }}>
+              <SortHeader field="costBasis" label="Cost Basis" sortField={sortField} sortDir={sortDir} onSort={onSort} align="right" />
+            </th>
+            <th style={{ ...thStyle, textAlign: 'right' }}>
+              <SortHeader field="pnl" label="P&L" sortField={sortField} sortDir={sortDir} onSort={onSort} align="right" />
+            </th>
             <th style={{ ...thStyle, width: '40px' }}></th>
           </tr>
         </thead>
@@ -97,7 +110,7 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
                   style={{
                     borderBottom: isExpanded ? 'none' : '1px solid var(--border)',
                     cursor: 'pointer',
-                    animation: `slideUp 0.35s ease-out ${posIdx * 0.04}s both`,
+                    animation: `slideUp 0.35s ease-out ${Math.min(posIdx * 0.04, 0.4)}s both`,
                   }}
                   onClick={() => toggleExpanded(position.id)}
                 >
@@ -245,6 +258,45 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
         />
       )}
     </div>
+  );
+}
+
+function SortHeader({ field, label, sortField, sortDir, onSort, align }: {
+  field: string;
+  label: string;
+  sortField?: string;
+  sortDir?: 'asc' | 'desc';
+  onSort?: (field: string) => void;
+  align?: 'left' | 'right';
+}) {
+  const isActive = sortField === field;
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onSort?.(field); }}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        padding: 0,
+        font: 'inherit',
+        color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
+        fontSize: 'inherit',
+        fontWeight: 'inherit',
+        textTransform: 'inherit' as never,
+        letterSpacing: 'inherit',
+        justifyContent: align === 'right' ? 'flex-end' : 'flex-start',
+        width: '100%',
+      }}
+    >
+      {label}
+      {isActive
+        ? (sortDir === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />)
+        : <ArrowUpDown size={13} style={{ opacity: 0.4 }} />
+      }
+    </button>
   );
 }
 
