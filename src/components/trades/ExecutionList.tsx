@@ -19,7 +19,7 @@ interface ExecutionListProps {
 }
 
 export default function ExecutionList({ positions }: ExecutionListProps) {
-  const { deleteExecution } = useStore();
+  const deleteExecution = useStore((s) => s.deleteExecution);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ positionId: string; executionId: string } | null>(null);
 

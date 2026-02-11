@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { TrendingUp, TrendingDown, Shield, Target, Zap } from 'lucide-react';
 import { useStore } from '../../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import TokenSearch from './TokenSearch';
 import Modal from '../Modal';
 import { FieldSection, FieldGroup, PrefixInput } from '../form';
@@ -14,7 +15,11 @@ interface TradeFormProps {
 }
 
 export default function TradeForm({ position, isClosing, isEditing, onClose }: TradeFormProps) {
-  const { createTrade, updatePosition, fetchPositions } = useStore();
+  const { createTrade, updatePosition, fetchPositions } = useStore(useShallow((s) => ({
+    createTrade: s.createTrade,
+    updatePosition: s.updatePosition,
+    fetchPositions: s.fetchPositions,
+  })));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

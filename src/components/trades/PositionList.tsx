@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react';
 import type { Position } from '../../types';
 import { useStore } from '../../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { formatCurrency, formatPrice, formatQuantity, formatDate } from '../../utils/format';
 import PnlDisplay from '../PnlDisplay';
 import { priceKey as getPriceKey } from '../../utils/priceKey';
@@ -27,7 +28,10 @@ interface PositionListProps {
 }
 
 export default function PositionList({ positions, onEdit, onClosePosition }: PositionListProps) {
-  const { deletePosition, prices } = useStore();
+  const { deletePosition, prices } = useStore(useShallow((s) => ({
+    deletePosition: s.deletePosition,
+    prices: s.prices,
+  })));
   const [expandedPositions, toggleExpanded] = useSetToggle();
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);

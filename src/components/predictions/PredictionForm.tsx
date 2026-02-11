@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CircleDot, Zap, Target } from 'lucide-react';
 import { useStore } from '../../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import Modal from '../Modal';
 import { FieldSection, FieldGroup, PrefixInput } from '../form';
 import type { Prediction, PredictionFormData, PredictionUpdateData } from '../../types';
@@ -12,7 +13,11 @@ interface PredictionFormProps {
 }
 
 export default function PredictionForm({ prediction, isEditing, onClose }: PredictionFormProps) {
-  const { createPrediction, updatePrediction, fetchPredictions } = useStore();
+  const { createPrediction, updatePrediction, fetchPredictions } = useStore(useShallow((s) => ({
+    createPrediction: s.createPrediction,
+    updatePrediction: s.updatePrediction,
+    fetchPredictions: s.fetchPredictions,
+  })));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

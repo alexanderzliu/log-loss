@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-do
 import { useEffect, type CSSProperties } from 'react';
 import { BookOpen, LayoutDashboard, TrendingUp, CircleDot } from 'lucide-react';
 import { useStore } from './store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { formatCurrency } from './utils/format';
 import Journal from './pages/Journal';
 import Predictions from './pages/Predictions';
@@ -38,7 +39,15 @@ function App() {
     fetchPositions,
     fetchPortfolioSummary,
     fetchPredictionsSummary,
-  } = useStore();
+  } = useStore(useShallow((s) => ({
+    positions: s.positions,
+    predictions: s.predictions,
+    portfolioSummary: s.portfolioSummary,
+    predictionsSummary: s.predictionsSummary,
+    fetchPositions: s.fetchPositions,
+    fetchPortfolioSummary: s.fetchPortfolioSummary,
+    fetchPredictionsSummary: s.fetchPredictionsSummary,
+  })));
 
   useEffect(() => {
     fetchPositions();

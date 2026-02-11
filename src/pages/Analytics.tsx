@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { fetchPriceHistory } from '../api/prices';
 import type { PriceHistory, AssetType } from '../types';
 import {
@@ -18,7 +19,11 @@ import { priceKey as getPriceKey } from '../utils/priceKey';
 import PageTransition from '../components/PageTransition';
 
 export default function Analytics() {
-  const { positions, prices, fetchPrices } = useStore();
+  const { positions, prices, fetchPrices } = useStore(useShallow((s) => ({
+    positions: s.positions,
+    prices: s.prices,
+    fetchPrices: s.fetchPrices,
+  })));
   const [selectedSymbol, setSelectedSymbol] = useState<string>('');
   const [selectedAssetType, setSelectedAssetType] = useState<AssetType>('crypto');
   const [priceHistory, setPriceHistory] = useState<PriceHistory[]>([]);

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Plus, List, LayoutGrid } from 'lucide-react';
 import ExecutionList from '../components/trades/ExecutionList';
 import PositionList from '../components/trades/PositionList';
@@ -8,7 +9,11 @@ import PageTransition from '../components/PageTransition';
 import type { Position } from '../types';
 
 export default function Journal() {
-  const { positions, positionsLoading, fetchPositions } = useStore();
+  const { positions, positionsLoading, fetchPositions } = useStore(useShallow((s) => ({
+    positions: s.positions,
+    positionsLoading: s.positionsLoading,
+    fetchPositions: s.fetchPositions,
+  })));
   const [showForm, setShowForm] = useState(false);
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
   const [closingPosition, setClosingPosition] = useState<Position | null>(null);

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Plus } from 'lucide-react';
 import PredictionList from '../components/predictions/PredictionList';
 import PredictionForm from '../components/predictions/PredictionForm';
@@ -8,7 +9,11 @@ import PageTransition from '../components/PageTransition';
 import type { Prediction } from '../types';
 
 export default function Predictions() {
-  const { predictions, predictionsLoading, fetchPredictions } = useStore();
+  const { predictions, predictionsLoading, fetchPredictions } = useStore(useShallow((s) => ({
+    predictions: s.predictions,
+    predictionsLoading: s.predictionsLoading,
+    fetchPredictions: s.fetchPredictions,
+  })));
   const [showForm, setShowForm] = useState(false);
   const [editingPrediction, setEditingPrediction] = useState<Prediction | null>(null);
   const [closingPrediction, setClosingPrediction] = useState<Prediction | null>(null);

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { TrendingDown } from 'lucide-react';
 import { useStore } from '../../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { formatCurrency } from '../../utils/format';
 import Modal from '../Modal';
 import { FieldGroup, PrefixInput } from '../form';
@@ -12,7 +13,10 @@ interface PredictionCloseModalProps {
 }
 
 export default function PredictionCloseModal({ prediction, onClose }: PredictionCloseModalProps) {
-  const { closePrediction, fetchPredictions } = useStore();
+  const { closePrediction, fetchPredictions } = useStore(useShallow((s) => ({
+    closePrediction: s.closePrediction,
+    fetchPredictions: s.fetchPredictions,
+  })));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exitPrice, setExitPrice] = useState<number | null>(null);

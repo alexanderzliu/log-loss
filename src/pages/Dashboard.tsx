@@ -1,5 +1,6 @@
 import { Fragment, useEffect } from 'react';
 import { useStore } from '../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { RefreshCw, ArrowUpRight, ArrowDownRight, ChevronDown, ChevronRight } from 'lucide-react';
 import { formatCurrency, formatPercent, formatQuantity, formatPrice } from '../utils/format';
 import { tableHeaderStyle, tableCellStyle } from '../utils/styles';
@@ -24,7 +25,20 @@ export default function Dashboard() {
     fetchPortfolioSummary,
     fetchPredictionsSummary,
     refreshPrices,
-  } = useStore();
+  } = useStore(useShallow((s) => ({
+    positions: s.positions,
+    positionsLoading: s.positionsLoading,
+    positionsError: s.positionsError,
+    prices: s.prices,
+    portfolioSummary: s.portfolioSummary,
+    portfolioError: s.portfolioError,
+    predictionsSummary: s.predictionsSummary,
+    predictionsSummaryError: s.predictionsSummaryError,
+    fetchPositions: s.fetchPositions,
+    fetchPortfolioSummary: s.fetchPortfolioSummary,
+    fetchPredictionsSummary: s.fetchPredictionsSummary,
+    refreshPrices: s.refreshPrices,
+  })));
 
   const [expandedPositions, toggleExpanded] = useSetToggle();
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Prediction } from '../../types';
 import { useStore } from '../../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { formatCurrency, formatDate } from '../../utils/format';
 import PnlDisplay from '../PnlDisplay';
 import { tableHeaderStyle, tableCellStyle } from '../../utils/styles';
@@ -22,7 +23,10 @@ interface PredictionListProps {
 }
 
 export default function PredictionList({ predictions, onEdit, onClose }: PredictionListProps) {
-  const { closePrediction, deletePrediction } = useStore();
+  const { closePrediction, deletePrediction } = useStore(useShallow((s) => ({
+    closePrediction: s.closePrediction,
+    deletePrediction: s.deletePrediction,
+  })));
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [resolveConfirm, setResolveConfirm] = useState<{ id: string; resolution: 'yes' | 'no' } | null>(null);
