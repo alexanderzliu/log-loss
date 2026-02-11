@@ -5,6 +5,7 @@ import { Plus, List, LayoutGrid } from 'lucide-react';
 import ExecutionList from '../components/trades/ExecutionList';
 import PositionList from '../components/trades/PositionList';
 import TradeForm from '../components/trades/TradeForm';
+import FilterPills from '../components/FilterPills';
 import PageTransition from '../components/PageTransition';
 import type { Position } from '../types';
 
@@ -78,32 +79,15 @@ export default function Journal() {
 
       {/* Filters and View Toggle */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {[
+        <FilterPills
+          options={[
             { key: 'all', label: 'All', count: positions.length },
             { key: 'open', label: 'Open', count: openCount },
             { key: 'closed', label: 'Closed', count: closedCount },
-          ].map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key as typeof filter)}
-              style={{
-                padding: '10px 18px',
-                borderRadius: '9999px',
-                border: filter === f.key ? '1px solid var(--border-accent)' : '1px solid transparent',
-                background: filter === f.key ? 'var(--accent-soft)' : 'transparent',
-                color: filter === f.key ? 'var(--accent)' : 'var(--text-muted)',
-                fontSize: '14px',
-                fontWeight: 500,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-              }}
-            >
-              {f.label} <span style={{ opacity: 0.6, marginLeft: '4px' }}>{f.count}</span>
-            </button>
-          ))}
-        </div>
+          ]}
+          active={filter}
+          onChange={(key) => setFilter(key as typeof filter)}
+        />
 
         {/* View Toggle */}
         <div style={{
