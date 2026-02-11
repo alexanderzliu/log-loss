@@ -37,7 +37,12 @@ export default function PositionList({ positions, onEdit, onClosePosition }: Pos
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   const handleDelete = async (id: string) => {
-    await deletePosition(id);
+    try {
+      await deletePosition(id);
+    } catch (err) {
+      console.error('Failed to delete position:', err);
+      window.alert('Failed to delete position. Please try again.');
+    }
     setDeleteConfirm(null);
     setMenuOpen(null);
   };

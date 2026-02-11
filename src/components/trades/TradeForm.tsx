@@ -15,10 +15,9 @@ interface TradeFormProps {
 }
 
 export default function TradeForm({ position, isClosing, isEditing, onClose }: TradeFormProps) {
-  const { createTrade, updatePosition, fetchPositions } = useStore(useShallow((s) => ({
+  const { createTrade, updatePosition } = useStore(useShallow((s) => ({
     createTrade: s.createTrade,
     updatePosition: s.updatePosition,
-    fetchPositions: s.fetchPositions,
   })));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -115,7 +114,6 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
       } else {
         await createTrade(formData);
       }
-      await fetchPositions();
       onClose();
     } catch (err) {
       setError((err as Error).message);

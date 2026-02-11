@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
 import { Plus } from 'lucide-react';
@@ -24,11 +24,11 @@ export default function Predictions() {
     fetchPredictions();
   }, [fetchPredictions]);
 
-  const filteredPredictions = predictions.filter((p) => {
+  const filteredPredictions = useMemo(() => predictions.filter((p) => {
     if (filter === 'open' && p.status !== 'open') return false;
     if (filter === 'closed' && p.status !== 'closed') return false;
     return true;
-  });
+  }), [predictions, filter]);
 
   const handleNewPrediction = () => {
     setEditingPrediction(null);
@@ -54,8 +54,8 @@ export default function Predictions() {
     setClosingPrediction(null);
   };
 
-  const openCount = predictions.filter(p => p.status === 'open').length;
-  const closedCount = predictions.filter(p => p.status === 'closed').length;
+  const openCount = useMemo(() => predictions.filter(p => p.status === 'open').length, [predictions]);
+  const closedCount = useMemo(() => predictions.filter(p => p.status === 'closed').length, [predictions]);
 
   return (
     <PageTransition>

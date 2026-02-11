@@ -36,7 +36,12 @@ export default function ExecutionList({ positions }: ExecutionListProps) {
 
   const handleDelete = async () => {
     if (!deleteConfirm) return;
-    await deleteExecution(deleteConfirm.positionId, deleteConfirm.executionId);
+    try {
+      await deleteExecution(deleteConfirm.positionId, deleteConfirm.executionId);
+    } catch (err) {
+      console.error('Failed to delete execution:', err);
+      window.alert('Failed to delete execution. Please try again.');
+    }
     setDeleteConfirm(null);
     setMenuOpen(null);
   };

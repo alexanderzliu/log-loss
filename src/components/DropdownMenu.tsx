@@ -13,6 +13,9 @@ export default function DropdownMenu({ isOpen, onToggle, onClose, children }: Dr
     <div style={{ position: 'relative' }}>
       <button
         onClick={onToggle}
+        aria-label="Actions"
+        aria-haspopup="true"
+        aria-expanded={isOpen}
         style={{
           background: 'transparent',
           border: 'none',

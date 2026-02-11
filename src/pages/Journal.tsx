@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
 import { Plus, List, LayoutGrid } from 'lucide-react';
@@ -25,11 +25,11 @@ export default function Journal() {
     fetchPositions();
   }, [fetchPositions]);
 
-  const filteredPositions = positions.filter((pos) => {
+  const filteredPositions = useMemo(() => positions.filter((pos) => {
     if (filter === 'open' && pos.status !== 'open') return false;
     if (filter === 'closed' && pos.status !== 'closed') return false;
     return true;
-  });
+  }), [positions, filter]);
 
   const handleNewTrade = () => {
     setEditingPosition(null);
@@ -55,8 +55,8 @@ export default function Journal() {
     setClosingPosition(null);
   };
 
-  const openCount = positions.filter(p => p.status === 'open').length;
-  const closedCount = positions.filter(p => p.status === 'closed').length;
+  const openCount = useMemo(() => positions.filter(p => p.status === 'open').length, [positions]);
+  const closedCount = useMemo(() => positions.filter(p => p.status === 'closed').length, [positions]);
 
   return (
     <PageTransition>

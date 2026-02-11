@@ -13,10 +13,9 @@ interface PredictionFormProps {
 }
 
 export default function PredictionForm({ prediction, isEditing, onClose }: PredictionFormProps) {
-  const { createPrediction, updatePrediction, fetchPredictions } = useStore(useShallow((s) => ({
+  const { createPrediction, updatePrediction } = useStore(useShallow((s) => ({
     createPrediction: s.createPrediction,
     updatePrediction: s.updatePrediction,
-    fetchPredictions: s.fetchPredictions,
   })));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +49,6 @@ export default function PredictionForm({ prediction, isEditing, onClose }: Predi
       } else {
         await createPrediction(formData);
       }
-      await fetchPredictions();
       onClose();
     } catch (err) {
       setError((err as Error).message);

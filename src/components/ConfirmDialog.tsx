@@ -5,9 +5,10 @@ interface ConfirmDialogProps {
   message: string;
   onConfirm: () => void;
   onCancel: () => void;
+  confirmLabel?: string;
 }
 
-export default function ConfirmDialog({ title, message, onConfirm, onCancel }: ConfirmDialogProps) {
+export default function ConfirmDialog({ title, message, onConfirm, onCancel, confirmLabel = 'Delete' }: ConfirmDialogProps) {
   return (
     <Modal onClose={onCancel} maxWidth="400px">
       <div style={{ padding: '24px' }}>
@@ -34,7 +35,7 @@ export default function ConfirmDialog({ title, message, onConfirm, onCancel }: C
               fontFamily: 'inherit'
             }}
           >
-            Delete
+            {confirmLabel}
           </button>
         </div>
       </div>

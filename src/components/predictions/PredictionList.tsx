@@ -32,7 +32,12 @@ export default function PredictionList({ predictions, onEdit, onClose }: Predict
   const [resolveConfirm, setResolveConfirm] = useState<{ id: string; resolution: 'yes' | 'no' } | null>(null);
 
   const handleDelete = async (id: string) => {
-    await deletePrediction(id);
+    try {
+      await deletePrediction(id);
+    } catch (err) {
+      console.error('Failed to delete prediction:', err);
+      window.alert('Failed to delete prediction. Please try again.');
+    }
     setDeleteConfirm(null);
     setMenuOpen(null);
   };
@@ -41,10 +46,15 @@ export default function PredictionList({ predictions, onEdit, onClose }: Predict
     if (!resolveConfirm) return;
     const prediction = predictions.find(p => p.id === resolveConfirm.id);
     if (!prediction) return;
-    await closePrediction(resolveConfirm.id, {
-      resolution: resolveConfirm.resolution,
-      date: new Date().toISOString().split('T')[0],
-    });
+    try {
+      await closePrediction(resolveConfirm.id, {
+        resolution: resolveConfirm.resolution,
+        date: new Date().toISOString().split('T')[0],
+      });
+    } catch (err) {
+      console.error('Failed to resolve prediction:', err);
+      window.alert('Failed to resolve prediction. Please try again.');
+    }
     setResolveConfirm(null);
     setMenuOpen(null);
   };
@@ -203,6 +213,7 @@ export default function PredictionList({ predictions, onEdit, onClose }: Predict
             message={`Exit at $${exitPrice.toFixed(2)} — P&L: ${pnl >= 0 ? '+' : ''}${formatCurrency(pnl)}`}
             onConfirm={handleResolve}
             onCancel={() => setResolveConfirm(null)}
+            confirmLabel="Resolve"
           />
         );
       })()}
