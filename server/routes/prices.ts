@@ -33,8 +33,8 @@ function getCachedPrice(symbol: string, assetType: string): Record<string, unkno
   return db.prepare(`
     SELECT * FROM price_cache
     WHERE symbol = ? AND asset_type = ?
-    AND datetime(last_updated) > datetime('now', '-${CACHE_EXPIRY_MINUTES} minutes')
-  `).get(symbol, assetType) as Record<string, unknown> | undefined;
+    AND datetime(last_updated) > datetime('now', '-' || ? || ' minutes')
+  `).get(symbol, assetType, CACHE_EXPIRY_MINUTES) as Record<string, unknown> | undefined;
 }
 
 function cachePriceData(key: string, assetType: string, priceData: PriceData): string {

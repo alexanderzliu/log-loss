@@ -5,6 +5,8 @@ const dbPath = path.join(process.cwd(), 'trading-journal.db');
 export const db = new Database(dbPath);
 
 export function initDatabase() {
+  // Enable WAL mode for better concurrent read/write performance
+  db.pragma('journal_mode = WAL');
   // Enable foreign keys
   db.pragma('foreign_keys = ON');
 
@@ -71,8 +73,8 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_positions_symbol ON positions(symbol);
     CREATE INDEX IF NOT EXISTS idx_positions_status ON positions(status);
     CREATE INDEX IF NOT EXISTS idx_positions_asset_type ON positions(asset_type);
+    CREATE INDEX IF NOT EXISTS idx_positions_lookup ON positions(symbol, asset_type, status, chain, contract_address);
     CREATE INDEX IF NOT EXISTS idx_executions_position_id ON executions(position_id);
-    CREATE INDEX IF NOT EXISTS idx_executions_side ON executions(side);
   `);
 
   // Migrate from old trades table if it exists
