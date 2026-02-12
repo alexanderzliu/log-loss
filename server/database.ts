@@ -91,6 +91,12 @@ export function initDatabase() {
   // Add reflections table
   migrateCreateReflections();
 
+  // Rename reflection type 'reflection' -> 'success'
+  migrateReflectionTypeRename();
+
+  // Add rules table
+  migrateCreateRules();
+
   console.log('Database initialized successfully');
 }
 
@@ -338,5 +344,70 @@ function migrateCreateReflections() {
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_reflections_position_id ON reflections(position_id);
     CREATE INDEX IF NOT EXISTS idx_reflections_type ON reflections(type);
+  `);
+}
+
+function migrateReflectionTypeRename() {
+  // Check if the table still has the old CHECK constraint by looking for 'reflection' type rows
+  // or checking the table SQL. We detect by trying to see the table definition.
+  const tableInfo = db.prepare(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='reflections'"
+  ).get() as { sql: string } | undefined;
+
+  if (!tableInfo || !tableInfo.sql.includes("'reflection'")) {
+    // Already migrated or table doesn't exist
+    return;
+  }
+
+  console.log('Migrating reflection type: reflection -> success...');
+
+  const migrate = db.transaction(() => {
+    // Update existing data
+    db.exec("UPDATE reflections SET type = 'success' WHERE type = 'reflection'");
+
+    // Recreate table with new CHECK constraint
+    db.exec(`
+      CREATE TABLE reflections_new (
+        id TEXT PRIMARY KEY,
+        position_id TEXT NOT NULL,
+        type TEXT NOT NULL DEFAULT 'success' CHECK(type IN ('success', 'lesson', 'mistake')),
+        content TEXT NOT NULL,
+        tags TEXT DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (position_id) REFERENCES positions(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Copy data
+    db.exec(`
+      INSERT INTO reflections_new (id, position_id, type, content, tags, created_at, updated_at)
+      SELECT id, position_id, type, content, tags, created_at, updated_at
+      FROM reflections
+    `);
+
+    // Drop old table and rename new one
+    db.exec('DROP TABLE reflections');
+    db.exec('ALTER TABLE reflections_new RENAME TO reflections');
+
+    // Recreate indexes
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_reflections_position_id ON reflections(position_id);
+      CREATE INDEX IF NOT EXISTS idx_reflections_type ON reflections(type);
+    `);
+  });
+
+  migrate();
+  console.log('Reflection type migration complete');
+}
+
+function migrateCreateRules() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS rules (
+      id TEXT PRIMARY KEY,
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
   `);
 }

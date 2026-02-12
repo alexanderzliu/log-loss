@@ -39,7 +39,7 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
     hypothesis: position?.hypothesis || '',
     chain: position?.chain ?? null,
     contractAddress: position?.contractAddress ?? null,
-    notes: isEditing ? (position?.notes || '') : '',
+    notes: '',
     positionId: isClosing ? position?.id : undefined,
   });
 
@@ -116,7 +116,6 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
           stopLoss: formData.stopLoss,
           takeProfit: formData.takeProfit,
           hypothesis: formData.hypothesis,
-          notes: formData.notes,
         };
         await updatePosition(position.id, updateData);
       } else {
@@ -255,16 +254,6 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
                     onChange={handleChange}
                     rows={3}
                     placeholder="Why are you making this trade?"
-                    className="w-full resize-none"
-                  />
-                </FieldGroup>
-                <FieldGroup label="Notes">
-                  <textarea
-                    name="notes"
-                    value={formData.notes}
-                    onChange={handleChange}
-                    rows={2}
-                    placeholder="Additional notes..."
                     className="w-full resize-none"
                   />
                 </FieldGroup>

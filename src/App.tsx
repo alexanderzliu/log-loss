@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import type { CSSProperties } from 'react';
-import { BookOpen, LayoutDashboard, TrendingUp, CircleDot, Sparkles } from 'lucide-react';
+import { BookOpen, BookMarked, LayoutDashboard, TrendingUp, CircleDot, Sparkles, Brain } from 'lucide-react';
 import { useStore } from './store/useStore';
 import { formatCurrency } from './utils/format';
 import Journal from './pages/Journal';
@@ -8,6 +8,8 @@ import Predictions from './pages/Predictions';
 import Dashboard from './pages/Dashboard';
 import Analytics from './pages/Analytics';
 import Insights from './pages/Insights';
+import Rulebook from './pages/Rulebook';
+import AIAnalysisPage from './pages/AIAnalysis';
 import ToastContainer from './components/Toast';
 import './index.css';
 
@@ -176,6 +178,14 @@ function App() {
               <TrendingUp size={18} />
               Analytics
             </NavLink>
+            <NavLink to="/rulebook" style={navLinkStyle}>
+              <BookMarked size={18} />
+              Rulebook
+            </NavLink>
+            <NavLink to="/ai-analysis" style={navLinkStyle}>
+              <Brain size={18} />
+              AI Analysis
+            </NavLink>
           </nav>
         </aside>
 
@@ -188,6 +198,8 @@ function App() {
             <Route path="/predictions" element={<Predictions />} />
             <Route path="/insights" element={<Insights />} />
             <Route path="/analytics" element={<Analytics />} />
+            <Route path="/rulebook" element={<Rulebook />} />
+            <Route path="/ai-analysis" element={<AIAnalysisPage />} />
           </Routes>
         </main>
         <ToastContainer />

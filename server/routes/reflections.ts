@@ -1,29 +1,15 @@
 import { Router } from 'express';
 import { db } from '../database';
 import { v4 as uuidv4 } from 'uuid';
-import type { Reflection, InsightFeedItem } from '../../shared/types.ts';
+import type { InsightFeedItem } from '../../shared/types.ts';
+import { rowToReflection } from '../helpers/rowMappers';
 
 const router = Router();
-
-function rowToReflection(row: Record<string, unknown>): Reflection {
-  const tags = (row.tags as string) || '';
-  return {
-    id: row.id as string,
-    positionId: row.position_id as string,
-    type: row.type as Reflection['type'],
-    content: row.content as string,
-    tags: tags ? tags.split(',').map(t => t.trim()) : [],
-    createdAt: row.created_at as string,
-    updatedAt: row.updated_at as string,
-    symbol: row.symbol as string | undefined,
-    assetType: row.asset_type as string | undefined,
-  };
-}
 
 // GET / - List all reflections with optional filters
 router.get('/', (req, res) => {
   try {
-    const { positionId, type, tag, search } = req.query;
+    const { positionId, type, search } = req.query;
 
     let query = `
       SELECT r.*, p.symbol, p.asset_type
@@ -41,11 +27,6 @@ router.get('/', (req, res) => {
       query += ' AND r.type = ?';
       params.push(type);
     }
-    if (tag) {
-      // Match comma-separated tags: exact match, starts with, ends with, or in middle
-      query += " AND (',' || r.tags || ',') LIKE ('%,' || ? || ',%')";
-      params.push(tag);
-    }
     if (search) {
       query += ' AND r.content LIKE ?';
       params.push(`%${search}%`);
@@ -58,28 +39,6 @@ router.get('/', (req, res) => {
   } catch (error) {
     console.error('Error fetching reflections:', error);
     res.status(500).json({ error: 'Failed to fetch reflections' });
-  }
-});
-
-// GET /tags - Get all unique tags
-router.get('/tags', (_req, res) => {
-  try {
-    const rows = db.prepare(
-      "SELECT DISTINCT tags FROM reflections WHERE tags != ''"
-    ).all() as { tags: string }[];
-
-    const tagSet = new Set<string>();
-    for (const row of rows) {
-      for (const tag of row.tags.split(',')) {
-        const trimmed = tag.trim();
-        if (trimmed) tagSet.add(trimmed);
-      }
-    }
-
-    res.json([...tagSet].sort());
-  } catch (error) {
-    console.error('Error fetching tags:', error);
-    res.status(500).json({ error: 'Failed to fetch tags' });
   }
 });
 
@@ -125,7 +84,6 @@ router.get('/feed', (req, res) => {
         p.id as id,
         'hypothesis' as type,
         p.hypothesis as content,
-        '' as tags,
         p.opened_at as date,
         p.id as position_id,
         p.symbol,
@@ -143,7 +101,6 @@ router.get('/feed', (req, res) => {
         r.id as id,
         r.type as type,
         r.content as content,
-        r.tags as tags,
         r.created_at as date,
         r.position_id,
         p.symbol,
@@ -162,23 +119,19 @@ router.get('/feed', (req, res) => {
     const params = [...hypothesisParams, ...reflectionParams];
     const rows = db.prepare(query).all(...params) as Record<string, unknown>[];
 
-    const feed: InsightFeedItem[] = rows.map(row => {
-      const tags = (row.tags as string) || '';
-      return {
-        id: row.id as string,
-        type: row.type as InsightFeedItem['type'],
-        content: row.content as string,
-        tags: tags ? tags.split(',').map(t => t.trim()) : [],
-        date: row.date as string,
-        positionId: row.position_id as string,
-        symbol: row.symbol as string,
-        assetType: row.asset_type as string,
-        direction: row.direction as string,
-        status: row.status as string,
-        realizedPnl: row.realized_pnl as number,
-        realizedPnlPercent: row.realized_pnl_percent as number | null,
-      };
-    });
+    const feed: InsightFeedItem[] = rows.map(row => ({
+      id: row.id as string,
+      type: row.type as InsightFeedItem['type'],
+      content: row.content as string,
+      date: row.date as string,
+      positionId: row.position_id as string,
+      symbol: row.symbol as string,
+      assetType: row.asset_type as string,
+      direction: row.direction as string,
+      status: row.status as string,
+      realizedPnl: row.realized_pnl as number,
+      realizedPnlPercent: row.realized_pnl_percent as number | null,
+    }));
 
     res.json(feed);
   } catch (error) {
@@ -190,7 +143,7 @@ router.get('/feed', (req, res) => {
 // POST / - Create reflection
 router.post('/', (req, res) => {
   try {
-    const { positionId, type, content, tags } = req.body;
+    const { positionId, type, content } = req.body;
 
     if (!positionId || typeof positionId !== 'string') {
       return res.status(400).json({ error: 'positionId is required' });
@@ -198,11 +151,8 @@ router.post('/', (req, res) => {
     if (!content || typeof content !== 'string') {
       return res.status(400).json({ error: 'content is required' });
     }
-    if (type && !['reflection', 'lesson', 'mistake'].includes(type)) {
-      return res.status(400).json({ error: 'type must be "reflection", "lesson", or "mistake"' });
-    }
-    if (Array.isArray(tags) && tags.some((t: unknown) => typeof t === 'string' && t.includes(','))) {
-      return res.status(400).json({ error: 'Tags must not contain commas' });
+    if (type && !['success', 'lesson', 'mistake'].includes(type)) {
+      return res.status(400).json({ error: 'type must be "success", "lesson", or "mistake"' });
     }
 
     // Verify position exists
@@ -212,12 +162,11 @@ router.post('/', (req, res) => {
     }
 
     const id = uuidv4();
-    const tagsStr = Array.isArray(tags) ? tags.join(',') : (tags || '');
 
     db.prepare(`
-      INSERT INTO reflections (id, position_id, type, content, tags)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(id, positionId, type || 'reflection', content, tagsStr);
+      INSERT INTO reflections (id, position_id, type, content)
+      VALUES (?, ?, ?, ?)
+    `).run(id, positionId, type || 'success', content);
 
     const row = db.prepare(`
       SELECT r.*, p.symbol, p.asset_type
@@ -237,7 +186,7 @@ router.post('/', (req, res) => {
 router.put('/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { content, type, tags } = req.body;
+    const { content, type } = req.body;
 
     const updates: string[] = [];
     const params: unknown[] = [];
@@ -250,19 +199,11 @@ router.put('/:id', (req, res) => {
       params.push(content);
     }
     if (type !== undefined) {
-      if (!['reflection', 'lesson', 'mistake'].includes(type)) {
-        return res.status(400).json({ error: 'type must be "reflection", "lesson", or "mistake"' });
+      if (!['success', 'lesson', 'mistake'].includes(type)) {
+        return res.status(400).json({ error: 'type must be "success", "lesson", or "mistake"' });
       }
       updates.push('type = ?');
       params.push(type);
-    }
-    if (tags !== undefined) {
-      if (Array.isArray(tags) && tags.some((t: unknown) => typeof t === 'string' && t.includes(','))) {
-        return res.status(400).json({ error: 'Tags must not contain commas' });
-      }
-      const tagsStr = Array.isArray(tags) ? tags.join(',') : (tags || '');
-      updates.push('tags = ?');
-      params.push(tagsStr);
     }
 
     if (updates.length === 0) {

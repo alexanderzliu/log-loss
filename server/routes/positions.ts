@@ -1,65 +1,10 @@
 import { Router } from 'express';
 import { db } from '../database';
 import { v4 as uuidv4 } from 'uuid';
-import type { Position, Execution, Reflection } from '../../shared/types.ts';
+import type { Position, Execution } from '../../shared/types.ts';
+import { rowToPosition, rowToExecution, rowToReflection } from '../helpers/rowMappers';
 
 const router = Router();
-
-// Helper to convert DB row to Position object (without executions)
-function rowToPosition(row: Record<string, unknown>): Position {
-  return {
-    id: row.id as string,
-    assetType: row.asset_type as Position['assetType'],
-    symbol: row.symbol as string,
-    direction: row.direction as Position['direction'],
-    status: row.status as Position['status'],
-    totalQuantity: row.total_quantity as number,
-    remainingQuantity: row.remaining_quantity as number,
-    avgEntryPrice: row.avg_entry_price as number,
-    totalCostBasis: row.total_cost_basis as number,
-    realizedPnl: row.realized_pnl as number,
-    realizedPnlPercent: row.realized_pnl_percent as number | null,
-    stopLoss: row.stop_loss as number | null,
-    takeProfit: row.take_profit as number | null,
-    hypothesis: row.hypothesis as string,
-    notes: row.notes as string,
-    chain: (row.chain as string) || null,
-    contractAddress: (row.contract_address as string) || null,
-    openedAt: row.opened_at as string,
-    closedAt: row.closed_at as string | null,
-    createdAt: row.created_at as string,
-    updatedAt: row.updated_at as string,
-    executions: [],
-  };
-}
-
-function rowToExecution(row: Record<string, unknown>): Execution {
-  return {
-    id: row.id as string,
-    positionId: row.position_id as string,
-    side: row.side as Execution['side'],
-    price: row.price as number,
-    quantity: row.quantity as number,
-    executedAt: row.executed_at as string,
-    pnl: row.pnl as number | null,
-    pnlPercent: row.pnl_percent as number | null,
-    notes: row.notes as string,
-    createdAt: row.created_at as string,
-  };
-}
-
-function rowToReflection(row: Record<string, unknown>): Reflection {
-  const tags = (row.tags as string) || '';
-  return {
-    id: row.id as string,
-    positionId: row.position_id as string,
-    type: row.type as Reflection['type'],
-    content: row.content as string,
-    tags: tags ? tags.split(',').map(t => t.trim()) : [],
-    createdAt: row.created_at as string,
-    updatedAt: row.updated_at as string,
-  };
-}
 
 function getPositionWithExecutions(id: string): Position | null {
   const row = db.prepare('SELECT * FROM positions WHERE id = ?').get(id) as Record<string, unknown> | undefined;
@@ -515,15 +460,15 @@ router.post('/', (req, res) => {
               id, asset_type, symbol, direction, status,
               total_quantity, remaining_quantity, avg_entry_price, total_cost_basis,
               realized_pnl, realized_pnl_percent,
-              stop_loss, take_profit, hypothesis, notes,
+              stop_loss, take_profit, hypothesis,
               chain, contract_address,
               opened_at
-            ) VALUES (?, ?, ?, 'long', 'open', ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, 'long', 'open', ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?, ?, ?)
           `).run(
             posId, assetType, upperSymbol,
             quantity, quantity, price, price * quantity,
             stopLoss ?? null, takeProfit ?? null,
-            hypothesis || '', notes || '',
+            hypothesis || '',
             chain || null, contractAddress || null,
             date
           );
@@ -678,7 +623,6 @@ router.put('/:id', (req, res) => {
     if ('stopLoss' in req.body) { updates.push('stop_loss = ?'); params.push(req.body.stopLoss ?? null); }
     if ('takeProfit' in req.body) { updates.push('take_profit = ?'); params.push(req.body.takeProfit ?? null); }
     if ('hypothesis' in req.body) { updates.push('hypothesis = ?'); params.push(req.body.hypothesis ?? ''); }
-    if ('notes' in req.body) { updates.push('notes = ?'); params.push(req.body.notes ?? ''); }
 
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });

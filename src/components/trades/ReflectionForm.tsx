@@ -1,50 +1,42 @@
-import { useState, type KeyboardEvent } from 'react';
-import type { Reflection, ReflectionType } from '../../types';
+import { useState } from 'react';
+import type { Reflection, ReflectionType, ReflectionSuggestion } from '../../types';
 import Modal from '../Modal';
-import { Lightbulb, BookOpen, AlertTriangle, X } from 'lucide-react';
+import { CheckCircle, GraduationCap, AlertTriangle, Sparkles, X, Loader2 } from 'lucide-react';
+import { suggestReflections } from '../../api/ai';
 
-const TYPES: { value: ReflectionType; label: string; icon: typeof Lightbulb; color: string; bg: string }[] = [
-  { value: 'reflection', label: 'Reflection', icon: BookOpen, color: 'var(--accent-violet)', bg: 'rgba(139, 92, 246, 0.12)' },
-  { value: 'lesson', label: 'Lesson', icon: Lightbulb, color: 'var(--profit)', bg: 'rgba(52, 211, 153, 0.12)' },
+const TYPES: { value: ReflectionType; label: string; icon: typeof CheckCircle; color: string; bg: string }[] = [
+  { value: 'success', label: 'Success', icon: CheckCircle, color: 'var(--profit)', bg: 'rgba(52, 211, 153, 0.12)' },
+  { value: 'lesson', label: 'Lesson', icon: GraduationCap, color: 'var(--accent-violet)', bg: 'rgba(139, 92, 246, 0.12)' },
   { value: 'mistake', label: 'Mistake', icon: AlertTriangle, color: 'var(--accent-warm)', bg: 'rgba(245, 158, 11, 0.12)' },
 ];
+
+const TYPE_ICONS: Record<ReflectionType, typeof CheckCircle> = {
+  success: CheckCircle,
+  lesson: GraduationCap,
+  mistake: AlertTriangle,
+};
+
+const TYPE_COLORS: Record<ReflectionType, { color: string; bg: string }> = {
+  success: { color: 'var(--profit)', bg: 'rgba(52, 211, 153, 0.08)' },
+  lesson: { color: 'var(--accent-violet)', bg: 'rgba(139, 92, 246, 0.08)' },
+  mistake: { color: 'var(--accent-warm)', bg: 'rgba(245, 158, 11, 0.08)' },
+};
 
 interface ReflectionFormProps {
   positionId: string;
   editing?: Reflection | null;
-  onSave: (data: { positionId: string; type: ReflectionType; content: string; tags: string[] }) => Promise<void>;
+  onSave: (data: { positionId: string; type: ReflectionType; content: string }) => Promise<void>;
   onClose: () => void;
 }
 
 export default function ReflectionForm({ positionId, editing, onSave, onClose }: ReflectionFormProps) {
-  const [type, setType] = useState<ReflectionType>(editing?.type || 'reflection');
+  const [type, setType] = useState<ReflectionType>(editing?.type || 'success');
   const [content, setContent] = useState(editing?.content || '');
-  const [tags, setTags] = useState<string[]>(editing?.tags || []);
-  const [tagInput, setTagInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const addTag = (raw: string) => {
-    const tag = raw.trim().toLowerCase();
-    if (tag && !tags.includes(tag)) {
-      setTags([...tags, tag]);
-    }
-    setTagInput('');
-  };
-
-  const handleTagKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
-      addTag(tagInput);
-    }
-    if (e.key === 'Backspace' && !tagInput && tags.length > 0) {
-      setTags(tags.slice(0, -1));
-    }
-  };
-
-  const removeTag = (tag: string) => {
-    setTags(tags.filter((t) => t !== tag));
-  };
+  const [suggestions, setSuggestions] = useState<ReflectionSuggestion[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     if (!content.trim()) {
@@ -54,12 +46,43 @@ export default function ReflectionForm({ positionId, editing, onSave, onClose }:
     setSaving(true);
     setError(null);
     try {
-      await onSave({ positionId, type, content: content.trim(), tags });
+      await onSave({ positionId, type, content: content.trim() });
       onClose();
     } catch (err) {
       setError((err as Error).message);
       setSaving(false);
     }
+  };
+
+  const handleAiSuggest = async () => {
+    setAiLoading(true);
+    setAiError(null);
+    setSuggestions([]);
+    try {
+      const results = await suggestReflections(positionId);
+      setSuggestions(results);
+    } catch (err) {
+      const message = (err as Error).message;
+      if (message.includes('API key')) {
+        setAiError('AI features require an OpenAI API key configured on the server.');
+      } else if (message.includes('Rate limit')) {
+        setAiError('Rate limit reached. Please try again in a moment.');
+      } else {
+        setAiError(message);
+      }
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const acceptSuggestion = (suggestion: ReflectionSuggestion) => {
+    setType(suggestion.type);
+    setContent(suggestion.content);
+    setSuggestions([]);
+  };
+
+  const dismissSuggestion = (index: number) => {
+    setSuggestions(prev => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -112,6 +135,109 @@ export default function ReflectionForm({ positionId, editing, onSave, onClose }:
           </div>
         </div>
 
+        {/* AI Suggest Button */}
+        {!editing && (
+          <div>
+            <button
+              onClick={handleAiSuggest}
+              disabled={aiLoading}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: 'var(--radius-btn)',
+                border: '1px solid rgba(139, 92, 246, 0.3)',
+                background: 'rgba(139, 92, 246, 0.08)',
+                color: 'var(--accent-violet)',
+                fontSize: '13px',
+                fontWeight: 500,
+                cursor: aiLoading ? 'default' : 'pointer',
+                fontFamily: 'inherit',
+                transition: 'all 0.15s ease',
+                opacity: aiLoading ? 0.7 : 1,
+              }}
+            >
+              {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+              {aiLoading ? 'Generating...' : 'AI Suggest'}
+            </button>
+
+            {/* AI Error */}
+            {aiError && (
+              <p style={{ fontSize: '12px', color: 'var(--loss)', marginTop: '8px' }}>
+                {aiError}
+              </p>
+            )}
+
+            {/* Suggestion Cards */}
+            {suggestions.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+                {suggestions.map((suggestion, idx) => {
+                  const SugIcon = TYPE_ICONS[suggestion.type];
+                  const colors = TYPE_COLORS[suggestion.type];
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        padding: '12px',
+                        borderRadius: '10px',
+                        border: `1px solid var(--border)`,
+                        background: colors.bg,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <SugIcon size={13} style={{ color: colors.color }} />
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: colors.color, textTransform: 'capitalize' }}>
+                          {suggestion.type}
+                        </span>
+                        <button
+                          onClick={() => dismissSuggestion(idx)}
+                          style={{
+                            marginLeft: 'auto',
+                            display: 'flex',
+                            alignItems: 'center',
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-muted)',
+                            cursor: 'pointer',
+                            padding: '2px',
+                          }}
+                          title="Dismiss"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                      <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                        {suggestion.content}
+                      </p>
+                      <button
+                        onClick={() => acceptSuggestion(suggestion)}
+                        style={{
+                          alignSelf: 'flex-start',
+                          padding: '4px 12px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: colors.color,
+                          color: '#000',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        Accept
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Content */}
         <div>
           <label style={labelStyle}>Content</label>
@@ -122,65 +248,6 @@ export default function ReflectionForm({ positionId, editing, onSave, onClose }:
             rows={5}
             style={textareaStyle}
           />
-        </div>
-
-        {/* Tags */}
-        <div>
-          <label style={labelStyle}>Tags</label>
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '6px',
-            padding: '8px 12px',
-            borderRadius: 'var(--radius-input)',
-            border: '1px solid var(--border)',
-            background: 'var(--bg-elevated)',
-            minHeight: '42px',
-            alignItems: 'center',
-          }}>
-            {tags.map((tag) => (
-              <span
-                key={tag}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '3px 8px',
-                  borderRadius: 'var(--radius-badge)',
-                  background: 'rgba(139, 92, 246, 0.1)',
-                  color: 'var(--accent-violet)',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                }}
-              >
-                {tag}
-                <button
-                  onClick={() => removeTag(tag)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: 'inherit', opacity: 0.7 }}
-                >
-                  <X size={11} />
-                </button>
-              </span>
-            ))}
-            <input
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value.replace(',', ''))}
-              onKeyDown={handleTagKeyDown}
-              onBlur={() => tagInput && addTag(tagInput)}
-              placeholder={tags.length === 0 ? 'Add tags...' : ''}
-              style={{
-                flex: 1,
-                minWidth: '80px',
-                background: 'transparent',
-                border: 'none',
-                outline: 'none',
-                color: 'var(--text-primary)',
-                fontSize: '13px',
-                fontFamily: 'inherit',
-                padding: '2px 0',
-              }}
-            />
-          </div>
         </div>
 
         {/* Actions */}

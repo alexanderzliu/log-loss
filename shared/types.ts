@@ -30,7 +30,6 @@ export interface Position {
   stopLoss: number | null;
   takeProfit: number | null;
   hypothesis: string;
-  notes: string;
   openedAt: string;
   closedAt: string | null;
   chain: string | null;
@@ -62,7 +61,6 @@ export interface PositionUpdateData {
   stopLoss: number | null;
   takeProfit: number | null;
   hypothesis: string;
-  notes: string;
 }
 
 export interface PriceData {
@@ -131,14 +129,13 @@ export interface RecentActivity {
 
 // --- Reflections ---
 
-export type ReflectionType = 'reflection' | 'lesson' | 'mistake';
+export type ReflectionType = 'success' | 'lesson' | 'mistake';
 
 export interface Reflection {
   id: string;
   positionId: string;
   type: ReflectionType;
   content: string;
-  tags: string[];
   createdAt: string;
   updatedAt: string;
   // Joined fields (when fetched via /api/reflections)
@@ -148,9 +145,8 @@ export interface Reflection {
 
 export interface InsightFeedItem {
   id: string;
-  type: 'hypothesis' | 'reflection' | 'lesson' | 'mistake';
+  type: 'hypothesis' | 'success' | 'lesson' | 'mistake';
   content: string;
-  tags: string[];
   date: string;
   positionId: string;
   symbol: string;
@@ -237,4 +233,27 @@ export interface PredictionsSummary {
   predictionsCostBasis: number;
   predictionsWinRate: number;
   openPredictionsCost: number;
+}
+
+// --- Rules ---
+
+export interface Rule {
+  id: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// --- AI ---
+
+export interface ReflectionSuggestion {
+  type: ReflectionType;
+  content: string;
+}
+
+export interface AIAnalysis {
+  insights: string[];
+  patterns: string[];
+  recommendations: string[];
+  generatedAt: string;
 }

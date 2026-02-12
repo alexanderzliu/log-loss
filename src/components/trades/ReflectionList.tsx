@@ -8,8 +8,8 @@ import DropdownMenu from '../DropdownMenu';
 import { menuItemStyle } from '../../utils/menuStyles';
 import {
   Plus,
-  BookOpen,
-  Lightbulb,
+  CheckCircle,
+  GraduationCap,
   AlertTriangle,
   Edit2,
   Trash2,
@@ -17,9 +17,9 @@ import {
 
 const EMPTY_REFLECTIONS: Reflection[] = [];
 
-const TYPE_CONFIG: Record<ReflectionType, { icon: typeof BookOpen; color: string; bg: string; label: string }> = {
-  reflection: { icon: BookOpen, color: 'var(--accent-violet)', bg: 'rgba(139, 92, 246, 0.1)', label: 'Reflection' },
-  lesson: { icon: Lightbulb, color: 'var(--profit)', bg: 'rgba(52, 211, 153, 0.1)', label: 'Lesson' },
+const TYPE_CONFIG: Record<ReflectionType, { icon: typeof CheckCircle; color: string; bg: string; label: string }> = {
+  success: { icon: CheckCircle, color: 'var(--profit)', bg: 'rgba(52, 211, 153, 0.1)', label: 'Success' },
+  lesson: { icon: GraduationCap, color: 'var(--accent-violet)', bg: 'rgba(139, 92, 246, 0.1)', label: 'Lesson' },
   mistake: { icon: AlertTriangle, color: 'var(--accent-warm)', bg: 'rgba(245, 158, 11, 0.1)', label: 'Mistake' },
 };
 
@@ -48,9 +48,9 @@ export default function ReflectionList({ positionId }: ReflectionListProps) {
     fetchReflections(positionId);
   }, [positionId, fetchReflections]);
 
-  const handleSave = async (data: { positionId: string; type: ReflectionType; content: string; tags: string[] }) => {
+  const handleSave = async (data: { positionId: string; type: ReflectionType; content: string }) => {
     if (editing) {
-      await updateReflection(editing.id, { content: data.content, type: data.type, tags: data.tags });
+      await updateReflection(editing.id, { content: data.content, type: data.type });
     } else {
       await createReflection(data);
     }
@@ -161,24 +161,6 @@ export default function ReflectionList({ positionId }: ReflectionListProps) {
                 <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                   {r.content}
                 </div>
-                {r.tags.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
-                    {r.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        style={{
-                          padding: '2px 7px',
-                          borderRadius: 'var(--radius-badge)',
-                          background: 'rgba(139, 92, 246, 0.08)',
-                          color: 'var(--text-muted)',
-                          fontSize: '11px',
-                        }}
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
               </div>
               <div onClick={(e) => e.stopPropagation()}>
                 <DropdownMenu

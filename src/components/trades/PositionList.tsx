@@ -23,7 +23,6 @@ import {
   ChevronDown,
   ChevronRight,
   Lightbulb,
-  StickyNote,
   MessageSquare,
 } from 'lucide-react';
 import ReflectionList from './ReflectionList';
@@ -38,11 +37,10 @@ interface PositionListProps {
 }
 
 export default function PositionList({ positions, onEdit, onClosePosition, sortField, sortDir, onSort }: PositionListProps) {
-  const { deletePosition, prices, addToast, reflections } = useStore(useShallow((s) => ({
+  const { deletePosition, prices, addToast } = useStore(useShallow((s) => ({
     deletePosition: s.deletePosition,
     prices: s.prices,
     addToast: s.addToast,
-    reflections: s.reflections,
   })));
   const [expandedPositions, toggleExpanded] = useSetToggle();
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
@@ -107,7 +105,7 @@ export default function PositionList({ positions, onEdit, onClosePosition, sortF
             }
 
             const costBasis = position.avgEntryPrice * (isOpen ? position.remainingQuantity : position.totalQuantity);
-            const reflectionCount = (reflections[position.id] || []).length;
+            const reflectionCount = position.reflectionCount ?? 0;
 
             return (
               <Fragment key={position.id}>
@@ -212,8 +210,8 @@ export default function PositionList({ positions, onEdit, onClosePosition, sortF
                   </td>
                 </tr>
 
-                {/* Expanded hypothesis/notes */}
-                {isExpanded && (position.hypothesis || position.notes) && (
+                {/* Expanded hypothesis */}
+                {isExpanded && position.hypothesis && (
                   <tr style={{ background: 'var(--bg-tertiary)', borderBottom: 'none' }}>
                     <td colSpan={7} style={{ padding: '0 24px 0 72px' }}>
                       <div style={{
@@ -226,28 +224,15 @@ export default function PositionList({ positions, onEdit, onClosePosition, sortF
                         flexDirection: 'column',
                         gap: '10px',
                       }}>
-                        {position.hypothesis && (
-                          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                            <Lightbulb size={15} style={{ color: 'var(--accent-warm)', flexShrink: 0, marginTop: '2px' }} />
-                            <div>
-                              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Hypothesis</div>
-                              <div style={{ fontSize: '13.5px', color: 'var(--text-primary)', lineHeight: 1.5, fontWeight: 500 }}>
-                                {position.hypothesis}
-                              </div>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                          <Lightbulb size={15} style={{ color: 'var(--accent-warm)', flexShrink: 0, marginTop: '2px' }} />
+                          <div>
+                            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Hypothesis</div>
+                            <div style={{ fontSize: '13.5px', color: 'var(--text-primary)', lineHeight: 1.5, fontWeight: 500 }}>
+                              {position.hypothesis}
                             </div>
                           </div>
-                        )}
-                        {position.notes && (
-                          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                            <StickyNote size={15} style={{ color: 'var(--text-muted)', flexShrink: 0, marginTop: '2px' }} />
-                            <div>
-                              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Notes</div>
-                              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                                {position.notes}
-                              </div>
-                            </div>
-                          </div>
-                        )}
+                        </div>
                         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                           <button
                             onClick={(e) => { e.stopPropagation(); onEdit(position); }}

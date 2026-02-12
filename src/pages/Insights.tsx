@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Lightbulb, BookOpen, GraduationCap, AlertTriangle } from 'lucide-react';
+import { Search, Lightbulb, CheckCircle, GraduationCap, AlertTriangle } from 'lucide-react';
 import { fetchInsightsFeed } from '../api/reflections';
 import { formatCurrency, formatDate } from '../utils/format';
 import FilterPills from '../components/FilterPills';
@@ -20,19 +20,19 @@ const TYPE_CONFIG: Record<InsightFeedItem['type'], {
     bg: 'rgba(139, 92, 246, 0.1)',
     border: 'rgba(139, 92, 246, 0.2)',
   },
-  reflection: {
-    label: 'Reflection',
-    icon: BookOpen,
-    color: '#6366f1',
-    bg: 'rgba(99, 102, 241, 0.1)',
-    border: 'rgba(99, 102, 241, 0.2)',
+  success: {
+    label: 'Success',
+    icon: CheckCircle,
+    color: 'var(--profit)',
+    bg: 'rgba(52, 211, 153, 0.1)',
+    border: 'rgba(52, 211, 153, 0.2)',
   },
   lesson: {
     label: 'Lesson',
     icon: GraduationCap,
-    color: 'var(--profit)',
-    bg: 'rgba(52, 211, 153, 0.1)',
-    border: 'rgba(52, 211, 153, 0.2)',
+    color: 'var(--accent-violet)',
+    bg: 'rgba(139, 92, 246, 0.1)',
+    border: 'rgba(139, 92, 246, 0.2)',
   },
   mistake: {
     label: 'Mistake',
@@ -118,7 +118,7 @@ export default function Insights() {
             options={[
               { key: 'all', label: 'All', count: filterCounts.all || 0 },
               { key: 'hypothesis', label: 'Hypotheses', count: filterCounts.hypothesis || 0 },
-              { key: 'reflection', label: 'Reflections', count: filterCounts.reflection || 0 },
+              { key: 'success', label: 'Successes', count: filterCounts.success || 0 },
               { key: 'lesson', label: 'Lessons', count: filterCounts.lesson || 0 },
               { key: 'mistake', label: 'Mistakes', count: filterCounts.mistake || 0 },
             ]}
@@ -326,24 +326,6 @@ function InsightCard({ item, index }: { item: InsightFeedItem; index: number }) 
         {item.content}
       </p>
 
-      {/* Tags */}
-      {item.tags.length > 0 && (
-        <div style={{ display: 'flex', gap: '6px', marginTop: '12px', flexWrap: 'wrap' }}>
-          {item.tags.map((tag) => (
-            <span key={tag} style={{
-              padding: '2px 8px',
-              borderRadius: '6px',
-              fontSize: '11px',
-              fontWeight: 500,
-              background: 'var(--bg-tertiary)',
-              color: 'var(--text-muted)',
-              border: '1px solid var(--border)',
-            }}>
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

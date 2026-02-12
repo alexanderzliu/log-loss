@@ -1,9 +1,10 @@
 import { create } from 'zustand';
-import type { Position, PriceData, PortfolioSummary, AssetType, TradeFormData, PositionUpdateData, Prediction, PredictionFormData, PredictionCloseData, PredictionUpdateData, PredictionsSummary, RecentActivity, Reflection } from '../types';
+import type { Position, PriceData, PortfolioSummary, AssetType, TradeFormData, PositionUpdateData, Prediction, PredictionFormData, PredictionCloseData, PredictionUpdateData, PredictionsSummary, RecentActivity, Reflection, Rule } from '../types';
 import * as positionsApi from '../api/positions';
 import * as pricesApi from '../api/prices';
 import * as predictionsApi from '../api/predictions';
 import * as reflectionsApi from '../api/reflections';
+import * as rulesApi from '../api/rules';
 import { priceKey } from '../utils/priceKey';
 
 // Extract unique assets from open positions
@@ -57,8 +58,8 @@ interface StoreState {
 
   // Reflections
   reflections: Record<string, Reflection[]>; // keyed by positionId
-  createReflection: (data: { positionId: string; type?: Reflection['type']; content: string; tags?: string[] }) => Promise<Reflection>;
-  updateReflection: (id: string, data: { content?: string; type?: Reflection['type']; tags?: string[] }) => Promise<Reflection>;
+  createReflection: (data: { positionId: string; type?: Reflection['type']; content: string }) => Promise<Reflection>;
+  updateReflection: (id: string, data: { content?: string; type?: Reflection['type'] }) => Promise<Reflection>;
   deleteReflection: (id: string, positionId: string) => Promise<void>;
   fetchReflections: (positionId: string) => Promise<void>;
 
@@ -80,6 +81,14 @@ interface StoreState {
   closePrediction: (id: string, data: PredictionCloseData) => Promise<Prediction>;
   deletePrediction: (id: string) => Promise<void>;
   fetchPredictionsSummary: () => Promise<void>;
+
+  // Rules
+  rules: Rule[];
+  rulesLoading: boolean;
+  fetchRules: () => Promise<void>;
+  addRule: (content: string) => Promise<Rule>;
+  updateRule: (id: string, content: string) => Promise<Rule>;
+  deleteRule: (id: string) => Promise<void>;
 }
 
 export const useStore = create<StoreState>((set, get) => ({
@@ -312,5 +321,44 @@ export const useStore = create<StoreState>((set, get) => ({
     } catch (error) {
       set({ predictionsSummaryError: (error as Error).message, predictionsSummaryLoading: false });
     }
+  },
+
+  // Rules
+  rules: [],
+  rulesLoading: false,
+
+  fetchRules: async () => {
+    set({ rulesLoading: true });
+    try {
+      const rules = await rulesApi.fetchRules();
+      set({ rules, rulesLoading: false });
+    } catch (error) {
+      console.error('Failed to fetch rules:', error);
+      set({ rulesLoading: false });
+    }
+  },
+
+  addRule: async (content) => {
+    const rule = await rulesApi.createRule(content);
+    set((state) => ({ rules: [...state.rules, rule] }));
+    get().addToast({ type: 'success', title: 'Rule Added' });
+    return rule;
+  },
+
+  updateRule: async (id, content) => {
+    const rule = await rulesApi.updateRule(id, content);
+    set((state) => ({
+      rules: state.rules.map((r) => (r.id === id ? rule : r)),
+    }));
+    get().addToast({ type: 'success', title: 'Rule Updated' });
+    return rule;
+  },
+
+  deleteRule: async (id) => {
+    await rulesApi.deleteRule(id);
+    set((state) => ({
+      rules: state.rules.filter((r) => r.id !== id),
+    }));
+    get().addToast({ type: 'success', title: 'Rule Deleted' });
   },
 }));
