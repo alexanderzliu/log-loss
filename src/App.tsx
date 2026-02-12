@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
-import type { CSSProperties } from 'react';
+import { useEffect, type CSSProperties } from 'react';
 import { BookOpen, BookMarked, LayoutDashboard, TrendingUp, CircleDot, Sparkles, Brain } from 'lucide-react';
 import { useStore } from './store/useStore';
 import { formatCurrency } from './utils/format';
@@ -81,6 +81,11 @@ function SidebarPnl() {
 
 function App() {
   const { openPositionsCount, openPredictionsCount } = useSidebarBadges();
+  const fetchPredictions = useStore(s => s.fetchPredictions);
+
+  useEffect(() => {
+    fetchPredictions();
+  }, [fetchPredictions]);
 
   return (
     <BrowserRouter>
