@@ -6,6 +6,23 @@ import { rowToPosition } from '../helpers/rowMappers';
 
 const router = Router();
 
+// Format prices preserving significant digits for micro-prices (e.g. 0.000000081 => "$0.000000081")
+function fmtPrice(value: number): string {
+  if (value === 0) return '$0.00';
+  const abs = Math.abs(value);
+  if (abs >= 0.01) return `$${value.toFixed(2)}`;
+  // For micro-prices, show enough decimals to capture significant digits
+  const str = abs.toFixed(20);
+  const decimals = str.slice(2);
+  let zeroCount = 0;
+  for (const ch of decimals) {
+    if (ch === '0') zeroCount++;
+    else break;
+  }
+  const formatted = abs.toFixed(zeroCount + 4);
+  return value < 0 ? `-$${formatted}` : `$${formatted}`;
+}
+
 function extractJSON(text: string): string {
   const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   return match ? match[1].trim() : text.trim();
@@ -82,16 +99,16 @@ Respond with a JSON object containing a "suggestions" array. Each suggestion has
 Position: ${position.symbol} (${position.assetType})
 Direction: ${position.direction}
 Status: ${position.status}
-Entry Price: $${position.avgEntryPrice.toFixed(2)}
+Entry Price: ${fmtPrice(position.avgEntryPrice)}
 Total Quantity: ${position.totalQuantity}
-Cost Basis: $${position.totalCostBasis.toFixed(2)}
+Cost Basis: ${fmtPrice(position.totalCostBasis)}
 ${position.stopLoss ? `Stop Loss: $${position.stopLoss}` : 'No stop loss set'}
 ${position.takeProfit ? `Take Profit: $${position.takeProfit}` : 'No take profit set'}
 Hypothesis: ${position.hypothesis || '(none)'}
 ${!isOpen ? `Realized P&L: $${position.realizedPnl.toFixed(2)} (${position.realizedPnlPercent?.toFixed(1)}%)` : ''}
 
 Executions:
-${executions.map(e => `- ${e.side.toUpperCase()} ${e.quantity} @ $${e.price.toFixed(2)} on ${e.executedAt}${e.pnl != null ? ` (P&L: $${e.pnl.toFixed(2)})` : ''}${e.notes ? ` Notes: ${e.notes}` : ''}`).join('\n')}
+${executions.map(e => `- ${e.side.toUpperCase()} ${e.quantity} @ ${fmtPrice(e.price)} on ${e.executedAt}${e.pnl != null ? ` (P&L: $${e.pnl.toFixed(2)})` : ''}${e.notes ? ` Notes: ${e.notes}` : ''}`).join('\n')}
 
 ${reflections.length > 0 ? `Existing reflections:\n${reflections.map(r => `- [${r.type}] ${r.content}`).join('\n')}` : 'No existing reflections.'}`;
 
@@ -185,7 +202,7 @@ Trading Portfolio Summary:
 - Top symbols by P&L: ${topSymbols.join(', ') || 'None'}
 
 Open positions:
-${openPositions.slice(0, 10).map(p => `- ${p.symbol} (${p.direction}): entry $${p.avgEntryPrice.toFixed(2)}, qty ${p.remainingQuantity}${p.hypothesis ? `, hypothesis: ${p.hypothesis}` : ''}`).join('\n') || 'None'}
+${openPositions.slice(0, 10).map(p => `- ${p.symbol} (${p.direction}): entry ${fmtPrice(p.avgEntryPrice)}, qty ${p.remainingQuantity}${p.hypothesis ? `, hypothesis: ${p.hypothesis}` : ''}`).join('\n') || 'None'}
 
 Recent closed positions:
 ${closedPositions.slice(0, 10).map(p => `- ${p.symbol}: P&L $${p.realizedPnl.toFixed(2)} (${p.realizedPnlPercent?.toFixed(1)}%)`).join('\n') || 'None'}

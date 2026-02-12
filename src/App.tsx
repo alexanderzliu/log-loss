@@ -81,11 +81,17 @@ function SidebarPnl() {
 
 function App() {
   const { openPositionsCount, openPredictionsCount } = useSidebarBadges();
+  const fetchPositions = useStore(s => s.fetchPositions);
   const fetchPredictions = useStore(s => s.fetchPredictions);
+  const fetchPortfolioSummary = useStore(s => s.fetchPortfolioSummary);
+  const fetchPredictionsSummary = useStore(s => s.fetchPredictionsSummary);
 
   useEffect(() => {
+    fetchPositions();
     fetchPredictions();
-  }, [fetchPredictions]);
+    fetchPortfolioSummary();
+    fetchPredictionsSummary();
+  }, [fetchPositions, fetchPredictions, fetchPortfolioSummary, fetchPredictionsSummary]);
 
   return (
     <BrowserRouter>

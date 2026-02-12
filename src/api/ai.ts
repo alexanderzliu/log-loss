@@ -16,13 +16,25 @@ export async function suggestReflections(positionId: string): Promise<Reflection
 }
 
 export async function generateAnalysis(): Promise<AIAnalysis> {
-  const response = await fetch(`${API_BASE}/analysis`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error || 'Failed to generate analysis');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 90_000);
+  try {
+    const response = await fetch(`${API_BASE}/analysis`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new Error(body?.error || 'Failed to generate analysis');
+    }
+    return response.json();
+  } catch (err) {
+    if ((err as Error).name === 'AbortError') {
+      throw new Error('Analysis timed out — the AI took too long to respond. Try again.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
   }
-  return response.json();
 }
