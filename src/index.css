@@ -346,13 +346,7 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px var(--accent-glow), 0 0 20px rgba(16, 185, 129, 0.06);
 }
 
-/* Table row hover */
-tbody tr {
-  transition: background 0.15s ease;
-}
-tbody tr:hover {
-  background: rgba(255, 255, 255, 0.02);
-}
+/* Table row hover - disabled for cleaner look */
 
 /* Shimmer loading */
 .shimmer {

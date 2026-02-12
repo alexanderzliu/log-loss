@@ -67,7 +67,10 @@ export default function PositionList({ positions, onEdit, onClosePosition, sortF
   }
 
   return (
-    <div className="card" style={{ overflow: 'visible' }}>
+    <div className="card" style={{
+      overflow: 'visible',
+      boxShadow: 'var(--shadow-card), 0 0 60px rgba(16, 185, 129, 0.03), 0 0 120px rgba(139, 92, 246, 0.02)',
+    }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ borderBottom: '1px solid var(--border)' }}>
@@ -106,6 +109,13 @@ export default function PositionList({ positions, onEdit, onClosePosition, sortF
 
             const costBasis = position.avgEntryPrice * (isOpen ? position.remainingQuantity : position.totalQuantity);
             const reflectionCount = position.reflectionCount ?? 0;
+            const isPnlPositive = displayPnl !== null ? displayPnl >= 0 : true;
+
+            // Row gradient intensity scales with P&L magnitude (like dashboard stat cards)
+            const pnlPct = displayPnlPercent ?? 0;
+            const gradientIntensity = Math.min(1, Math.sqrt(Math.abs(pnlPct) / 50));
+            const rowGradientColor = isPnlPositive ? '52, 211, 153' : '248, 113, 113';
+            const rowGradientAlpha = (0.02 + 0.06 * gradientIntensity).toFixed(3);
 
             return (
               <Fragment key={position.id}>
@@ -115,6 +125,7 @@ export default function PositionList({ positions, onEdit, onClosePosition, sortF
                     borderBottom: isExpanded ? 'none' : '1px solid var(--border)',
                     cursor: 'pointer',
                     animation: `slideUp 0.35s ease-out ${Math.min(posIdx * 0.04, 0.4)}s both`,
+                    background: `linear-gradient(135deg, rgba(${rowGradientColor}, ${rowGradientAlpha}) 0%, transparent 60%)`,
                   }}
                   onClick={() => toggleExpanded(position.id)}
                 >
@@ -210,47 +221,25 @@ export default function PositionList({ positions, onEdit, onClosePosition, sortF
                   </td>
                 </tr>
 
-                {/* Expanded hypothesis */}
+                {/* Expanded hypothesis - Thread line */}
                 {isExpanded && position.hypothesis && (
-                  <tr style={{ background: 'var(--bg-tertiary)', borderBottom: 'none' }}>
-                    <td colSpan={7} style={{ padding: '0 24px 0 72px' }}>
-                      <div style={{
-                        padding: '14px 16px',
-                        borderLeft: '3px solid var(--accent-violet)',
-                        background: 'rgba(139, 92, 246, 0.06)',
-                        borderRadius: '0 8px 8px 0',
-                        margin: '12px 0',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '10px',
-                      }}>
-                        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                          <Lightbulb size={15} style={{ color: 'var(--accent-warm)', flexShrink: 0, marginTop: '2px' }} />
-                          <div>
-                            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Hypothesis</div>
-                            <div style={{ fontSize: '13.5px', color: 'var(--text-primary)', lineHeight: 1.5, fontWeight: 500 }}>
-                              {position.hypothesis}
+                  <tr style={expandedRowStyle}>
+                    <td colSpan={7} style={expandedTdHypothesis}>
+                      <div style={threadLineStyle}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                            <Lightbulb size={15} style={{ color: 'var(--accent-warm)', flexShrink: 0, marginTop: '2px' }} />
+                            <div>
+                              <div style={hypothesisLabelStyle}>Hypothesis</div>
+                              <div style={hypothesisTextStyle}>
+                                {position.hypothesis}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                           <button
                             onClick={(e) => { e.stopPropagation(); onEdit(position); }}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              color: 'var(--accent-violet)',
-                              fontSize: '12px',
-                              fontWeight: 500,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              padding: '4px 8px',
-                              borderRadius: '6px',
-                              transition: 'background 0.15s',
-                            }}
-                            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)')}
+                            style={editBtnStyle}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(16, 185, 129, 0.08)')}
                             onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
                           >
                             <Edit2 size={12} /> Edit
@@ -261,11 +250,13 @@ export default function PositionList({ positions, onEdit, onClosePosition, sortF
                   </tr>
                 )}
 
-                {/* Expanded reflections */}
+                {/* Expanded reflections - Thread line */}
                 {isExpanded && (
-                  <tr style={{ background: 'var(--bg-tertiary)', borderBottom: 'none' }}>
-                    <td colSpan={7} style={{ padding: '4px 24px 12px 72px' }}>
-                      <ReflectionList positionId={position.id} />
+                  <tr style={expandedRowStyle}>
+                    <td colSpan={7} style={expandedTdReflection}>
+                      <div style={threadLineReflStyle}>
+                        <ReflectionList positionId={position.id} />
+                      </div>
                     </td>
                   </tr>
                 )}
@@ -280,11 +271,10 @@ export default function PositionList({ positions, onEdit, onClosePosition, sortF
                       key={exec.id}
                       style={{
                         borderBottom: isLast ? '1px solid var(--border)' : 'none',
-                        background: 'var(--bg-tertiary)',
                         animation: `slideUp 0.25s ease-out ${execIdx * 0.03}s both`,
                       }}
                     >
-                      <td style={{ ...tdStyle, paddingLeft: '72px' }}>
+                      <td style={execTdLeft}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <span className={`badge ${exec.side === 'buy' ? 'badge-profit' : 'badge-loss'}`}>
                             {exec.side === 'buy' ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
@@ -300,18 +290,14 @@ export default function PositionList({ positions, onEdit, onClosePosition, sortF
                           </div>
                         </div>
                       </td>
-                      <td style={{ ...tdStyle, textAlign: 'center' }}>
-                        <span className={`badge ${exec.side === 'buy' ? 'badge-profit' : 'badge-loss'}`} style={{ fontSize: '11px' }}>
-                          {exec.side.toUpperCase()}
-                        </span>
-                      </td>
-                      <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontSize: '13px', color: 'var(--text-secondary)' }}>
+                      <td style={{ ...tdStyle, textAlign: 'center' }} />
+                      <td style={execTdMono}>
                         {formatPrice(exec.price)}
                       </td>
-                      <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontSize: '13px', color: 'var(--text-secondary)' }}>
+                      <td style={execTdMono}>
                         {formatQuantity(exec.quantity)}
                       </td>
-                      <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontSize: '13px', color: 'var(--text-secondary)' }}>
+                      <td style={execTdMono}>
                         {formatCurrency(value)}
                       </td>
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
@@ -380,3 +366,42 @@ function SortHeader({ field, label, sortField, sortDir, onSort, align }: {
 
 const thStyle = { ...tableHeaderStyle, padding: '18px 24px' };
 const tdStyle = { ...tableCellStyle, padding: '16px 24px' };
+
+// Static styles extracted from render loop
+const threadLineStyle: React.CSSProperties = {
+  borderLeft: '2px solid var(--border-light)',
+  paddingLeft: '20px',
+  paddingTop: '8px',
+  paddingBottom: '8px',
+  marginLeft: '17px',
+};
+const threadLineReflStyle: React.CSSProperties = {
+  ...threadLineStyle,
+  paddingTop: '4px',
+  paddingBottom: '4px',
+};
+const expandedTdHypothesis: React.CSSProperties = { padding: '4px 24px 4px 72px' };
+const expandedTdReflection: React.CSSProperties = { padding: '4px 24px 8px 72px' };
+const expandedRowStyle: React.CSSProperties = { borderBottom: 'none' };
+const execTdLeft: React.CSSProperties = { ...tdStyle, paddingLeft: '72px' };
+const execTdMono: React.CSSProperties = {
+  ...tdStyle,
+  textAlign: 'right',
+  fontFamily: "'DM Mono', monospace",
+  fontSize: '13px',
+  color: 'var(--text-secondary)',
+};
+const hypothesisLabelStyle: React.CSSProperties = {
+  fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)',
+  textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px',
+};
+const hypothesisTextStyle: React.CSSProperties = {
+  fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: 1.5,
+};
+const editBtnStyle: React.CSSProperties = {
+  background: 'none', border: 'none', cursor: 'pointer',
+  color: 'var(--accent)', fontSize: '12px', fontWeight: 500,
+  display: 'inline-flex', alignItems: 'center', gap: '4px',
+  padding: '4px 8px', borderRadius: '6px', flexShrink: 0,
+  transition: 'background 0.15s',
+};
