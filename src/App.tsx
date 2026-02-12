@@ -41,7 +41,7 @@ function useSidebarBadges() {
 function SidebarPnl() {
   const portfolioSummary = useStore(s => s.portfolioSummary);
   const predictionsSummary = useStore(s => s.predictionsSummary);
-  const totalPnl = (portfolioSummary?.realizedPnl || 0) + (predictionsSummary?.predictionsPnl || 0);
+  const totalPnl = (portfolioSummary?.realizedPnl ?? 0) + (predictionsSummary?.predictionsPnl ?? 0);
   const isPositive = totalPnl >= 0;
 
   return (

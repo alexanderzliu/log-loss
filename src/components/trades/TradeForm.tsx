@@ -120,6 +120,16 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
         };
         await updatePosition(position.id, updateData);
       } else {
+        if (formData.price <= 0) {
+          setError('Price must be greater than zero');
+          setLoading(false);
+          return;
+        }
+        if (formData.quantity <= 0) {
+          setError('Quantity must be greater than zero');
+          setLoading(false);
+          return;
+        }
         await createTrade(formData);
       }
       onClose();

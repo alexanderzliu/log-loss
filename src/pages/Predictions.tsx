@@ -10,10 +10,11 @@ import PageTransition from '../components/PageTransition';
 import type { Prediction } from '../types';
 
 export default function Predictions() {
-  const { predictions, predictionsLoading, fetchPredictions } = useStore(useShallow((s) => ({
+  const { predictions, predictionsLoading, fetchPredictions, fetchPredictionsSummary } = useStore(useShallow((s) => ({
     predictions: s.predictions,
     predictionsLoading: s.predictionsLoading,
     fetchPredictions: s.fetchPredictions,
+    fetchPredictionsSummary: s.fetchPredictionsSummary,
   })));
   const [showForm, setShowForm] = useState(false);
   const [editingPrediction, setEditingPrediction] = useState<Prediction | null>(null);
@@ -22,7 +23,8 @@ export default function Predictions() {
 
   useEffect(() => {
     fetchPredictions();
-  }, [fetchPredictions]);
+    fetchPredictionsSummary();
+  }, [fetchPredictions, fetchPredictionsSummary]);
 
   const filteredPredictions = useMemo(() => predictions.filter((p) => {
     if (filter === 'open' && p.status !== 'open') return false;

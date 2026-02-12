@@ -74,7 +74,6 @@ export default function Insights() {
     try {
       const data = await fetchInsightsFeed({
         search: search || undefined,
-        type: typeFilter !== 'all' ? typeFilter : undefined,
       });
       setFeed(data);
     } catch (e) {
@@ -87,10 +86,9 @@ export default function Insights() {
   useEffect(() => {
     const timer = setTimeout(loadFeed, search ? 300 : 0);
     return () => clearTimeout(timer);
-  }, [search, typeFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filterCounts = useMemo(() => {
-    // Show counts based on unfiltered data when filter is 'all', otherwise just show current
     const counts: Record<string, number> = { all: feed.length };
     for (const item of feed) {
       counts[item.type] = (counts[item.type] || 0) + 1;
@@ -98,7 +96,12 @@ export default function Insights() {
     return counts;
   }, [feed]);
 
-  const grouped = useMemo(() => groupByMonth(feed), [feed]);
+  const filteredFeed = useMemo(() => {
+    if (typeFilter === 'all') return feed;
+    return feed.filter(item => item.type === typeFilter);
+  }, [feed, typeFilter]);
+
+  const grouped = useMemo(() => groupByMonth(filteredFeed), [filteredFeed]);
 
   return (
     <PageTransition>
@@ -169,6 +172,13 @@ export default function Insights() {
             <p className="empty-state-title" style={{ fontSize: '16px', fontWeight: 600 }}>No insights yet</p>
             <p className="empty-state-text">
               Add hypotheses when creating trades, or write reflections on your positions
+            </p>
+          </div>
+        ) : filteredFeed.length === 0 ? (
+          <div className="card empty-state">
+            <p className="empty-state-title" style={{ fontSize: '16px', fontWeight: 600 }}>No matching insights</p>
+            <p className="empty-state-text">
+              No insights match the current filter
             </p>
           </div>
         ) : (

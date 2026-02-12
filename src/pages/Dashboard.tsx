@@ -71,9 +71,9 @@ export default function Dashboard() {
   );
 
   const unrealizedPnlPercent = openPositionsInvested > 0 ? (unrealizedPnl / openPositionsInvested) * 100 : 0;
-  const predictionsPnl = predictionsSummary?.predictionsPnl || 0;
-  const totalPnl = (portfolioSummary?.realizedPnl || 0) + unrealizedPnl + predictionsPnl;
-  const totalCostBasis = (portfolioSummary?.totalCostBasis || 0) + (predictionsSummary?.predictionsCostBasis || 0);
+  const predictionsPnl = predictionsSummary?.predictionsPnl ?? 0;
+  const totalPnl = (portfolioSummary?.realizedPnl ?? 0) + unrealizedPnl + predictionsPnl;
+  const totalCostBasis = (portfolioSummary?.totalCostBasis ?? 0) + (predictionsSummary?.predictionsCostBasis ?? 0);
   const totalPnlPercent = totalCostBasis > 0 ? (totalPnl / totalCostBasis) * 100 : 0;
   const totalInvested = totalCostBasis;
 

@@ -79,45 +79,68 @@ function getPositionWithExecutions(id: string): Position | null {
   return position;
 }
 
-// Recompute all derived fields on a position from its executions (single query)
+// Recompute all derived fields on a position from its executions
 function recomputePositionAggregates(positionId: string): void {
   const agg = db.prepare(`
     SELECT
       COALESCE(SUM(CASE WHEN side = 'buy' THEN quantity ELSE 0 END), 0) as total_buy_qty,
       COALESCE(SUM(CASE WHEN side = 'buy' THEN price * quantity ELSE 0 END), 0) as total_cost_basis,
       COALESCE(SUM(CASE WHEN side = 'sell' THEN quantity ELSE 0 END), 0) as total_sell_qty,
-      COALESCE(SUM(CASE WHEN side = 'sell' THEN pnl ELSE 0 END), 0) as realized_pnl,
-      MAX(CASE WHEN side = 'sell' THEN executed_at END) as last_sell_date
+      MAX(CASE WHEN side = 'sell' THEN executed_at END) as last_sell_date,
+      MIN(CASE WHEN side = 'buy' THEN executed_at END) as first_buy_date
     FROM executions
     WHERE position_id = ?
   `).get(positionId) as {
     total_buy_qty: number;
     total_cost_basis: number;
     total_sell_qty: number;
-    realized_pnl: number;
     last_sell_date: string | null;
+    first_buy_date: string | null;
   };
 
   const totalQuantity = agg.total_buy_qty;
   const totalCostBasis = agg.total_cost_basis;
   const avgEntryPrice = totalQuantity > 0 ? totalCostBasis / totalQuantity : 0;
-  const remainingQuantity = totalQuantity - agg.total_sell_qty;
-  const realizedPnl = agg.realized_pnl;
+  const remainingQuantity = Math.max(0, totalQuantity - agg.total_sell_qty);
+
+  // Fetch position direction for P&L calculation
+  const position = db.prepare('SELECT direction FROM positions WHERE id = ?').get(positionId) as { direction: string } | undefined;
+  const directionMultiplier = position?.direction === 'short' ? -1 : 1;
+
+  // Recompute P&L on all sell executions based on current avg entry price
+  const sellExecs = db.prepare(
+    "SELECT id, price, quantity FROM executions WHERE position_id = ? AND side = 'sell'"
+  ).all(positionId) as { id: string; price: number; quantity: number }[];
+
+  const updateSellPnl = db.prepare(
+    'UPDATE executions SET pnl = ?, pnl_percent = ? WHERE id = ?'
+  );
+
+  let realizedPnl = 0;
+  for (const sell of sellExecs) {
+    const pnl = directionMultiplier * (sell.price - avgEntryPrice) * sell.quantity;
+    const pnlPercent = avgEntryPrice > 0 ? directionMultiplier * ((sell.price - avgEntryPrice) / avgEntryPrice) * 100 : 0;
+    updateSellPnl.run(pnl, pnlPercent, sell.id);
+    realizedPnl += pnl;
+  }
+
   const realizedPnlPercent = totalCostBasis > 0 ? (realizedPnl / totalCostBasis) * 100 : null;
 
-  const status = remainingQuantity <= 0 ? 'closed' : 'open';
+  const status = remainingQuantity <= 1e-9 ? 'closed' : 'open';
   const closedAt = status === 'closed' ? agg.last_sell_date : null;
+  const openedAt = agg.first_buy_date;
 
   db.prepare(`
     UPDATE positions SET
       total_quantity = ?, remaining_quantity = ?, avg_entry_price = ?,
       total_cost_basis = ?, realized_pnl = ?, realized_pnl_percent = ?,
-      status = ?, closed_at = ?, updated_at = datetime('now')
+      status = ?, closed_at = ?, opened_at = COALESCE(?, opened_at),
+      updated_at = datetime('now')
     WHERE id = ?
   `).run(
-    totalQuantity, remainingQuantity, avgEntryPrice,
+    totalQuantity, status === 'closed' ? 0 : remainingQuantity, avgEntryPrice,
     totalCostBasis, realizedPnl, realizedPnlPercent,
-    status, closedAt, positionId
+    status, closedAt, openedAt, positionId
   );
 }
 
@@ -523,6 +546,9 @@ router.post('/', (req, res) => {
         if (!position) {
           throw new Error('Position not found');
         }
+        if (position.status !== 'open') {
+          throw new Error('Position is already closed');
+        }
 
         const remainingQty = position.remaining_quantity as number;
         if (remainingQty <= 0) {
@@ -557,7 +583,7 @@ router.post('/', (req, res) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to create trade';
     console.error('Error creating trade:', error);
-    if (message.includes('required') || message.includes('not found') || message.includes('No remaining') || message.includes('exceeds')) {
+    if (message.includes('required') || message.includes('not found') || message.includes('No remaining') || message.includes('exceeds') || message.includes('already closed')) {
       return res.status(400).json({ error: message });
     }
     res.status(500).json({ error: 'Failed to create trade' });
@@ -592,6 +618,9 @@ router.post('/:id/executions', (req, res) => {
       }
 
       if (side === 'sell') {
+        if (position.status !== 'open') {
+          throw new Error('Position is already closed');
+        }
         const remainingQty = position.remaining_quantity as number;
         if (remainingQty <= 0) {
           throw new Error('No remaining quantity to sell');
@@ -631,7 +660,7 @@ router.post('/:id/executions', (req, res) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to add execution';
     console.error('Error adding execution:', error);
-    if (message.includes('not found') || message.includes('No remaining') || message.includes('exceeds')) {
+    if (message.includes('not found') || message.includes('No remaining') || message.includes('exceeds') || message.includes('already closed')) {
       return res.status(400).json({ error: message });
     }
     res.status(500).json({ error: 'Failed to add execution' });

@@ -121,7 +121,7 @@ router.post('/', (req, res) => {
   try {
     const { market, category, side, entryPrice, quantity, date, expiresAt, hypothesis, notes } = req.body;
 
-    if (!market || typeof market !== 'string') {
+    if (!market || typeof market !== 'string' || !market.trim()) {
       return res.status(400).json({ error: 'Market question is required' });
     }
     if (!side || !['yes', 'no'].includes(side)) {

@@ -236,7 +236,7 @@ async function fetchDexScreenerPrice(chain: string, contractAddress: string): Pr
       marketCap: best.marketCap || null,
       fdv: best.fdv || null,
       liquidityUsd: best.liquidity?.usd || null,
-      txnCount24h: txnBuys + txnSells || null,
+      txnCount24h: txnBuys + txnSells,
       holderCount: null, // populated separately via holder APIs
     };
   } catch (error) {
@@ -415,7 +415,8 @@ router.get('/search', async (req, res) => {
 router.get('/:assetType/:symbol', async (req, res) => {
   try {
     const { assetType, symbol } = req.params;
-    const result = await getPrice(symbol, assetType);
+    const { chain, contractAddress } = req.query;
+    const result = await getPrice(symbol, assetType, chain as string | undefined, contractAddress as string | undefined);
 
     if (result.error) {
       return res.status(404).json({ error: result.error });

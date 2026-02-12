@@ -34,10 +34,11 @@ const tooltipStyle = {
 };
 
 export default function Analytics() {
-  const { positions, prices, fetchPrices } = useStore(useShallow((s) => ({
+  const { positions, prices, fetchPrices, fetchPositions } = useStore(useShallow((s) => ({
     positions: s.positions,
     prices: s.prices,
     fetchPrices: s.fetchPrices,
+    fetchPositions: s.fetchPositions,
   })));
 
   // Price analytics state (existing)
@@ -54,8 +55,9 @@ export default function Analytics() {
   const [analytics, setAnalytics] = useState<TradingAnalytics | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
 
-  // Fetch trading analytics on mount
+  // Fetch trading analytics and positions on mount
   useEffect(() => {
+    fetchPositions();
     let cancelled = false;
     async function load() {
       setAnalyticsLoading(true);
@@ -76,7 +78,7 @@ export default function Analytics() {
     }
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, [fetchPositions]);
 
   // Get unique symbols from positions - memoized to avoid new array refs each render
   const trackedAssets = useMemo(() => Array.from(

@@ -178,7 +178,7 @@ export default function PositionList({ positions, onEdit, onClosePosition, sortF
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>
                     <PnlDisplay
-                      pnl={displayPnl !== null && displayPnl !== 0 ? displayPnl : null}
+                      pnl={displayPnl}
                       pnlPercent={displayPnlPercent}
                     />
                   </td>

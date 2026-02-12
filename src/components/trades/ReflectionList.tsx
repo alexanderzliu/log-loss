@@ -28,13 +28,14 @@ interface ReflectionListProps {
 }
 
 export default function ReflectionList({ positionId }: ReflectionListProps) {
-  const { reflections, fetchReflections, createReflection, updateReflection, deleteReflection } = useStore(
+  const { reflections, fetchReflections, createReflection, updateReflection, deleteReflection, addToast } = useStore(
     useShallow((s) => ({
       reflections: s.reflections[positionId] ?? EMPTY_REFLECTIONS,
       fetchReflections: s.fetchReflections,
       createReflection: s.createReflection,
       updateReflection: s.updateReflection,
       deleteReflection: s.deleteReflection,
+      addToast: s.addToast,
     }))
   );
 
@@ -56,7 +57,12 @@ export default function ReflectionList({ positionId }: ReflectionListProps) {
   };
 
   const handleDelete = async (id: string) => {
-    await deleteReflection(id, positionId);
+    try {
+      await deleteReflection(id, positionId);
+    } catch (err) {
+      console.error('Failed to delete reflection:', err);
+      addToast({ type: 'error', title: 'Delete Failed', message: 'Failed to delete reflection. Please try again.' });
+    }
     setDeleteConfirm(null);
     setMenuOpen(null);
   };
