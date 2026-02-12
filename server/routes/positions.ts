@@ -271,45 +271,43 @@ router.get('/stats/analytics', (_req, res) => {
       ORDER BY SUM(p.realized_pnl) DESC
     `).all() as { symbol: string; assetType: string; pnl: number; tradeCount: number }[];
 
-    // Monthly P&L
+    // Monthly P&L (position-level, grouped by close date)
     const monthlyPnl = db.prepare(`
       SELECT
-        strftime('%Y-%m', e.executed_at) as month,
-        SUM(e.pnl) as pnl,
-        COUNT(CASE WHEN e.pnl > 0 THEN 1 END) as wins,
-        COUNT(CASE WHEN e.pnl < 0 THEN 1 END) as losses
-      FROM executions e
-      WHERE e.side = 'sell' AND e.pnl IS NOT NULL
-      GROUP BY strftime('%Y-%m', e.executed_at)
+        strftime('%Y-%m', closed_at) as month,
+        SUM(realized_pnl) as pnl,
+        COUNT(CASE WHEN realized_pnl > 0 THEN 1 END) as wins,
+        COUNT(CASE WHEN realized_pnl < 0 THEN 1 END) as losses
+      FROM positions
+      WHERE status = 'closed' AND closed_at IS NOT NULL
+      GROUP BY strftime('%Y-%m', closed_at)
       ORDER BY month ASC
     `).all() as { month: string; pnl: number; wins: number; losses: number }[];
 
-    // Best and worst trades (sell executions)
+    // Best and worst trades (position-level)
     const bestTrade = db.prepare(`
-      SELECT e.pnl, e.pnl_percent, e.executed_at, p.symbol
-      FROM executions e
-      JOIN positions p ON p.id = e.position_id
-      WHERE e.side = 'sell' AND e.pnl IS NOT NULL
-      ORDER BY e.pnl DESC LIMIT 1
+      SELECT realized_pnl as pnl, realized_pnl_percent as pnl_percent, closed_at as executed_at, symbol
+      FROM positions
+      WHERE status = 'closed' AND realized_pnl IS NOT NULL
+      ORDER BY realized_pnl DESC LIMIT 1
     `).get() as { pnl: number; pnl_percent: number; executed_at: string; symbol: string } | undefined;
 
     const worstTrade = db.prepare(`
-      SELECT e.pnl, e.pnl_percent, e.executed_at, p.symbol
-      FROM executions e
-      JOIN positions p ON p.id = e.position_id
-      WHERE e.side = 'sell' AND e.pnl IS NOT NULL
-      ORDER BY e.pnl ASC LIMIT 1
+      SELECT realized_pnl as pnl, realized_pnl_percent as pnl_percent, closed_at as executed_at, symbol
+      FROM positions
+      WHERE status = 'closed' AND realized_pnl IS NOT NULL
+      ORDER BY realized_pnl ASC LIMIT 1
     `).get() as { pnl: number; pnl_percent: number; executed_at: string; symbol: string } | undefined;
 
-    // Average win/loss
+    // Average win/loss (position-level)
     const avgStats = db.prepare(`
       SELECT
-        AVG(CASE WHEN e.pnl > 0 THEN e.pnl END) as avg_win,
-        AVG(CASE WHEN e.pnl < 0 THEN e.pnl END) as avg_loss,
-        SUM(CASE WHEN e.pnl > 0 THEN e.pnl ELSE 0 END) as total_wins,
-        ABS(SUM(CASE WHEN e.pnl < 0 THEN e.pnl ELSE 0 END)) as total_losses
-      FROM executions e
-      WHERE e.side = 'sell' AND e.pnl IS NOT NULL
+        AVG(CASE WHEN realized_pnl > 0 THEN realized_pnl END) as avg_win,
+        AVG(CASE WHEN realized_pnl < 0 THEN realized_pnl END) as avg_loss,
+        SUM(CASE WHEN realized_pnl > 0 THEN realized_pnl ELSE 0 END) as total_wins,
+        ABS(SUM(CASE WHEN realized_pnl < 0 THEN realized_pnl ELSE 0 END)) as total_losses
+      FROM positions
+      WHERE status = 'closed'
     `).get() as { avg_win: number | null; avg_loss: number | null; total_wins: number; total_losses: number };
 
     // Average hold time (days between position open and close)
