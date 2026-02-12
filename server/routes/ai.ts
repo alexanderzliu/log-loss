@@ -6,6 +6,11 @@ import { rowToPosition } from '../helpers/rowMappers';
 
 const router = Router();
 
+function extractJSON(text: string): string {
+  const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  return match ? match[1].trim() : text.trim();
+}
+
 // POST /suggest-reflections
 router.post('/suggest-reflections', async (req, res) => {
   try {
@@ -92,14 +97,14 @@ ${reflections.length > 0 ? `Existing reflections:\n${reflections.map(r => `- [${
 
     const client = getOpenAIClient()!;
     const completion = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      response_format: { type: 'json_object' },
+      model: 'gpt-5',
+
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: tradeContext },
       ],
-      temperature: 0.7,
-      max_tokens: 500,
+
+      max_completion_tokens: 4000,
     });
 
     const responseText = completion.choices[0]?.message?.content;
@@ -107,7 +112,7 @@ ${reflections.length > 0 ? `Existing reflections:\n${reflections.map(r => `- [${
       return res.status(500).json({ error: 'No response from AI' });
     }
 
-    const parsed = JSON.parse(responseText);
+    const parsed = JSON.parse(extractJSON(responseText));
     const suggestions: ReflectionSuggestion[] = (parsed.suggestions || []).map(
       (s: { type: string; content: string }) => ({
         type: ['success', 'lesson', 'mistake'].includes(s.type) ? s.type : 'lesson',
@@ -199,14 +204,14 @@ Focus on process over outcomes. Be specific and reference actual data points whe
 
     const client = getOpenAIClient()!;
     const completion = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      response_format: { type: 'json_object' },
+      model: 'gpt-5',
+
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: tradeDataSummary },
       ],
-      temperature: 0.7,
-      max_tokens: 1000,
+
+      max_completion_tokens: 8000,
     });
 
     const responseText = completion.choices[0]?.message?.content;
@@ -214,7 +219,7 @@ Focus on process over outcomes. Be specific and reference actual data points whe
       return res.status(500).json({ error: 'No response from AI' });
     }
 
-    const parsed = JSON.parse(responseText);
+    const parsed = JSON.parse(extractJSON(responseText));
     res.json({
       insights: parsed.insights || [],
       patterns: parsed.patterns || [],
