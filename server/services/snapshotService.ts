@@ -122,8 +122,17 @@ export class SnapshotService {
         const { metrics } = result;
         const volumeBuy24h = metrics.volumeBuy.h24;
         const volumeSell24h = metrics.volumeSell.h24;
-        const totalVol = volumeBuy24h + volumeSell24h;
-        const buyPressure = totalVol > 0 ? volumeBuy24h / totalVol : null;
+        const hasVolumeSplit = volumeBuy24h > 0 || volumeSell24h > 0;
+
+        let buyPressure: number | null = null;
+        if (hasVolumeSplit) {
+          const totalVol = volumeBuy24h + volumeSell24h;
+          buyPressure = totalVol > 0 ? volumeBuy24h / totalVol : null;
+        } else {
+          // Fall back to txn count ratio when volume split is unavailable
+          const totalTxns = metrics.txns.h24.buys + metrics.txns.h24.sells;
+          buyPressure = totalTxns > 0 ? metrics.txns.h24.buys / totalTxns : null;
+        }
 
         // Fetch holder count (best-effort, non-blocking per token)
         let holderCount: number | null = null;

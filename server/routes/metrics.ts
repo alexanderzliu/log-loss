@@ -36,6 +36,12 @@ function safeDivide(a: number, b: number): number {
   return b !== 0 ? a / b : 0;
 }
 
+function hasVolumeSplit(raw: DexScreenerMetrics): boolean {
+  // Check if DexScreener actually returned volumeBuy/volumeSell data
+  // (not just zero-filled defaults from extraction)
+  return (raw.volumeBuy.h24 > 0 || raw.volumeSell.h24 > 0);
+}
+
 function computeMetrics(raw: DexScreenerMetrics): ComputedMetrics {
   const tfCalc = (fn: (tf: 'm5' | 'h1' | 'h6' | 'h24') => number): TimeframeData => ({
     m5: fn('m5'),
@@ -44,23 +50,33 @@ function computeMetrics(raw: DexScreenerMetrics): ComputedMetrics {
     h24: fn('h24'),
   });
 
+  const volumeSplitAvailable = hasVolumeSplit(raw);
+
   return {
-    buyPressure: tfCalc(tf =>
-      safeDivide(raw.volumeBuy[tf], raw.volumeBuy[tf] + raw.volumeSell[tf]),
-    ),
-    avgBuySize: tfCalc(tf =>
-      safeDivide(raw.volumeBuy[tf], raw.buyers[tf]),
-    ),
-    avgSellSize: tfCalc(tf =>
-      safeDivide(raw.volumeSell[tf], raw.sellers[tf]),
-    ),
+    // Buy pressure: prefer volumeBuy/volumeSell if available,
+    // otherwise fall back to txn count ratio (buys / total txns)
+    buyPressure: volumeSplitAvailable
+      ? tfCalc(tf => safeDivide(raw.volumeBuy[tf], raw.volumeBuy[tf] + raw.volumeSell[tf]))
+      : tfCalc(tf => safeDivide(raw.txns[tf].buys, raw.txns[tf].buys + raw.txns[tf].sells)),
+
+    // Avg buy/sell size: when no volume split, estimate from total volume + txn counts
+    avgBuySize: volumeSplitAvailable
+      ? tfCalc(tf => safeDivide(raw.volumeBuy[tf], raw.buyers[tf]))
+      : tfCalc(tf => safeDivide(raw.volume[tf], raw.txns[tf].buys + raw.txns[tf].sells)),
+    avgSellSize: volumeSplitAvailable
+      ? tfCalc(tf => safeDivide(raw.volumeSell[tf], raw.sellers[tf]))
+      : tfCalc(tf => safeDivide(raw.volume[tf], raw.txns[tf].buys + raw.txns[tf].sells)),
+
     // Volume acceleration: (5m volume annualized to 1h) / actual 1h volume
     volumeAcceleration: raw.volume.h1 > 0
       ? (raw.volume.m5 * 12) / raw.volume.h1
       : 0,
-    buyerSellerRatio: tfCalc(tf =>
-      safeDivide(raw.buyers[tf], raw.sellers[tf]),
-    ),
+
+    // Buyer/seller ratio: prefer unique wallet counts if available,
+    // otherwise use txn counts
+    buyerSellerRatio: (raw.buyers.h24 > 0 || raw.sellers.h24 > 0)
+      ? tfCalc(tf => safeDivide(raw.buyers[tf], raw.sellers[tf]))
+      : tfCalc(tf => safeDivide(raw.txns[tf].buys, raw.txns[tf].sells)),
   };
 }
 
