@@ -26,6 +26,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import ReflectionList from './ReflectionList';
+import MomentumPanel from '../MomentumPanel';
 
 interface PositionListProps {
   positions: Position[];
@@ -250,6 +251,17 @@ export default function PositionList({ positions, onEdit, onClosePosition, sortF
                   </tr>
                 )}
 
+                {/* Expanded momentum panel - DEX tokens only */}
+                {isExpanded && position.chain && position.contractAddress && (
+                  <tr style={expandedRowStyle}>
+                    <td colSpan={7} style={expandedTdMomentum}>
+                      <div style={threadLineStyle}>
+                        <MomentumPanel chain={position.chain} contractAddress={position.contractAddress} />
+                      </div>
+                    </td>
+                  </tr>
+                )}
+
                 {/* Expanded reflections - Thread line */}
                 {isExpanded && (
                   <tr style={expandedRowStyle}>
@@ -381,6 +393,7 @@ const threadLineReflStyle: React.CSSProperties = {
   paddingBottom: '4px',
 };
 const expandedTdHypothesis: React.CSSProperties = { padding: '4px 24px 4px 72px' };
+const expandedTdMomentum: React.CSSProperties = { padding: '4px 24px 4px 72px' };
 const expandedTdReflection: React.CSSProperties = { padding: '4px 24px 8px 72px' };
 const expandedRowStyle: React.CSSProperties = { borderBottom: 'none' };
 const execTdLeft: React.CSSProperties = { ...tdStyle, paddingLeft: '72px' };

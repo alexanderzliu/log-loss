@@ -97,6 +97,15 @@ export function initDatabase() {
   // Add rules table
   migrateCreateRules();
 
+  // Add token_metrics table for memecoin analytics
+  migrateCreateTokenMetrics();
+
+  // Add token_snapshots table for time-series data (Phase 2)
+  migrateCreateTokenSnapshots();
+
+  // Add service_state table for crash-resilient service state (Phase 2)
+  migrateCreateServiceState();
+
   console.log('Database initialized successfully');
 }
 
@@ -408,6 +417,71 @@ function migrateCreateRules() {
       content TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+}
+
+function migrateCreateTokenSnapshots() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS token_snapshots (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      chain            TEXT NOT NULL,
+      contract_address TEXT NOT NULL,
+      captured_at      TEXT NOT NULL,
+      price            REAL,
+      volume_24h       REAL,
+      volume_buy_24h   REAL,
+      volume_sell_24h  REAL,
+      buys_24h         INTEGER,
+      sells_24h        INTEGER,
+      liquidity_usd    REAL,
+      holder_count     INTEGER,
+      market_cap       REAL,
+      buy_pressure     REAL,
+      raw_metrics      TEXT,
+      created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_snapshots_token_time ON token_snapshots(chain, contract_address, captured_at);
+    CREATE INDEX IF NOT EXISTS idx_snapshots_time ON token_snapshots(captured_at);
+  `);
+}
+
+function migrateCreateServiceState() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS service_state (
+      service_name TEXT PRIMARY KEY,
+      last_run_at  TEXT NOT NULL,
+      metadata     TEXT
+    )
+  `);
+}
+
+function migrateCreateTokenMetrics() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS token_metrics (
+      chain            TEXT NOT NULL,
+      contract_address TEXT NOT NULL,
+      price            REAL,
+      volume_24h       REAL,
+      volume_buy_24h   REAL,
+      volume_sell_24h  REAL,
+      buys_24h         INTEGER,
+      sells_24h        INTEGER,
+      buyers_24h       INTEGER,
+      sellers_24h      INTEGER,
+      liquidity_usd    REAL,
+      market_cap       REAL,
+      fdv              REAL,
+      pair_created_at  INTEGER,
+      pair_address     TEXT,
+      dex_id           TEXT,
+      raw_metrics      TEXT NOT NULL,
+      created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (chain, contract_address)
     )
   `);
 }

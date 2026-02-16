@@ -8,6 +8,8 @@ import predictionsRouter from './routes/predictions';
 import reflectionsRouter from './routes/reflections';
 import rulesRouter from './routes/rules';
 import aiRouter from './routes/ai';
+import metricsRouter from './routes/metrics';
+import { snapshotService } from './services/snapshotService';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled rejection:', reason);
@@ -29,6 +31,7 @@ app.use('/api/predictions', predictionsRouter);
 app.use('/api/reflections', reflectionsRouter);
 app.use('/api/rules', rulesRouter);
 app.use('/api/ai', aiRouter);
+app.use('/api/metrics', metricsRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {
@@ -51,10 +54,18 @@ app.use((_err: Error, _req: express.Request, res: express.Response, _next: expre
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+
+  // Start snapshot service unless explicitly disabled
+  if (process.env.FEATURE_SNAPSHOTS !== 'false') {
+    snapshotService.start();
+  }
 });
 
 // Graceful shutdown
-process.on('SIGINT', () => {
+function shutdown() {
+  snapshotService.stop();
   db.close();
   process.exit(0);
-});
+}
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);

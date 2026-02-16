@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { db } from '../database';
 import { fetchHolderCount } from './holders';
+import { dexScreenerLimiter } from '../services/rateLimiter';
+import type { DexScreenerMetrics } from '../../shared/types';
 
 const router = Router();
 
@@ -193,6 +195,7 @@ interface DexScreenerPair {
   chainId: string;
   dexId: string;
   pairAddress: string;
+  pairCreatedAt: number | null;
   baseToken: { address: string; name: string; symbol: string };
   quoteToken: { address: string; name: string; symbol: string };
   priceUsd: string;
@@ -200,49 +203,111 @@ interface DexScreenerPair {
   priceChange: { h24: number; h6: number; h1: number; m5: number };
   liquidity: { usd: number; base: number; quote: number };
   txns: { h24: { buys: number; sells: number }; h6: { buys: number; sells: number }; h1: { buys: number; sells: number }; m5: { buys: number; sells: number } };
+  // Extended fields from DexScreener API
+  volumeBuy?: { h24: number; h6: number; h1: number; m5: number };
+  volumeSell?: { h24: number; h6: number; h1: number; m5: number };
+  buyers?: { h24: number; h6: number; h1: number; m5: number };
+  sellers?: { h24: number; h6: number; h1: number; m5: number };
+  makers?: { h24: number; h6: number; h1: number; m5: number };
   fdv: number;
   marketCap: number;
   info?: { imageUrl?: string };
 }
 
-async function fetchDexScreenerPrice(chain: string, contractAddress: string): Promise<PriceData | null> {
+function pickBestPair(pairs: DexScreenerPair[]): DexScreenerPair {
+  return pairs.reduce((a, b) =>
+    (a.liquidity?.usd ?? 0) >= (b.liquidity?.usd ?? 0) ? a : b
+  );
+}
+
+function extractDexScreenerMetrics(pair: DexScreenerPair): DexScreenerMetrics {
+  const tf = (obj: { m5: number; h1: number; h6: number; h24: number } | undefined) => ({
+    m5: obj?.m5 ?? 0,
+    h1: obj?.h1 ?? 0,
+    h6: obj?.h6 ?? 0,
+    h24: obj?.h24 ?? 0,
+  });
+  return {
+    txns: {
+      m5: { buys: pair.txns?.m5?.buys ?? 0, sells: pair.txns?.m5?.sells ?? 0 },
+      h1: { buys: pair.txns?.h1?.buys ?? 0, sells: pair.txns?.h1?.sells ?? 0 },
+      h6: { buys: pair.txns?.h6?.buys ?? 0, sells: pair.txns?.h6?.sells ?? 0 },
+      h24: { buys: pair.txns?.h24?.buys ?? 0, sells: pair.txns?.h24?.sells ?? 0 },
+    },
+    volume: tf(pair.volume),
+    volumeBuy: tf(pair.volumeBuy),
+    volumeSell: tf(pair.volumeSell),
+    buyers: tf(pair.buyers),
+    sellers: tf(pair.sellers),
+    makers: tf(pair.makers),
+    priceChange: tf(pair.priceChange),
+    liquidity: {
+      usd: pair.liquidity?.usd ?? 0,
+      base: pair.liquidity?.base ?? 0,
+      quote: pair.liquidity?.quote ?? 0,
+    },
+    pairCreatedAt: pair.pairCreatedAt ?? null,
+    pairAddress: pair.pairAddress ?? '',
+    dexId: pair.dexId ?? '',
+  };
+}
+
+/** Fetch raw DexScreener pairs for a token (rate-limited). Exported for use by metrics route. */
+export async function fetchDexScreenerPairs(chain: string, contractAddress: string): Promise<DexScreenerPair[] | null> {
   try {
+    await dexScreenerLimiter.acquire();
     const response = await fetch(
       `https://api.dexscreener.com/tokens/v1/${chain}/${contractAddress}`
     );
     if (!response.ok) return null;
-
     const pairs = await response.json() as DexScreenerPair[];
     if (!pairs || pairs.length === 0) return null;
-
-    // Pick the pair with highest liquidity
-    const best = pairs.reduce((a, b) =>
-      (a.liquidity?.usd || 0) >= (b.liquidity?.usd || 0) ? a : b
-    );
-
-    const priceUsd = parseFloat(best.priceUsd);
-    if (isNaN(priceUsd)) return null;
-
-    const txnBuys = best.txns?.h24?.buys || 0;
-    const txnSells = best.txns?.h24?.sells || 0;
-
-    return {
-      price: priceUsd,
-      change24h: priceUsd * ((best.priceChange?.h24 || 0) / 100),
-      changePercent24h: best.priceChange?.h24 || 0,
-      high24h: priceUsd,
-      low24h: priceUsd,
-      volume24h: best.volume?.h24 || 0,
-      marketCap: best.marketCap || null,
-      fdv: best.fdv || null,
-      liquidityUsd: best.liquidity?.usd || null,
-      txnCount24h: txnBuys + txnSells,
-      holderCount: null, // populated separately via holder APIs
-    };
+    return pairs;
   } catch (error) {
-    console.error(`DexScreener price error for ${chain}/${contractAddress}:`, error);
+    console.error(`DexScreener fetch error for ${chain}/${contractAddress}:`, error);
     return null;
   }
+}
+
+/** Fetch full DexScreener metrics for a token. Returns metrics + price data. */
+export async function fetchDexScreenerFullMetrics(
+  chain: string,
+  contractAddress: string,
+): Promise<{ priceData: PriceData; metrics: DexScreenerMetrics; marketCap: number | null; fdv: number | null } | null> {
+  const pairs = await fetchDexScreenerPairs(chain, contractAddress);
+  if (!pairs) return null;
+
+  const best = pickBestPair(pairs);
+  const priceUsd = parseFloat(best.priceUsd);
+  if (isNaN(priceUsd)) return null;
+
+  const metrics = extractDexScreenerMetrics(best);
+  const txnBuys = best.txns?.h24?.buys ?? 0;
+  const txnSells = best.txns?.h24?.sells ?? 0;
+
+  return {
+    priceData: {
+      price: priceUsd,
+      change24h: priceUsd * ((best.priceChange?.h24 ?? 0) / 100),
+      changePercent24h: best.priceChange?.h24 ?? 0,
+      high24h: priceUsd,
+      low24h: priceUsd,
+      volume24h: best.volume?.h24 ?? 0,
+      marketCap: best.marketCap ?? null,
+      fdv: best.fdv ?? null,
+      liquidityUsd: best.liquidity?.usd ?? null,
+      txnCount24h: txnBuys + txnSells,
+      holderCount: null,
+    },
+    metrics,
+    marketCap: best.marketCap ?? null,
+    fdv: best.fdv ?? null,
+  };
+}
+
+async function fetchDexScreenerPrice(chain: string, contractAddress: string): Promise<PriceData | null> {
+  const result = await fetchDexScreenerFullMetrics(chain, contractAddress);
+  return result ? result.priceData : null;
 }
 
 // --- Unified price resolver ---
@@ -459,11 +524,91 @@ router.post('/batch', async (req, res) => {
   }
 });
 
+// --- GeckoTerminal OHLCV fallback ---
+
+// Map DexScreener chain IDs to GeckoTerminal network IDs
+const geckoTerminalNetworkMap: Record<string, string> = {
+  solana: 'solana',
+  ethereum: 'eth',
+  base: 'base',
+  bsc: 'bsc',
+  arbitrum: 'arbitrum',
+  optimism: 'optimism',
+  polygon_pos: 'polygon-pos',
+  avalanche: 'avax',
+};
+
+interface GeckoTerminalOHLCV {
+  data: {
+    attributes: {
+      ohlcv_list: [number, number, number, number, number, number][]; // [timestamp, open, high, low, close, volume]
+    };
+  };
+}
+
+async function fetchGeckoTerminalOHLCV(
+  chain: string,
+  contractAddress: string,
+  days: number,
+): Promise<{ timestamp: string; price: number }[] | null> {
+  const network = geckoTerminalNetworkMap[chain];
+  if (!network) return null;
+
+  // Look up the pair_address from token_metrics for this token
+  const metricsRow = db.prepare(
+    'SELECT pair_address FROM token_metrics WHERE chain = ? AND contract_address = ?'
+  ).get(chain, contractAddress) as { pair_address: string | null } | undefined;
+
+  const poolAddress = metricsRow?.pair_address;
+  if (!poolAddress) return null;
+
+  // Map days to GeckoTerminal timeframe and aggregate
+  let timeframe: string;
+  let aggregate: number;
+  if (days <= 1) {
+    timeframe = 'minute';
+    aggregate = 15;
+  } else if (days <= 7) {
+    timeframe = 'hour';
+    aggregate = 1;
+  } else {
+    timeframe = 'day';
+    aggregate = 1;
+  }
+
+  try {
+    const url = `https://api.geckoterminal.com/api/v2/networks/${network}/pools/${poolAddress}/ohlcv/${timeframe}?aggregate=${aggregate}&limit=1000&currency=usd`;
+    const response = await fetch(url, {
+      headers: { Accept: 'application/json' },
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json() as GeckoTerminalOHLCV;
+    const ohlcvList = data?.data?.attributes?.ohlcv_list;
+    if (!ohlcvList || ohlcvList.length === 0) return null;
+
+    // Filter to requested day range and map to price history format
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+
+    return ohlcvList
+      .filter(candle => candle[0] * 1000 >= cutoff)
+      .map(candle => ({
+        timestamp: new Date(candle[0] * 1000).toISOString(),
+        price: candle[4], // close price
+      }))
+      .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  } catch (error) {
+    console.error(`GeckoTerminal OHLCV error for ${chain}/${poolAddress}:`, error);
+    return null;
+  }
+}
+
 // Get price history for charts
 router.get('/history/:assetType/:symbol', async (req, res) => {
   try {
     const { assetType, symbol } = req.params;
-    const { days: daysParam = '30', contractAddress } = req.query;
+    const { days: daysParam = '30', contractAddress, chain: chainParam } = req.query;
     const upperSymbol = symbol.toUpperCase();
 
     // Validate days parameter
@@ -472,8 +617,15 @@ router.get('/history/:assetType/:symbol', async (req, res) => {
       return res.status(400).json({ error: 'Days must be a number between 1 and 365' });
     }
 
-    // DexScreener tokens: no historical data available
+    // DexScreener tokens: try GeckoTerminal as fallback
     if (contractAddress) {
+      const chain = chainParam as string | undefined;
+      if (chain) {
+        const history = await fetchGeckoTerminalOHLCV(chain, contractAddress as string, days);
+        if (history && history.length > 0) {
+          return res.json({ symbol: upperSymbol, assetType, history });
+        }
+      }
       return res.json({ symbol: upperSymbol, assetType, history: [], unavailable: true });
     }
 

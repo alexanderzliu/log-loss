@@ -21,7 +21,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['server/**/*.ts'],
+    files: ['server/**/*.ts', 'shared/**/*.ts'],
     extends: [
       js.configs.recommended,
       tseslint.configs.recommended,

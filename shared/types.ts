@@ -257,3 +257,140 @@ export interface AIAnalysis {
   recommendations: string[];
   generatedAt: string;
 }
+
+// --- Memecoin Metrics ---
+
+export type LifecycleStage = 'launch' | 'discovery' | 'momentum' | 'established';
+
+export interface TimeframeData {
+  m5: number;
+  h1: number;
+  h6: number;
+  h24: number;
+}
+
+export interface DexScreenerMetrics {
+  txns: {
+    m5: { buys: number; sells: number };
+    h1: { buys: number; sells: number };
+    h6: { buys: number; sells: number };
+    h24: { buys: number; sells: number };
+  };
+  volume: TimeframeData;
+  volumeBuy: TimeframeData;
+  volumeSell: TimeframeData;
+  buyers: TimeframeData;
+  sellers: TimeframeData;
+  makers: TimeframeData;
+  priceChange: TimeframeData;
+  liquidity: { usd: number; base: number; quote: number };
+  pairCreatedAt: number | null;
+  pairAddress: string;
+  dexId: string;
+}
+
+export interface ComputedMetrics {
+  buyPressure: TimeframeData;
+  avgBuySize: TimeframeData;
+  avgSellSize: TimeframeData;
+  volumeAcceleration: number;
+  buyerSellerRatio: TimeframeData;
+}
+
+export interface TokenMetrics {
+  chain: string;
+  contractAddress: string;
+  price: number;
+  volume24h: number;
+  volumeBuy24h: number;
+  volumeSell24h: number;
+  buys24h: number;
+  sells24h: number;
+  buyers24h: number;
+  sellers24h: number;
+  liquidityUsd: number;
+  marketCap: number | null;
+  fdv: number | null;
+  pairCreatedAt: number | null;
+  pairAddress: string | null;
+  dexId: string | null;
+  lifecycleStage: LifecycleStage;
+  raw: DexScreenerMetrics;
+  computed: ComputedMetrics;
+  updatedAt: string;
+}
+
+export interface MomentumSummary {
+  chain: string;
+  contractAddress: string;
+  lifecycleStage: LifecycleStage;
+  buyPressure: TimeframeData;
+  volumeAcceleration: number;
+  buyerSellerRatio: TimeframeData;
+  priceChange: TimeframeData;
+  volume: TimeframeData;
+}
+
+// --- Phase 2: Snapshots & Derivatives ---
+
+export interface TokenSnapshot {
+  id: number;
+  chain: string;
+  contractAddress: string;
+  capturedAt: string;
+  price: number | null;
+  volume24h: number | null;
+  volumeBuy24h: number | null;
+  volumeSell24h: number | null;
+  buys24h: number | null;
+  sells24h: number | null;
+  liquidityUsd: number | null;
+  holderCount: number | null;
+  marketCap: number | null;
+  buyPressure: number | null;
+  rawMetrics: string | null;
+}
+
+export type DerivativeWindow = '30m' | '1h' | '6h' | '24h';
+
+export interface DerivativeChange {
+  absolute: number | null;
+  percent: number | null;
+}
+
+export interface DerivativesResult {
+  chain: string;
+  contractAddress: string;
+  window: DerivativeWindow;
+  from: string | null;
+  to: string | null;
+  changes: {
+    price: DerivativeChange;
+    volume24h: DerivativeChange;
+    liquidityUsd: DerivativeChange;
+    holderCount: DerivativeChange;
+    buyPressure: DerivativeChange;
+    marketCap: DerivativeChange;
+  };
+}
+
+export interface SnapshotHistoryPoint {
+  capturedAt: string;
+  price: number | null;
+  volume24h: number | null;
+  liquidityUsd: number | null;
+  buyPressure: number | null;
+  marketCap: number | null;
+  holderCount: number | null;
+}
+
+// --- GeckoTerminal OHLCV ---
+
+export interface OHLCVCandle {
+  timestamp: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
