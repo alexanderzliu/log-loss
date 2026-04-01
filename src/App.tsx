@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { useEffect, type CSSProperties } from 'react';
-import { BookOpen, BookMarked, LayoutDashboard, TrendingUp, CircleDot, Sparkles, Brain } from 'lucide-react';
+import { BookOpen, BookMarked, LayoutDashboard, TrendingUp, CircleDot, Sparkles } from 'lucide-react';
 import { useStore } from './store/useStore';
 import { formatCurrency } from './utils/format';
 import Journal from './pages/Journal';
@@ -9,7 +9,6 @@ import Dashboard from './pages/Dashboard';
 import Analytics from './pages/Analytics';
 import Insights from './pages/Insights';
 import Rulebook from './pages/Rulebook';
-import AIAnalysisPage from './pages/AIAnalysis';
 import ToastContainer from './components/Toast';
 import './index.css';
 
@@ -34,10 +33,10 @@ function navLinkStyle({ isActive }: { isActive: boolean }): CSSProperties {
 }
 
 function useSidebarBadges() {
-  const openPositionsCount = useStore(s => s.positions.filter(p => p.status === 'open').length);
+  const openTradesCount = useStore(s => s.trades.filter(t => t.status === 'open').length);
   const openPredictionsCount = useStore(s => s.predictions.filter(p => p.status === 'open').length);
 
-  return { openPositionsCount, openPredictionsCount };
+  return { openTradesCount, openPredictionsCount };
 }
 
 function SidebarPnl() {
@@ -80,18 +79,18 @@ function SidebarPnl() {
 }
 
 function App() {
-  const { openPositionsCount, openPredictionsCount } = useSidebarBadges();
-  const fetchPositions = useStore(s => s.fetchPositions);
+  const { openTradesCount, openPredictionsCount } = useSidebarBadges();
+  const fetchTrades = useStore(s => s.fetchTrades);
   const fetchPredictions = useStore(s => s.fetchPredictions);
   const fetchPortfolioSummary = useStore(s => s.fetchPortfolioSummary);
   const fetchPredictionsSummary = useStore(s => s.fetchPredictionsSummary);
 
   useEffect(() => {
-    fetchPositions();
+    fetchTrades();
     fetchPredictions();
     fetchPortfolioSummary();
     fetchPredictionsSummary();
-  }, [fetchPositions, fetchPredictions, fetchPortfolioSummary, fetchPredictionsSummary]);
+  }, [fetchTrades, fetchPredictions, fetchPortfolioSummary, fetchPredictionsSummary]);
 
   return (
     <BrowserRouter>
@@ -150,7 +149,7 @@ function App() {
             <NavLink to="/trades" style={navLinkStyle}>
               <BookOpen size={18} />
               <span style={{ flex: 1 }}>Trades</span>
-              {openPositionsCount > 0 && (
+              {openTradesCount > 0 && (
                 <span style={{
                   fontSize: '11px',
                   fontWeight: 600,
@@ -160,7 +159,7 @@ function App() {
                   color: 'var(--profit)',
                   fontFamily: "'DM Mono', monospace",
                 }}>
-                  {openPositionsCount}
+                  {openTradesCount}
                 </span>
               )}
             </NavLink>
@@ -193,10 +192,6 @@ function App() {
               <BookMarked size={18} />
               Rulebook
             </NavLink>
-            <NavLink to="/ai-analysis" style={navLinkStyle}>
-              <Brain size={18} />
-              AI Analysis
-            </NavLink>
           </nav>
         </aside>
 
@@ -210,7 +205,6 @@ function App() {
             <Route path="/insights" element={<Insights />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/rulebook" element={<Rulebook />} />
-            <Route path="/ai-analysis" element={<AIAnalysisPage />} />
           </Routes>
         </main>
         <ToastContainer />

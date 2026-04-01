@@ -149,7 +149,7 @@ Removed all crypto-specific code to simplify the codebase:
 
 ## Phase 3: UI updates for options trading
 
-**Status: Mostly complete**
+**Status: Complete**
 
 Update the frontend to support options workflows:
 
@@ -157,11 +157,11 @@ Update the frontend to support options workflows:
 - [x] Update trade list to show options-relevant columns (underlying, strategy, DTE, strikes, P&L)
 - [x] Strategy grouping — visually show spread legs together
 - [x] Expiration awareness — highlight approaching expirations, show DTE
-- [~] Entry quality badges (Clean/FOMO/Chased/Intuitive) with color coding — done in form & filtering, not yet shown on trade list rows
+- [x] Entry quality badges (Clean/FOMO/Chased/Intuitive) with color coding — shown on trade list rows, form, and filtering
 - [x] Thesis tag filtering and grouping
-- [~] Update Dashboard with options-relevant metrics — basic metrics on Dashboard, strategy/entry-quality breakdowns on Analytics page
+- [x] Update Dashboard with options-relevant metrics — basic metrics on Dashboard, strategy/entry-quality breakdowns on Analytics page
 - [x] Update Analytics/equity curve for options P&L
-- [ ] Planned trades view — trades with status `'planned'` shown separately
+- [x] Planned trades view — 'planned' status support with filter pill, create-as-planned toggle, open trade action
 
 ## Phase 4: VWAP & chart data capture
 
@@ -194,16 +194,16 @@ Build programmatic access so Claude can query and analyze the journal:
 
 ## Phase 6: Notion data migration
 
-**Status: Not started**
+**Status: Complete**
 
 Import existing trades from the Notion CSV exports in `notion-trade-journal/`:
 
-- [ ] Parse CSV and map fields to new schema
-- [ ] Extract option details from ticker/name (strike, expiration, call/put)
-- [ ] Handle multi-leg trades (spreads have 2 legs to create)
-- [ ] Parse the rich Notes field — potentially split into structured fields if we add them
-- [ ] Validate imported data and computed P&L
-- [ ] Backfill equity curve data points from close dates + realized P&L
+- [x] Parse CSV and map fields to new schema
+- [x] Extract option details from ticker/name (strike, expiration, call/put)
+- [x] Handle multi-leg trades (spreads have 2 legs to create)
+- [x] Parse the rich Notes field — potentially split into structured fields if we add them
+- [x] Validate imported data and computed P&L
+- [x] Backfill equity curve data points from close dates + realized P&L
 
 ---
 

@@ -171,7 +171,7 @@ export default function Insights() {
           <div className="card empty-state">
             <p className="empty-state-title" style={{ fontSize: '16px', fontWeight: 600 }}>No insights yet</p>
             <p className="empty-state-text">
-              Add hypotheses when creating trades, or write reflections on your positions
+              Add hypotheses when creating trades, or write reflections on your trades
             </p>
           </div>
         ) : filteredFeed.length === 0 ? (
@@ -273,7 +273,7 @@ function InsightCard({ item, index }: { item: InsightFeedItem; index: number }) 
           color: 'var(--text-primary)',
           fontSize: '14px',
         }}>
-          {item.symbol}
+          {item.underlying}
         </span>
 
         {/* Status pill */}
@@ -285,7 +285,7 @@ function InsightCard({ item, index }: { item: InsightFeedItem; index: number }) 
           background: item.status === 'open' ? 'rgba(52, 211, 153, 0.08)' : 'rgba(255, 255, 255, 0.04)',
           color: item.status === 'open' ? 'var(--profit)' : 'var(--text-muted)',
         }}>
-          {item.direction} / {item.status}
+          {item.strategy} / {item.status}
         </span>
 
         {/* P&L if closed */}
@@ -297,11 +297,6 @@ function InsightCard({ item, index }: { item: InsightFeedItem; index: number }) 
             color: isPositivePnl ? 'var(--profit)' : 'var(--loss)',
           }}>
             {isPositivePnl ? '+' : ''}{formatCurrency(item.realizedPnl)}
-            {item.realizedPnlPercent != null && (
-              <span style={{ fontWeight: 400, fontSize: '12px', marginLeft: '4px' }}>
-                ({item.realizedPnlPercent >= 0 ? '+' : ''}{item.realizedPnlPercent.toFixed(1)}%)
-              </span>
-            )}
           </span>
         )}
 

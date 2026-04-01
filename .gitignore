@@ -19,6 +19,17 @@ dist-ssr
 # Database
 *.db
 *.db-journal
+*.db-shm
+*.db-wal
+*.db.bak
+
+# Notion CSV exports
+notion-trade-journal/
+
+# Screenshots & artifacts
+*.png
+screenshots/
+.playwright-mcp/
 
 # Editor directories and files
 .vscode/*

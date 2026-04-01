@@ -1,108 +1,211 @@
 import { useState } from 'react';
-import { TrendingUp, TrendingDown, Shield, Target, Zap } from 'lucide-react';
+import {
+  TrendingUp,
+  TrendingDown,
+  Zap,
+  Target,
+  Layers,
+  Tag,
+  Plus,
+  X,
+} from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
-import TokenSearch from './TokenSearch';
 import Modal from '../Modal';
 import { FieldSection, FieldGroup, PrefixInput } from '../form';
-import { priceKey as getPriceKey } from '../../utils/priceKey';
-import type { Position, TradeFormData, PositionUpdateData } from '../../types';
+import type {
+  Trade,
+  TradeCreateData,
+  TradeUpdateData,
+  TradeCloseData,
+  TradeStrategy,
+  TradeAssetType,
+  TradeSide,
+  EntryQuality,
+  TradeLeg,
+  OptionType,
+} from '../../types';
+
+type FormMode = 'create' | 'edit' | 'close';
 
 interface TradeFormProps {
-  position?: Position | null;
-  isClosing?: boolean;
-  isEditing?: boolean;
+  trade?: Trade | null;
+  mode?: FormMode;
   onClose: () => void;
 }
 
-export default function TradeForm({ position, isClosing, isEditing, onClose }: TradeFormProps) {
-  const { createTrade, updatePosition, prices } = useStore(useShallow((s) => ({
+type LegDraft = {
+  id?: string;
+  ticker: string;
+  optionType: OptionType | null;
+  strike: string;
+  expiration: string;
+  side: TradeSide;
+  quantity: string;
+  entryPrice: string;
+  exitPrice: string;
+};
+
+type TagDraft = { tag: string; category?: string };
+
+const STRATEGIES: { value: TradeStrategy; label: string }[] = [
+  { value: 'long', label: 'Long' },
+  { value: 'short', label: 'Short' },
+  { value: 'debit_spread', label: 'Debit Spread' },
+  { value: 'credit_spread', label: 'Credit Spread' },
+  { value: 'iron_condor', label: 'Iron Condor' },
+  { value: 'straddle', label: 'Straddle' },
+  { value: 'strangle', label: 'Strangle' },
+  { value: 'custom', label: 'Custom' },
+];
+
+const ASSET_TYPES: { value: TradeAssetType; label: string }[] = [
+  { value: 'option', label: 'Option' },
+  { value: 'futures', label: 'Futures' },
+  { value: 'stock', label: 'Stock' },
+];
+
+const ENTRY_QUALITIES: { value: EntryQuality; label: string; color: string; bg: string }[] = [
+  { value: 'clean', label: 'Clean', color: 'var(--profit)', bg: 'rgba(52, 211, 153, 0.12)' },
+  { value: 'intuitive', label: 'Intuitive', color: 'var(--accent-violet)', bg: 'rgba(139, 92, 246, 0.12)' },
+  { value: 'chased', label: 'Chased', color: 'var(--accent-warm)', bg: 'rgba(245, 158, 11, 0.12)' },
+  { value: 'fomo', label: 'FOMO', color: 'var(--loss)', bg: 'rgba(248, 113, 113, 0.12)' },
+];
+
+function makeLegDraft(side: TradeSide): LegDraft {
+  return { ticker: '', optionType: 'call', strike: '', expiration: '', side, quantity: '', entryPrice: '', exitPrice: '' };
+}
+
+function scaffoldLegs(strategy: TradeStrategy, side: TradeSide): LegDraft[] {
+  switch (strategy) {
+    case 'long':
+      return [makeLegDraft(side)];
+    case 'short':
+      return [makeLegDraft(side)];
+    case 'debit_spread':
+      return [makeLegDraft('buy'), makeLegDraft('sell')];
+    case 'credit_spread':
+      return [makeLegDraft('sell'), makeLegDraft('buy')];
+    case 'iron_condor':
+      return [
+        { ...makeLegDraft('sell'), optionType: 'put' },
+        { ...makeLegDraft('buy'), optionType: 'put' },
+        { ...makeLegDraft('sell'), optionType: 'call' },
+        { ...makeLegDraft('buy'), optionType: 'call' },
+      ];
+    case 'straddle':
+      return [
+        { ...makeLegDraft('buy'), optionType: 'call' },
+        { ...makeLegDraft('buy'), optionType: 'put' },
+      ];
+    case 'strangle':
+      return [
+        { ...makeLegDraft('buy'), optionType: 'call' },
+        { ...makeLegDraft('buy'), optionType: 'put' },
+      ];
+    case 'custom':
+    default:
+      return [];
+  }
+}
+
+function existingLegsToClose(trade: Trade): LegDraft[] {
+  return trade.legs.map((l) => ({
+    id: l.id,
+    ticker: l.ticker,
+    optionType: l.optionType,
+    strike: l.strike !== null ? String(l.strike) : '',
+    expiration: l.expiration ?? '',
+    side: l.side,
+    quantity: String(l.quantity),
+    entryPrice: l.entryPrice !== null ? String(l.entryPrice) : '',
+    exitPrice: l.exitPrice !== null ? String(l.exitPrice) : '',
+  }));
+}
+
+export default function TradeForm({ trade, mode = 'create', onClose }: TradeFormProps) {
+  const { createTrade, updateTrade, closeTrade } = useStore(useShallow((s) => ({
     createTrade: s.createTrade,
-    updatePosition: s.updatePosition,
-    prices: s.prices,
+    updateTrade: s.updateTrade,
+    closeTrade: s.closeTrade,
   })));
-  const currentPrice = position ? prices[getPriceKey(position)]?.price : undefined;
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const initialPrice = isClosing && currentPrice ? currentPrice : 0;
+  // --- Create mode state ---
+  const [name, setName] = useState(trade?.name ?? '');
+  const [underlying, setUnderlying] = useState(trade?.underlying ?? '');
+  const [assetType, setAssetType] = useState<TradeAssetType>(trade?.assetType ?? 'option');
+  const [strategy, setStrategy] = useState<TradeStrategy>(trade?.strategy ?? 'long');
+  const [side, setSide] = useState<TradeSide>(trade?.side ?? 'buy');
+  const [quantity, setQuantity] = useState(trade?.quantity ? String(trade.quantity) : '');
+  const [entryPrice, setEntryPrice] = useState(trade?.entryPrice !== null && trade?.entryPrice !== undefined ? String(trade.entryPrice) : '');
+  const [fees, setFees] = useState(trade?.fees !== null && trade?.fees !== undefined ? String(trade.fees) : '');
+  const [openDate, setOpenDate] = useState(trade?.openDate ?? new Date().toISOString().slice(0, 16));
+  const [entryQuality, setEntryQuality] = useState<EntryQuality | null>(trade?.entryQuality ?? null);
+  const [thesis, setThesis] = useState(trade?.thesis ?? '');
+  const [exitPlan, setExitPlan] = useState(trade?.exitPlan ?? '');
+  const [notes, setNotes] = useState(trade?.notes ?? '');
+  const [savePlanned, setSavePlanned] = useState(false);
 
-  const [formData, setFormData] = useState<TradeFormData>({
-    assetType: position?.assetType || 'crypto',
-    symbol: position?.symbol || '',
-    side: isClosing ? 'sell' : 'buy',
-    date: new Date().toISOString().split('T')[0],
-    price: initialPrice,
-    quantity: isClosing ? (position?.remainingQuantity || 0) : 0,
-    stopLoss: position?.stopLoss ?? null,
-    takeProfit: position?.takeProfit ?? null,
-    hypothesis: position?.hypothesis || '',
-    chain: position?.chain ?? null,
-    contractAddress: position?.contractAddress ?? null,
-    notes: '',
-    positionId: isClosing ? position?.id : undefined,
-  });
+  // Legs
+  const initialLegs = mode === 'close' && trade
+    ? existingLegsToClose(trade)
+    : mode === 'create'
+      ? scaffoldLegs(strategy, side)
+      : [];
+  const [legs, setLegs] = useState<LegDraft[]>(initialLegs);
 
-  // Auto-calculation: raw strings for display, parsed numbers for math
-  const [priceStr, setPriceStr] = useState(isClosing && currentPrice ? String(currentPrice) : '');
-  const [quantityStr, setQuantityStr] = useState(isClosing && position?.remainingQuantity ? String(position.remainingQuantity) : '');
-  const initialTotal = isClosing && currentPrice && position?.remainingQuantity
-    ? String(currentPrice * position.remainingQuantity)
-    : '';
-  const [totalStr, setTotalStr] = useState(initialTotal);
-  const [editedFields, setEditedFields] = useState<[string, string]>(['price', 'quantity']);
+  // Tags
+  const [tags, setTags] = useState<TagDraft[]>(trade?.tags?.map((t) => ({ tag: t.tag, category: t.category ?? undefined })) ?? []);
+  const [tagInput, setTagInput] = useState('');
 
-  const calculatedField = ['price', 'quantity', 'total'].find(f => !editedFields.includes(f)) || 'total';
+  // --- Close mode state ---
+  const [exitPrice, setExitPrice] = useState('');
+  const [closeDate, setCloseDate] = useState(new Date().toISOString().slice(0, 16));
+  const [realizedPnl, setRealizedPnl] = useState('');
+  const [followedPlan, setFollowedPlan] = useState<boolean | null>(null);
+  const [reflection, setReflection] = useState('');
 
   const parseNum = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
 
-  const updateEditedPair = (field: string): [string, string] => {
-    if (editedFields[1] === field) return editedFields;
-    const newPair: [string, string] = [editedFields[1], field];
-    setEditedFields(newPair);
-    return newPair;
-  };
-
-  const recalculate = (price: number, quantity: number, total: number, pair: [string, string]) => {
-    const calc = ['price', 'quantity', 'total'].find(f => !pair.includes(f));
-    if (calc === 'total') {
-      const v = price * quantity;
-      setTotalStr(v ? String(v) : '');
-    } else if (calc === 'quantity' && price > 0) {
-      const v = total / price;
-      setQuantityStr(v ? String(v) : '');
-      setFormData(prev => ({ ...prev, quantity: v }));
-    } else if (calc === 'price' && quantity > 0) {
-      const v = total / quantity;
-      setPriceStr(v ? String(v) : '');
-      setFormData(prev => ({ ...prev, price: v }));
+  const handleStrategyChange = (newStrategy: TradeStrategy) => {
+    setStrategy(newStrategy);
+    if (mode === 'create') {
+      setLegs(scaffoldLegs(newStrategy, side));
     }
   };
 
-  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    setPriceStr(raw);
-    const val = parseNum(raw);
-    setFormData(prev => ({ ...prev, price: val }));
-    const pair = updateEditedPair('price');
-    recalculate(val, parseNum(quantityStr), parseNum(totalStr), pair);
+  const updateLeg = (idx: number, field: keyof LegDraft, value: string | TradeSide | OptionType | null) => {
+    setLegs((prev) => prev.map((l, i) => i === idx ? { ...l, [field]: value } : l));
   };
 
-  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    setQuantityStr(raw);
-    const val = parseNum(raw);
-    setFormData(prev => ({ ...prev, quantity: val }));
-    const pair = updateEditedPair('quantity');
-    recalculate(parseNum(priceStr), val, parseNum(totalStr), pair);
+  const addLeg = () => {
+    setLegs((prev) => [...prev, makeLegDraft('buy')]);
   };
 
-  const handleTotalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    setTotalStr(raw);
-    const val = parseNum(raw);
-    const pair = updateEditedPair('total');
-    recalculate(parseNum(priceStr), parseNum(quantityStr), val, pair);
+  const removeLeg = (idx: number) => {
+    setLegs((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const addTag = () => {
+    const trimmed = tagInput.trim();
+    if (trimmed && !tags.some((t) => t.tag === trimmed)) {
+      setTags((prev) => [...prev, { tag: trimmed }]);
+      setTagInput('');
+    }
+  };
+
+  const removeTag = (idx: number) => {
+    setTags((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleTagKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTag();
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -111,26 +214,85 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
     setLoading(true);
 
     try {
-      if (isEditing && position) {
-        const updateData: PositionUpdateData = {
-          stopLoss: formData.stopLoss,
-          takeProfit: formData.takeProfit,
-          hypothesis: formData.hypothesis,
+      if (mode === 'create') {
+        if (!underlying.trim()) {
+          setError('Underlying is required');
+          setLoading(false);
+          return;
+        }
+
+        const legData: Omit<TradeLeg, 'id' | 'tradeId'>[] = legs.map((l) => ({
+          ticker: l.ticker || underlying,
+          optionType: l.optionType,
+          strike: l.strike ? parseNum(l.strike) : null,
+          expiration: l.expiration || null,
+          side: l.side,
+          quantity: parseNum(l.quantity) || parseNum(quantity) || 1,
+          entryPrice: l.entryPrice ? parseNum(l.entryPrice) : parseNum(entryPrice) || null,
+          exitPrice: null,
+          entryUnderlyingPrice: null,
+          exitUnderlyingPrice: null,
+          delta: null,
+          gamma: null,
+          theta: null,
+          vega: null,
+          iv: null,
+        }));
+
+        const data: TradeCreateData = {
+          name: name.trim(),
+          assetType,
+          underlying: underlying.trim().toUpperCase(),
+          status: savePlanned ? 'planned' : 'open',
+          strategy,
+          side,
+          quantity: parseNum(quantity) || 1,
+          entryPrice: entryPrice ? parseNum(entryPrice) : null,
+          fees: fees ? parseNum(fees) : null,
+          openDate: openDate || null,
+          entryQuality,
+          thesis: thesis.trim(),
+          exitPlan: exitPlan.trim(),
+          notes: notes.trim(),
+          legs: legData,
+          tags,
         };
-        await updatePosition(position.id, updateData);
-      } else {
-        if (formData.price <= 0) {
-          setError('Price must be greater than zero');
+
+        await createTrade(data);
+      } else if (mode === 'edit' && trade) {
+        const data: TradeUpdateData = {
+          name: name.trim(),
+          thesis: thesis.trim(),
+          exitPlan: exitPlan.trim(),
+          notes: notes.trim(),
+          entryQuality: entryQuality ?? undefined,
+          fees: fees ? parseNum(fees) : undefined,
+        };
+
+        await updateTrade(trade.id, data);
+      } else if (mode === 'close' && trade) {
+        if (!realizedPnl) {
+          setError('Realized P&L is required');
           setLoading(false);
           return;
         }
-        if (formData.quantity <= 0) {
-          setError('Quantity must be greater than zero');
-          setLoading(false);
-          return;
-        }
-        await createTrade(formData);
+
+        const legExits = legs
+          .filter((l) => l.id && l.exitPrice)
+          .map((l) => ({ id: l.id!, exitPrice: parseNum(l.exitPrice) }));
+
+        const data: TradeCloseData = {
+          exitPrice: exitPrice ? parseNum(exitPrice) : null,
+          closeDate: closeDate || new Date().toISOString(),
+          realizedPnl: parseNum(realizedPnl),
+          reflection: reflection.trim() || undefined,
+          followedPlan: followedPlan ?? undefined,
+          legs: legExits.length > 0 ? legExits : undefined,
+        };
+
+        await closeTrade(trade.id, data);
       }
+
       onClose();
     } catch (err) {
       setError((err as Error).message);
@@ -139,26 +301,17 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
     }
   };
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value, type } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]:
-        type === 'number'
-          ? value === ''
-            ? null
-            : parseFloat(value)
-          : value,
-    }));
-  };
-
-  const title = isClosing
-    ? 'Close Position'
-    : isEditing
-    ? 'Edit Position'
+  const title = mode === 'close'
+    ? 'Close Trade'
+    : mode === 'edit'
+    ? 'Edit Trade'
     : 'New Trade';
+
+  const subtitle = mode === 'close'
+    ? `Closing ${trade?.name || trade?.underlying}`
+    : mode === 'edit'
+    ? `Editing ${trade?.name || trade?.underlying}`
+    : 'Enter your trade details';
 
   const headerContent = (
     <div className="flex items-center gap-3">
@@ -166,15 +319,15 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
         width: '36px',
         height: '36px',
         borderRadius: '12px',
-        background: isClosing
+        background: mode === 'close'
           ? 'rgba(248, 113, 113, 0.1)'
           : 'var(--accent-glow)',
-        border: `1px solid ${isClosing ? 'rgba(248, 113, 113, 0.2)' : 'rgba(16, 185, 129, 0.15)'}`,
+        border: `1px solid ${mode === 'close' ? 'rgba(248, 113, 113, 0.2)' : 'rgba(16, 185, 129, 0.15)'}`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
       }}>
-        {isClosing ? (
+        {mode === 'close' ? (
           <TrendingDown size={18} style={{ color: 'var(--loss)' }} />
         ) : (
           <Zap size={18} style={{ color: 'var(--accent)' }} />
@@ -182,9 +335,7 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
       </div>
       <div>
         <h2 style={{ fontSize: '17px', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.2 }}>{title}</h2>
-        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-          {isClosing ? `Selling ${formData.symbol}` : isEditing ? `Editing ${formData.symbol}` : 'Enter your position details'}
-        </p>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{subtitle}</p>
       </div>
     </div>
   );
@@ -192,387 +343,688 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
   return (
     <Modal
       onClose={onClose}
-      accentBar={isClosing
+      maxWidth={mode === 'create' ? '640px' : '520px'}
+      accentBar={mode === 'close'
         ? 'linear-gradient(90deg, var(--loss), transparent)'
         : 'linear-gradient(90deg, var(--accent), rgba(16, 185, 129, 0.1))'}
       header={headerContent}
       error={error}
     >
-        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1" style={{ padding: '0 24px 24px' }}>
+      <form onSubmit={handleSubmit} className="overflow-y-auto flex-1" style={{ padding: '0 24px 24px' }}>
 
-          {isClosing && (
-            <div style={{
-              padding: '10px 14px',
-              borderRadius: '12px',
-              fontSize: '13px',
-              background: 'rgba(59, 130, 246, 0.08)',
-              border: '1px solid rgba(59, 130, 246, 0.15)',
-              color: '#60a5fa',
-              marginBottom: '16px',
-            }}>
-              Creating a sell order to close your {formData.symbol} position.
-            </div>
-          )}
+        {mode === 'close' && (
+          <div style={{
+            padding: '10px 14px',
+            borderRadius: '12px',
+            fontSize: '13px',
+            background: 'rgba(59, 130, 246, 0.08)',
+            border: '1px solid rgba(59, 130, 246, 0.15)',
+            color: '#60a5fa',
+            marginBottom: '16px',
+          }}>
+            Closing your {trade?.underlying} {trade?.strategy.replace(/_/g, ' ')} trade.
+          </div>
+        )}
 
-          {isEditing ? (
-            <div className="flex flex-col" style={{ gap: '16px' }}>
-              {/* Stop Loss & Take Profit */}
-              <FieldSection label="Risk Management" icon={<Shield size={12} />}>
-                <div className="grid grid-cols-2 gap-3">
-                  <FieldGroup label="Stop Loss">
-                    <PrefixInput
-                      prefix="$"
-                      type="number"
-                      name="stopLoss"
-                      value={formData.stopLoss || ''}
-                      onChange={handleChange}
-                      step="any"
-                      min="0"
-                      placeholder="0.00"
-                    />
-                  </FieldGroup>
-                  <FieldGroup label="Take Profit">
-                    <PrefixInput
-                      prefix="$"
-                      type="number"
-                      name="takeProfit"
-                      value={formData.takeProfit || ''}
-                      onChange={handleChange}
-                      step="any"
-                      min="0"
-                      placeholder="0.00"
-                    />
-                  </FieldGroup>
-                </div>
-              </FieldSection>
+        {/* ==================== CREATE MODE ==================== */}
+        {mode === 'create' && (
+          <div className="flex flex-col" style={{ gap: '16px' }}>
 
-              <FieldSection label="Thesis" icon={<Target size={12} />}>
-                <FieldGroup label="Hypothesis / Trade Thesis">
-                  <textarea
-                    name="hypothesis"
-                    value={formData.hypothesis}
-                    onChange={handleChange}
-                    rows={3}
-                    placeholder="Why are you making this trade?"
-                    className="w-full resize-none"
+            {/* Market Section */}
+            <FieldSection label="Market" icon={<TrendingUp size={12} />}>
+              <div className="grid grid-cols-2 gap-3">
+                <FieldGroup label="Name" optional>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g., SPY 0DTE Put"
+                    className="w-full"
                   />
                 </FieldGroup>
-              </FieldSection>
-            </div>
-          ) : (
-            <div className="flex flex-col" style={{ gap: '16px' }}>
-              {/* Market Section */}
-              <FieldSection label="Market" icon={<TrendingUp size={12} />}>
-                <div className="grid grid-cols-2 gap-3">
-                  <FieldGroup label="Asset Type">
-                    {/* Glowing underline toggle */}
-                    <div style={{
-                      display: 'flex',
-                      position: 'relative',
-                      borderBottom: '2px solid var(--border)',
-                    }}>
-                      {(['crypto', 'stock'] as const).map((type) => (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => !isClosing && setFormData((prev) => ({
-                            ...prev,
-                            assetType: type,
-                            chain: type === 'stock' ? null : prev.chain,
-                            contractAddress: type === 'stock' ? null : prev.contractAddress,
-                          }))}
-                          disabled={isClosing}
-                          style={{
-                            flex: 1,
-                            padding: '10px 12px',
-                            fontSize: '13px',
-                            fontWeight: 600,
-                            fontFamily: 'inherit',
-                            border: 'none',
-                            background: 'transparent',
-                            cursor: isClosing ? 'not-allowed' : 'pointer',
-                            transition: 'color 0.2s ease',
-                            color: formData.assetType === type
-                              ? 'var(--text-primary)'
-                              : 'var(--text-muted)',
-                          }}
-                        >
-                          {type === 'crypto' ? 'Crypto' : 'Stock'}
-                        </button>
-                      ))}
-                      {/* Sliding glowing underline */}
-                      <div style={{
-                        position: 'absolute',
-                        bottom: '-2px',
-                        left: 0,
-                        width: '50%',
-                        height: '2px',
-                        borderRadius: '2px',
-                        background: 'var(--accent)',
-                        transform: `translateX(${formData.assetType === 'stock' ? '100%' : '0'})`,
-                        transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                        boxShadow: '0 0 8px rgba(16, 185, 129, 0.6), 0 0 20px rgba(16, 185, 129, 0.3)',
-                      }} />
-                    </div>
-                  </FieldGroup>
-                  <FieldGroup label="Symbol">
-                    {formData.assetType === 'crypto' && !isClosing ? (
-                      <TokenSearch
-                        value={formData.symbol}
-                        chain={formData.chain ?? null}
-                        contractAddress={formData.contractAddress ?? null}
-                        disabled={isClosing}
-                        onChange={({ symbol, chain, contractAddress }) => {
-                          setFormData((prev) => ({ ...prev, symbol, chain, contractAddress }));
-                        }}
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        name="symbol"
-                        value={formData.symbol}
-                        onChange={handleChange}
-                        disabled={isClosing}
-                        placeholder={formData.assetType === 'stock' ? 'e.g., AAPL' : 'e.g., BTC'}
-                        className="w-full uppercase disabled:opacity-50"
-                        required
-                      />
-                    )}
-                  </FieldGroup>
-                </div>
-              </FieldSection>
+                <FieldGroup label="Underlying">
+                  <input
+                    type="text"
+                    value={underlying}
+                    onChange={(e) => setUnderlying(e.target.value)}
+                    placeholder="e.g., SPY, AAPL"
+                    className="w-full uppercase"
+                    required
+                  />
+                </FieldGroup>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <FieldGroup label="Asset Type">
+                  <select
+                    value={assetType}
+                    onChange={(e) => setAssetType(e.target.value as TradeAssetType)}
+                    className="w-full"
+                  >
+                    {ASSET_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </select>
+                </FieldGroup>
+                <FieldGroup label="Strategy">
+                  <select
+                    value={strategy}
+                    onChange={(e) => handleStrategyChange(e.target.value as TradeStrategy)}
+                    className="w-full"
+                  >
+                    {STRATEGIES.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                </FieldGroup>
+              </div>
+            </FieldSection>
 
-              {/* Order Section */}
-              <FieldSection label="Order" icon={<Zap size={12} />}>
-                {/* Buy / Sell toggle with glowing underline */}
+            {/* Order Section */}
+            <FieldSection label="Order" icon={<Zap size={12} />}>
+              {/* Buy / Sell toggle */}
+              <div style={{
+                display: 'flex',
+                position: 'relative',
+                borderBottom: '2px solid var(--border)',
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setSide('buy')}
+                  style={{
+                    ...sideToggleStyle,
+                    color: side === 'buy' ? 'var(--profit)' : 'var(--text-muted)',
+                  }}
+                >
+                  <TrendingUp size={16} />
+                  Buy
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSide('sell')}
+                  style={{
+                    ...sideToggleStyle,
+                    color: side === 'sell' ? 'var(--loss)' : 'var(--text-muted)',
+                  }}
+                >
+                  <TrendingDown size={16} />
+                  Sell
+                </button>
                 <div style={{
+                  position: 'absolute',
+                  bottom: '-2px',
+                  left: 0,
+                  width: '50%',
+                  height: '2px',
+                  borderRadius: '2px',
+                  background: side === 'buy' ? 'var(--profit)' : 'var(--loss)',
+                  transform: `translateX(${side === 'sell' ? '100%' : '0'})`,
+                  transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.3s ease, box-shadow 0.3s ease',
+                  boxShadow: side === 'buy'
+                    ? '0 0 8px rgba(52, 211, 153, 0.6), 0 0 20px rgba(52, 211, 153, 0.3)'
+                    : '0 0 8px rgba(248, 113, 113, 0.6), 0 0 20px rgba(248, 113, 113, 0.3)',
+                }} />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <FieldGroup label="Entry Price">
+                  <PrefixInput
+                    prefix="$"
+                    type="text"
+                    inputMode="decimal"
+                    value={entryPrice}
+                    onChange={(e) => setEntryPrice(e.target.value)}
+                    placeholder="0.00"
+                  />
+                </FieldGroup>
+                <FieldGroup label="Quantity">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    placeholder="0"
+                    className="w-full"
+                  />
+                </FieldGroup>
+                <FieldGroup label="Fees" optional>
+                  <PrefixInput
+                    prefix="$"
+                    type="text"
+                    inputMode="decimal"
+                    value={fees}
+                    onChange={(e) => setFees(e.target.value)}
+                    placeholder="0.00"
+                  />
+                </FieldGroup>
+              </div>
+
+              <FieldGroup label="Open Date">
+                <input
+                  type="datetime-local"
+                  value={openDate}
+                  onChange={(e) => setOpenDate(e.target.value)}
+                  className="w-full"
+                />
+              </FieldGroup>
+            </FieldSection>
+
+            {/* Entry Quality */}
+            <FieldSection label="Entry Quality" icon={<Target size={12} />}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {ENTRY_QUALITIES.map((q) => {
+                  const isActive = entryQuality === q.value;
+                  return (
+                    <button
+                      key={q.value}
+                      type="button"
+                      onClick={() => setEntryQuality(isActive ? null : q.value)}
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '8px 10px',
+                        borderRadius: 'var(--radius-btn)',
+                        border: `1px solid ${isActive ? q.color : 'var(--border)'}`,
+                        background: isActive ? q.bg : 'transparent',
+                        color: isActive ? q.color : 'var(--text-muted)',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {q.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </FieldSection>
+
+            {/* Legs Builder */}
+            <FieldSection label="Legs" icon={<Layers size={12} />}>
+              {legs.length === 0 && (
+                <div style={{
+                  padding: '12px',
+                  borderRadius: '8px',
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px dashed var(--border)',
+                  fontSize: '12.5px',
+                  color: 'var(--text-muted)',
+                  textAlign: 'center',
+                }}>
+                  No legs yet. Add legs to track individual contracts.
+                </div>
+              )}
+              {legs.map((leg, idx) => (
+                <div key={idx} style={{
+                  padding: '12px',
+                  borderRadius: '10px',
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid var(--border)',
                   display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
                   position: 'relative',
-                  borderBottom: '2px solid var(--border)',
                 }}>
                   <button
                     type="button"
-                    onClick={() => !isClosing && setFormData((prev) => ({ ...prev, side: 'buy' }))}
-                    disabled={isClosing}
+                    onClick={() => removeLeg(idx)}
                     style={{
-                      flex: 1,
-                      padding: '12px',
-                      fontWeight: 600,
-                      fontSize: '14px',
-                      fontFamily: 'inherit',
-                      letterSpacing: '0.3px',
+                      position: 'absolute',
+                      top: '8px',
+                      right: '8px',
+                      background: 'none',
                       border: 'none',
-                      background: 'transparent',
-                      cursor: isClosing ? 'not-allowed' : 'pointer',
-                      opacity: isClosing ? 0.5 : 1,
-                      transition: 'color 0.2s ease',
+                      cursor: 'pointer',
+                      color: 'var(--text-muted)',
+                      padding: '2px',
+                      borderRadius: '4px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '6px',
-                      color: formData.side === 'buy'
-                        ? 'var(--profit)'
-                        : 'var(--text-muted)',
                     }}
                   >
-                    <TrendingUp size={16} />
-                    Buy
+                    <X size={14} />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => !isClosing && setFormData((prev) => ({ ...prev, side: 'sell' }))}
-                    disabled={isClosing}
-                    style={{
-                      flex: 1,
-                      padding: '12px',
-                      fontWeight: 600,
-                      fontSize: '14px',
-                      fontFamily: 'inherit',
-                      letterSpacing: '0.3px',
-                      border: 'none',
-                      background: 'transparent',
-                      cursor: isClosing ? 'not-allowed' : 'pointer',
-                      opacity: isClosing ? 0.5 : 1,
-                      transition: 'color 0.2s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                      color: formData.side === 'sell'
-                        ? 'var(--loss)'
-                        : 'var(--text-muted)',
-                    }}
-                  >
-                    <TrendingDown size={16} />
-                    Sell
-                  </button>
-                  {/* Glowing underline */}
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '-2px',
-                    left: 0,
-                    width: '50%',
-                    height: '2px',
-                    borderRadius: '2px',
-                    background: formData.side === 'buy' ? 'var(--profit)' : 'var(--loss)',
-                    transform: `translateX(${formData.side === 'sell' ? '100%' : '0'})`,
-                    transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.3s ease, box-shadow 0.3s ease',
-                    boxShadow: formData.side === 'buy'
-                      ? '0 0 8px rgba(52, 211, 153, 0.6), 0 0 20px rgba(52, 211, 153, 0.3)'
-                      : '0 0 8px rgba(248, 113, 113, 0.6), 0 0 20px rgba(248, 113, 113, 0.3)',
-                  }} />
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Leg {idx + 1}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <FieldGroup label="Ticker">
+                      <input
+                        type="text"
+                        value={leg.ticker}
+                        onChange={(e) => updateLeg(idx, 'ticker', e.target.value)}
+                        placeholder={underlying || 'SPY'}
+                        className="w-full uppercase"
+                        style={{ fontSize: '13px' }}
+                      />
+                    </FieldGroup>
+                    <FieldGroup label="Type">
+                      <select
+                        value={leg.optionType ?? ''}
+                        onChange={(e) => updateLeg(idx, 'optionType', (e.target.value || null) as OptionType | null)}
+                        className="w-full"
+                        style={{ fontSize: '13px' }}
+                      >
+                        <option value="">--</option>
+                        <option value="call">Call</option>
+                        <option value="put">Put</option>
+                      </select>
+                    </FieldGroup>
+                    <FieldGroup label="Side">
+                      <select
+                        value={leg.side}
+                        onChange={(e) => updateLeg(idx, 'side', e.target.value as TradeSide)}
+                        className="w-full"
+                        style={{ fontSize: '13px' }}
+                      >
+                        <option value="buy">Buy</option>
+                        <option value="sell">Sell</option>
+                      </select>
+                    </FieldGroup>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    <FieldGroup label="Strike">
+                      <PrefixInput
+                        prefix="$"
+                        type="text"
+                        inputMode="decimal"
+                        value={leg.strike}
+                        onChange={(e) => updateLeg(idx, 'strike', e.target.value)}
+                        placeholder="0"
+                        style={{ fontSize: '13px' }}
+                      />
+                    </FieldGroup>
+                    <FieldGroup label="Expiration">
+                      <input
+                        type="date"
+                        value={leg.expiration}
+                        onChange={(e) => updateLeg(idx, 'expiration', e.target.value)}
+                        className="w-full"
+                        style={{ fontSize: '13px' }}
+                      />
+                    </FieldGroup>
+                    <FieldGroup label="Qty">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={leg.quantity}
+                        onChange={(e) => updateLeg(idx, 'quantity', e.target.value)}
+                        placeholder={quantity || '1'}
+                        className="w-full"
+                        style={{ fontSize: '13px' }}
+                      />
+                    </FieldGroup>
+                    <FieldGroup label="Entry $">
+                      <PrefixInput
+                        prefix="$"
+                        type="text"
+                        inputMode="decimal"
+                        value={leg.entryPrice}
+                        onChange={(e) => updateLeg(idx, 'entryPrice', e.target.value)}
+                        placeholder="0.00"
+                        style={{ fontSize: '13px' }}
+                      />
+                    </FieldGroup>
+                  </div>
                 </div>
+              ))}
+              <button
+                type="button"
+                onClick={addLeg}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '8px 14px',
+                  borderRadius: 'var(--radius-btn)',
+                  border: '1px dashed var(--border)',
+                  background: 'transparent',
+                  color: 'var(--accent)',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  transition: 'all 0.15s ease',
+                  width: '100%',
+                }}
+              >
+                <Plus size={14} /> Add Leg
+              </button>
+            </FieldSection>
 
-                <FieldGroup label={isClosing ? 'Exit Date' : 'Entry Date'}>
+            {/* Thesis */}
+            <FieldSection label="Thesis" icon={<Target size={12} />}>
+              <FieldGroup label="Thesis">
+                <textarea
+                  value={thesis}
+                  onChange={(e) => setThesis(e.target.value)}
+                  rows={2}
+                  placeholder="Why are you making this trade?"
+                  className="w-full resize-none"
+                />
+              </FieldGroup>
+              <FieldGroup label="Exit Plan">
+                <textarea
+                  value={exitPlan}
+                  onChange={(e) => setExitPlan(e.target.value)}
+                  rows={2}
+                  placeholder="When/how will you exit?"
+                  className="w-full resize-none"
+                />
+              </FieldGroup>
+              <FieldGroup label="Notes" optional>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={2}
+                  placeholder="Additional notes..."
+                  className="w-full resize-none"
+                />
+              </FieldGroup>
+            </FieldSection>
+
+            {/* Tags */}
+            <FieldSection label="Tags" icon={<Tag size={12} />}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {tags.map((t, idx) => (
+                  <span key={idx} style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    padding: '4px 10px',
+                    borderRadius: '12px',
+                    background: 'rgba(139, 92, 246, 0.1)',
+                    color: 'var(--accent-violet)',
+                    border: '1px solid rgba(139, 92, 246, 0.2)',
+                  }}>
+                    {t.tag}
+                    <button
+                      type="button"
+                      onClick={() => removeTag(idx)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: 0, display: 'flex' }}
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={handleTagKeyDown}
+                  placeholder="Add a tag..."
+                  className="w-full"
+                  style={{ flex: 1 }}
+                />
+                <button
+                  type="button"
+                  onClick={addTag}
+                  disabled={!tagInput.trim()}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: 'var(--radius-btn)',
+                    border: '1px solid var(--border)',
+                    background: 'transparent',
+                    color: tagInput.trim() ? 'var(--accent)' : 'var(--text-muted)',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    cursor: tagInput.trim() ? 'pointer' : 'default',
+                    fontFamily: 'inherit',
+                    opacity: tagInput.trim() ? 1 : 0.5,
+                  }}
+                >
+                  Add
+                </button>
+              </div>
+            </FieldSection>
+          </div>
+        )}
+
+        {/* ==================== EDIT MODE ==================== */}
+        {mode === 'edit' && (
+          <div className="flex flex-col" style={{ gap: '16px' }}>
+            <FieldSection label="Details" icon={<Target size={12} />}>
+              <FieldGroup label="Name">
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Trade name"
+                  className="w-full"
+                />
+              </FieldGroup>
+              <FieldGroup label="Fees">
+                <PrefixInput
+                  prefix="$"
+                  type="text"
+                  inputMode="decimal"
+                  value={fees}
+                  onChange={(e) => setFees(e.target.value)}
+                  placeholder="0.00"
+                />
+              </FieldGroup>
+            </FieldSection>
+
+            <FieldSection label="Entry Quality" icon={<Target size={12} />}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {ENTRY_QUALITIES.map((q) => {
+                  const isActive = entryQuality === q.value;
+                  return (
+                    <button
+                      key={q.value}
+                      type="button"
+                      onClick={() => setEntryQuality(isActive ? null : q.value)}
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '8px 10px',
+                        borderRadius: 'var(--radius-btn)',
+                        border: `1px solid ${isActive ? q.color : 'var(--border)'}`,
+                        background: isActive ? q.bg : 'transparent',
+                        color: isActive ? q.color : 'var(--text-muted)',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {q.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </FieldSection>
+
+            <FieldSection label="Thesis" icon={<Target size={12} />}>
+              <FieldGroup label="Thesis">
+                <textarea
+                  value={thesis}
+                  onChange={(e) => setThesis(e.target.value)}
+                  rows={3}
+                  placeholder="Why are you making this trade?"
+                  className="w-full resize-none"
+                />
+              </FieldGroup>
+              <FieldGroup label="Exit Plan">
+                <textarea
+                  value={exitPlan}
+                  onChange={(e) => setExitPlan(e.target.value)}
+                  rows={2}
+                  placeholder="When/how will you exit?"
+                  className="w-full resize-none"
+                />
+              </FieldGroup>
+              <FieldGroup label="Notes" optional>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={2}
+                  placeholder="Additional notes..."
+                  className="w-full resize-none"
+                />
+              </FieldGroup>
+            </FieldSection>
+          </div>
+        )}
+
+        {/* ==================== CLOSE MODE ==================== */}
+        {mode === 'close' && (
+          <div className="flex flex-col" style={{ gap: '16px' }}>
+            <FieldSection label="Close Details" icon={<TrendingDown size={12} />}>
+              <div className="grid grid-cols-2 gap-3">
+                <FieldGroup label="Exit Price">
+                  <PrefixInput
+                    prefix="$"
+                    type="text"
+                    inputMode="decimal"
+                    value={exitPrice}
+                    onChange={(e) => setExitPrice(e.target.value)}
+                    placeholder="0.00"
+                  />
+                </FieldGroup>
+                <FieldGroup label="Close Date">
                   <input
-                    type="date"
-                    name="date"
-                    value={formData.date}
-                    onChange={handleChange}
+                    type="datetime-local"
+                    value={closeDate}
+                    onChange={(e) => setCloseDate(e.target.value)}
                     className="w-full"
                     required
                   />
                 </FieldGroup>
+              </div>
+              <FieldGroup label="Realized P&L">
+                <PrefixInput
+                  prefix="$"
+                  type="text"
+                  inputMode="decimal"
+                  value={realizedPnl}
+                  onChange={(e) => setRealizedPnl(e.target.value)}
+                  placeholder="0.00 (positive or negative)"
+                  required
+                />
+              </FieldGroup>
+            </FieldSection>
 
-                <div className="grid grid-cols-3 gap-3">
-                  <FieldGroup label={`${isClosing ? 'Exit Price' : 'Entry Price'}${calculatedField === 'price' ? ' (calc)' : ''}`}>
-                    <PrefixInput
-                      prefix="$"
-                      type="text"
-                      inputMode="decimal"
-                      name="price"
-                      value={priceStr}
-                      onChange={handlePriceChange}
-                      placeholder="0.00"
-                      required
-                    />
-                    {isClosing && currentPrice !== undefined && (
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        marginTop: '6px',
-                        fontSize: '11px',
-                        color: 'var(--text-muted)',
-                      }}>
-                        <span>Mkt: ${currentPrice < 0.01 ? currentPrice.toPrecision(4) : currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const p = String(currentPrice);
-                            setPriceStr(p);
-                            setFormData(prev => ({ ...prev, price: currentPrice }));
-                            const pair = updateEditedPair('price');
-                            recalculate(currentPrice, parseNum(quantityStr), parseNum(totalStr), pair);
-                          }}
-                          style={{
-                            background: 'rgba(16, 185, 129, 0.1)',
-                            border: '1px solid rgba(16, 185, 129, 0.2)',
-                            borderRadius: '6px',
-                            padding: '2px 8px',
-                            fontSize: '10px',
-                            fontWeight: 600,
-                            color: 'var(--accent)',
-                            cursor: 'pointer',
-                            fontFamily: 'inherit',
-                          }}
-                        >
-                          Use market price
-                        </button>
-                      </div>
-                    )}
-                  </FieldGroup>
-                  <FieldGroup label={`Quantity${calculatedField === 'quantity' ? ' (calc)' : ''}`}>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      name="quantity"
-                      value={quantityStr}
-                      onChange={handleQuantityChange}
-                      placeholder="0"
-                      className="w-full"
-                      required
-                    />
-                  </FieldGroup>
-                  <FieldGroup label={`Total${calculatedField === 'total' ? ' (calc)' : ''}`}>
-                    <PrefixInput
-                      prefix="$"
-                      type="text"
-                      inputMode="decimal"
-                      name="total"
-                      value={totalStr}
-                      onChange={handleTotalChange}
-                      placeholder="0.00"
-                    />
-                  </FieldGroup>
+            {/* Followed Plan toggle */}
+            <FieldSection label="Execution" icon={<Target size={12} />}>
+              <FieldGroup label="Did you follow your plan?">
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {([
+                    { value: true, label: 'Yes', color: 'var(--profit)', bg: 'rgba(52, 211, 153, 0.12)' },
+                    { value: false, label: 'No', color: 'var(--loss)', bg: 'rgba(248, 113, 113, 0.12)' },
+                  ] as const).map((opt) => {
+                    const isActive = followedPlan === opt.value;
+                    return (
+                      <button
+                        key={String(opt.value)}
+                        type="button"
+                        onClick={() => setFollowedPlan(isActive ? null : opt.value)}
+                        style={{
+                          flex: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '10px',
+                          borderRadius: 'var(--radius-btn)',
+                          border: `1px solid ${isActive ? opt.color : 'var(--border)'}`,
+                          background: isActive ? opt.bg : 'transparent',
+                          color: isActive ? opt.color : 'var(--text-muted)',
+                          fontSize: '13px',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
                 </div>
-              </FieldSection>
+              </FieldGroup>
+              <FieldGroup label="Reflection" optional>
+                <textarea
+                  value={reflection}
+                  onChange={(e) => setReflection(e.target.value)}
+                  rows={3}
+                  placeholder="What did you learn from this trade?"
+                  className="w-full resize-none"
+                />
+              </FieldGroup>
+            </FieldSection>
 
-              {/* Risk Management (only for new buys) */}
-              {formData.side === 'buy' && !isClosing && (
-                <FieldSection label="Risk Management" icon={<Shield size={12} />}>
-                  <div className="grid grid-cols-2 gap-3">
-                    <FieldGroup label="Stop Loss" optional>
+            {/* Per-leg exit prices */}
+            {legs.length > 0 && (
+              <FieldSection label="Leg Exit Prices" icon={<Layers size={12} />}>
+                {legs.map((leg, idx) => (
+                  <div key={idx} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    background: 'rgba(255,255,255,0.02)',
+                    border: '1px solid var(--border)',
+                  }}>
+                    <div style={{ flex: 1, fontSize: '13px', color: 'var(--text-secondary)' }}>
+                      <span style={{ fontWeight: 500 }}>{leg.ticker || trade?.underlying}</span>
+                      {leg.optionType && (
+                        <span style={{ marginLeft: '6px', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                          {leg.optionType}
+                        </span>
+                      )}
+                      {leg.strike && (
+                        <span style={{ marginLeft: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                          ${leg.strike}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ width: '120px' }}>
                       <PrefixInput
                         prefix="$"
-                        type="number"
-                        name="stopLoss"
-                        value={formData.stopLoss || ''}
-                        onChange={handleChange}
-                        step="any"
-                        min="0"
-                        placeholder="0.00"
+                        type="text"
+                        inputMode="decimal"
+                        value={leg.exitPrice}
+                        onChange={(e) => updateLeg(idx, 'exitPrice', e.target.value)}
+                        placeholder="Exit $"
+                        style={{ fontSize: '13px' }}
                       />
-                    </FieldGroup>
-                    <FieldGroup label="Take Profit" optional>
-                      <PrefixInput
-                        prefix="$"
-                        type="number"
-                        name="takeProfit"
-                        value={formData.takeProfit || ''}
-                        onChange={handleChange}
-                        step="any"
-                        min="0"
-                        placeholder="0.00"
-                      />
-                    </FieldGroup>
+                    </div>
                   </div>
-                </FieldSection>
-              )}
-
-              {/* Thesis */}
-              <FieldSection label="Thesis" icon={<Target size={12} />}>
-                {!isClosing && (
-                  <FieldGroup label="Hypothesis">
-                    <textarea
-                      name="hypothesis"
-                      value={formData.hypothesis}
-                      onChange={handleChange}
-                      rows={2}
-                      placeholder="Why are you making this trade?"
-                      className="w-full resize-none"
-                    />
-                  </FieldGroup>
-                )}
-                <FieldGroup label="Notes">
-                  <textarea
-                    name="notes"
-                    value={formData.notes}
-                    onChange={handleChange}
-                    rows={2}
-                    placeholder="Additional notes..."
-                    className="w-full resize-none"
-                  />
-                </FieldGroup>
+                ))}
               </FieldSection>
-            </div>
-          )}
+            )}
+          </div>
+        )}
 
-          {/* Actions */}
-          <div
-            className="flex gap-3"
-            style={{ paddingTop: '20px', marginTop: '20px', borderTop: '1px solid var(--border)' }}
-          >
+        {/* Actions */}
+        <div
+          style={{ paddingTop: '20px', marginTop: '20px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '12px' }}
+        >
+          {mode === 'create' && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--text-secondary)' }}>
+              <input
+                type="checkbox"
+                checked={savePlanned}
+                onChange={(e) => setSavePlanned(e.target.checked)}
+                style={{ accentColor: '#60a5fa', width: '16px', height: '16px' }}
+              />
+              Save as planned (don't open yet)
+            </label>
+          )}
+          <div className="flex gap-3">
             <button
               type="button"
               onClick={onClose}
@@ -584,15 +1036,44 @@ export default function TradeForm({ position, isClosing, isEditing, onClose }: T
               type="submit"
               disabled={loading}
               className="btn-primary flex-1"
-              style={isClosing ? {
+              style={mode === 'close' ? {
                 background: 'linear-gradient(135deg, var(--loss) 0%, #dc2626 100%)',
                 boxShadow: '0 2px 12px rgba(248, 113, 113, 0.2)',
+              } : savePlanned ? {
+                background: 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%)',
+                boxShadow: '0 2px 12px rgba(96, 165, 250, 0.2)',
               } : {}}
             >
-              {loading ? 'Saving...' : isClosing ? 'Close Position' : isEditing ? 'Update Position' : 'Add Trade'}
+              {loading
+                ? 'Saving...'
+                : mode === 'close'
+                ? 'Close Trade'
+                : mode === 'edit'
+                ? 'Update Trade'
+                : savePlanned
+                ? 'Save Plan'
+                : 'Create Trade'}
             </button>
           </div>
-        </form>
+        </div>
+      </form>
     </Modal>
   );
 }
+
+const sideToggleStyle: React.CSSProperties = {
+  flex: 1,
+  padding: '12px',
+  fontWeight: 600,
+  fontSize: '14px',
+  fontFamily: 'inherit',
+  letterSpacing: '0.3px',
+  border: 'none',
+  background: 'transparent',
+  cursor: 'pointer',
+  transition: 'color 0.2s ease',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '6px',
+};

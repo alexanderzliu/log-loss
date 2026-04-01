@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useStore } from '../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
 import { fetchPriceHistory } from '../api/prices';
-import { fetchEquityCurve, fetchTradingAnalytics } from '../api/positions';
-import type { PriceHistory, AssetType, EquityCurvePoint, TradingAnalytics } from '../types';
+import { fetchEquityCurve, fetchTradingAnalytics } from '../api/trades';
+import type { PriceHistory, TradeAssetType, EquityCurvePoint, TradingAnalytics } from '../types';
 import {
   LineChart,
   Line,
@@ -20,9 +20,10 @@ import {
 } from 'recharts';
 import { format } from 'date-fns';
 import { Search, TrendingUp, TrendingDown, BarChart3 } from 'lucide-react';
-import { formatPrice, formatPercent, formatCurrency, formatCompactNumber, formatCompactCount } from '../utils/format';
+import { formatPrice, formatPercent, formatCurrency, formatCompactNumber } from '../utils/format';
 import { priceKey as getPriceKey } from '../utils/priceKey';
 import PageTransition from '../components/PageTransition';
+import PnlCalendar from '../components/PnlCalendar';
 
 const tooltipStyle = {
   borderRadius: '12px',
@@ -34,16 +35,16 @@ const tooltipStyle = {
 };
 
 export default function Analytics() {
-  const { positions, prices, fetchPrices, fetchPositions } = useStore(useShallow((s) => ({
-    positions: s.positions,
+  const { trades, prices, fetchPrices, fetchTrades } = useStore(useShallow((s) => ({
+    trades: s.trades,
     prices: s.prices,
     fetchPrices: s.fetchPrices,
-    fetchPositions: s.fetchPositions,
+    fetchTrades: s.fetchTrades,
   })));
 
   // Price analytics state (existing)
   const [selectedSymbol, setSelectedSymbol] = useState<string>('');
-  const [selectedAssetType, setSelectedAssetType] = useState<AssetType>('crypto');
+  const [selectedAssetType, setSelectedAssetType] = useState<TradeAssetType>('stock');
   const [priceHistory, setPriceHistory] = useState<PriceHistory[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchInput, setSearchInput] = useState('');
@@ -55,9 +56,9 @@ export default function Analytics() {
   const [analytics, setAnalytics] = useState<TradingAnalytics | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
 
-  // Fetch trading analytics and positions on mount
+  // Fetch trading analytics and trades on mount
   useEffect(() => {
-    fetchPositions();
+    fetchTrades();
     let cancelled = false;
     async function load() {
       setAnalyticsLoading(true);
@@ -78,14 +79,14 @@ export default function Analytics() {
     }
     load();
     return () => { cancelled = true; };
-  }, [fetchPositions]);
+  }, [fetchTrades]);
 
-  // Get unique symbols from positions - memoized to avoid new array refs each render
+  // Get unique symbols from trades - memoized to avoid new array refs each render
   const trackedAssets = useMemo(() => Array.from(
     new Map(
-      positions.map((p) => [getPriceKey(p), { symbol: p.symbol, assetType: p.assetType, chain: p.chain, contractAddress: p.contractAddress }])
+      trades.map((t) => [getPriceKey({ symbol: t.underlying, assetType: t.assetType }), { symbol: t.underlying, assetType: t.assetType }])
     ).values()
-  ), [positions]);
+  ), [trades]);
 
   useEffect(() => {
     if (trackedAssets.length > 0) {
@@ -93,7 +94,7 @@ export default function Analytics() {
     }
   }, [trackedAssets, fetchPrices]);
 
-  const loadPriceHistory = useCallback(async (symbol: string, assetType: AssetType, days: number) => {
+  const loadPriceHistory = useCallback(async (symbol: string, assetType: TradeAssetType, days: number) => {
     if (!symbol) return;
     const currentRequestId = ++requestIdRef.current;
     setLoading(true);
@@ -126,7 +127,7 @@ export default function Analytics() {
     }
   };
 
-  const handleAssetClick = (symbol: string, assetType: AssetType) => {
+  const handleAssetClick = (symbol: string, assetType: TradeAssetType) => {
     setSelectedSymbol(symbol);
     setSelectedAssetType(assetType);
     setSearchInput(symbol);
@@ -158,8 +159,18 @@ export default function Analytics() {
     losses: m.losses,
   }));
 
-  // Sort P&L by symbol by absolute value descending
-  const pnlBySymbol = [...(analytics?.pnlBySymbol ?? [])].sort(
+  // Sort P&L by underlying by absolute value descending
+  const pnlByUnderlying = [...(analytics?.pnlByUnderlying ?? [])].sort(
+    (a, b) => Math.abs(b.pnl) - Math.abs(a.pnl)
+  );
+
+  // Sort P&L by strategy by absolute value descending
+  const pnlByStrategy = [...(analytics?.pnlByStrategy ?? [])].sort(
+    (a, b) => Math.abs(b.pnl) - Math.abs(a.pnl)
+  );
+
+  // Sort P&L by entry quality by absolute value descending
+  const pnlByEntryQuality = [...(analytics?.pnlByEntryQuality ?? [])].sort(
     (a, b) => Math.abs(b.pnl) - Math.abs(a.pnl)
   );
 
@@ -203,7 +214,7 @@ export default function Analytics() {
             No trading data yet
           </h3>
           <p className="empty-state-text" style={{ maxWidth: '320px', margin: '0 auto' }}>
-            Close some positions to see performance analytics here.
+            Close some trades to see performance analytics here.
           </p>
         </div>
       ) : (
@@ -364,6 +375,9 @@ export default function Analytics() {
             )}
           </div>
 
+          {/* P&L Calendar */}
+          <PnlCalendar data={equityCurve} />
+
           {/* Monthly Returns + P&L by Symbol side by side */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
             {/* Monthly Returns Bar Chart */}
@@ -426,19 +440,19 @@ export default function Analytics() {
               )}
             </div>
 
-            {/* P&L by Symbol */}
+            {/* P&L by Underlying */}
             <div className="card" style={{ padding: '28px' }}>
               <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '24px' }}>
-                P&L by Symbol
+                P&L by Underlying
               </h2>
-              {pnlBySymbol.length > 0 ? (
+              {pnlByUnderlying.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '280px', overflowY: 'auto' }}>
-                  {pnlBySymbol.map((item) => {
-                    const maxAbsPnl = Math.abs(pnlBySymbol[0].pnl);
+                  {pnlByUnderlying.map((item) => {
+                    const maxAbsPnl = Math.abs(pnlByUnderlying[0].pnl);
                     const barWidth = maxAbsPnl > 0 ? (Math.abs(item.pnl) / maxAbsPnl) * 100 : 0;
                     const isPositive = item.pnl >= 0;
                     return (
-                      <div key={item.symbol} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div key={item.underlying} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{
                           width: '60px',
                           flexShrink: 0,
@@ -446,7 +460,7 @@ export default function Analytics() {
                           fontSize: '13px',
                           color: 'var(--text-primary)',
                         }}>
-                          {item.symbol}
+                          {item.underlying}
                         </div>
                         <div style={{ flex: 1, position: 'relative', height: '28px', background: 'var(--bg-elevated)', borderRadius: '6px', overflow: 'hidden' }}>
                           <div style={{
@@ -491,7 +505,152 @@ export default function Analytics() {
                 </div>
               ) : (
                 <div style={{ height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-                  No symbol data available
+                  No underlying data available
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Strategy Performance & Entry Quality */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            {/* P&L by Strategy */}
+            <div className="card" style={{ padding: '28px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '24px' }}>
+                Strategy Performance
+              </h2>
+              {pnlByStrategy.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '320px', overflowY: 'auto' }}>
+                  {pnlByStrategy.map((item) => {
+                    const maxAbsPnl = Math.max(...pnlByStrategy.map(s => Math.abs(s.pnl)));
+                    const barWidth = maxAbsPnl > 0 ? (Math.abs(item.pnl) / maxAbsPnl) * 100 : 0;
+                    const isPositive = item.pnl >= 0;
+                    return (
+                      <div key={item.strategy} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '90px',
+                          flexShrink: 0,
+                          fontWeight: 600,
+                          fontSize: '12px',
+                          color: 'var(--text-primary)',
+                          textTransform: 'capitalize',
+                        }}>
+                          {item.strategy.replace(/_/g, ' ')}
+                        </div>
+                        <div style={{ flex: 1, position: 'relative', height: '28px', background: 'var(--bg-elevated)', borderRadius: '6px', overflow: 'hidden' }}>
+                          <div style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            height: '100%',
+                            width: `${Math.max(barWidth, 2)}%`,
+                            background: isPositive
+                              ? 'linear-gradient(90deg, rgba(52, 211, 153, 0.3), rgba(52, 211, 153, 0.15))'
+                              : 'linear-gradient(90deg, rgba(248, 113, 113, 0.3), rgba(248, 113, 113, 0.15))',
+                            borderRadius: '6px',
+                            transition: 'width 0.3s ease',
+                          }} />
+                          <div style={{
+                            position: 'relative',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            height: '100%',
+                            padding: '0 10px',
+                          }}>
+                            <span style={{
+                              fontFamily: "'DM Mono', monospace",
+                              fontSize: '13px',
+                              fontWeight: 600,
+                              color: isPositive ? 'var(--profit)' : 'var(--loss)',
+                            }}>
+                              {formatCurrency(item.pnl)}
+                            </span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', gap: '8px' }}>
+                              <span style={{ color: item.winRate >= 50 ? 'var(--profit)' : 'var(--loss)' }}>
+                                {item.winRate.toFixed(0)}% win
+                              </span>
+                              <span>{item.tradeCount} trade{item.tradeCount !== 1 ? 's' : ''}</span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                  No strategy data available
+                </div>
+              )}
+            </div>
+
+            {/* P&L by Entry Quality */}
+            <div className="card" style={{ padding: '28px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '24px' }}>
+                Entry Quality
+              </h2>
+              {pnlByEntryQuality.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '320px', overflowY: 'auto' }}>
+                  {pnlByEntryQuality.map((item) => {
+                    const maxAbsPnl = Math.max(...pnlByEntryQuality.map(s => Math.abs(s.pnl)));
+                    const barWidth = maxAbsPnl > 0 ? (Math.abs(item.pnl) / maxAbsPnl) * 100 : 0;
+                    const isPositive = item.pnl >= 0;
+                    return (
+                      <div key={item.entryQuality} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '90px',
+                          flexShrink: 0,
+                          fontWeight: 600,
+                          fontSize: '12px',
+                          color: 'var(--text-primary)',
+                          textTransform: 'capitalize',
+                        }}>
+                          {item.entryQuality}
+                        </div>
+                        <div style={{ flex: 1, position: 'relative', height: '28px', background: 'var(--bg-elevated)', borderRadius: '6px', overflow: 'hidden' }}>
+                          <div style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            height: '100%',
+                            width: `${Math.max(barWidth, 2)}%`,
+                            background: isPositive
+                              ? 'linear-gradient(90deg, rgba(52, 211, 153, 0.3), rgba(52, 211, 153, 0.15))'
+                              : 'linear-gradient(90deg, rgba(248, 113, 113, 0.3), rgba(248, 113, 113, 0.15))',
+                            borderRadius: '6px',
+                            transition: 'width 0.3s ease',
+                          }} />
+                          <div style={{
+                            position: 'relative',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            height: '100%',
+                            padding: '0 10px',
+                          }}>
+                            <span style={{
+                              fontFamily: "'DM Mono', monospace",
+                              fontSize: '13px',
+                              fontWeight: 600,
+                              color: isPositive ? 'var(--profit)' : 'var(--loss)',
+                            }}>
+                              {formatCurrency(item.pnl)}
+                            </span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', gap: '8px' }}>
+                              <span style={{ color: item.winRate >= 50 ? 'var(--profit)' : 'var(--loss)' }}>
+                                {item.winRate.toFixed(0)}% win
+                              </span>
+                              <span>{item.tradeCount} trade{item.tradeCount !== 1 ? 's' : ''}</span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                  No entry quality data available
                 </div>
               )}
             </div>
@@ -523,7 +682,7 @@ export default function Analytics() {
                     {formatCurrency(analytics!.bestTrade.pnl)}
                   </p>
                   <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '6px' }}>
-                    {analytics!.bestTrade.symbol} &middot; {formatPercent(analytics!.bestTrade.pnlPercent)} &middot; {format(new Date(analytics!.bestTrade.date), 'MMM d, yyyy')}
+                    {analytics!.bestTrade.underlying} &middot; {analytics!.bestTrade.name} &middot; {format(new Date(analytics!.bestTrade.date), 'MMM d, yyyy')}
                   </p>
                 </div>
               )}
@@ -550,7 +709,7 @@ export default function Analytics() {
                     {formatCurrency(analytics!.worstTrade.pnl)}
                   </p>
                   <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '6px' }}>
-                    {analytics!.worstTrade.symbol} &middot; {formatPercent(analytics!.worstTrade.pnlPercent)} &middot; {format(new Date(analytics!.worstTrade.date), 'MMM d, yyyy')}
+                    {analytics!.worstTrade.underlying} &middot; {analytics!.worstTrade.name} &middot; {format(new Date(analytics!.worstTrade.date), 'MMM d, yyyy')}
                   </p>
                 </div>
               )}
@@ -589,16 +748,9 @@ export default function Analytics() {
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value.toUpperCase())}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          placeholder="Enter symbol (e.g., BTC, AAPL)"
+          placeholder="Enter symbol (e.g., SPY, AAPL)"
           style={{ flex: 1 }}
         />
-        <select
-          value={selectedAssetType}
-          onChange={(e) => setSelectedAssetType(e.target.value as AssetType)}
-        >
-          <option value="crypto">Crypto</option>
-          <option value="stock">Stock</option>
-        </select>
         <button
           onClick={handleSearch}
           className="btn-primary"
@@ -821,36 +973,6 @@ export default function Analytics() {
                     {currentPrice.volume24h ? formatCompactNumber(currentPrice.volume24h) : 'N/A'}
                   </div>
                 </div>
-                {currentPrice.marketCap ? (
-                  <div>
-                    <div style={labelStyle}>Market Cap</div>
-                    <div style={valueStyle}>{formatCompactNumber(currentPrice.marketCap)}</div>
-                  </div>
-                ) : null}
-                {currentPrice.fdv ? (
-                  <div>
-                    <div style={labelStyle}>FDV</div>
-                    <div style={valueStyle}>{formatCompactNumber(currentPrice.fdv)}</div>
-                  </div>
-                ) : null}
-                {currentPrice.liquidityUsd ? (
-                  <div>
-                    <div style={labelStyle}>Liquidity</div>
-                    <div style={valueStyle}>{formatCompactNumber(currentPrice.liquidityUsd)}</div>
-                  </div>
-                ) : null}
-                {currentPrice.txnCount24h ? (
-                  <div>
-                    <div style={labelStyle}>24h Txns</div>
-                    <div style={valueStyle}>{formatCompactCount(currentPrice.txnCount24h)}</div>
-                  </div>
-                ) : null}
-                {currentPrice.holderCount ? (
-                  <div>
-                    <div style={labelStyle}>Holders</div>
-                    <div style={valueStyle}>{formatCompactCount(currentPrice.holderCount)}</div>
-                  </div>
-                ) : null}
               </div>
             );
           })()}

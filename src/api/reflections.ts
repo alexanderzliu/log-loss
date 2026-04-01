@@ -3,12 +3,12 @@ import type { Reflection, InsightFeedItem } from '../types';
 const API_BASE = '/api/reflections';
 
 export async function fetchReflections(filters?: {
-  positionId?: string;
+  tradeId?: string;
   type?: string;
   search?: string;
 }): Promise<Reflection[]> {
   const params = new URLSearchParams();
-  if (filters?.positionId) params.set('positionId', filters.positionId);
+  if (filters?.tradeId) params.set('tradeId', filters.tradeId);
   if (filters?.type) params.set('type', filters.type);
   if (filters?.search) params.set('search', filters.search);
 
@@ -19,7 +19,7 @@ export async function fetchReflections(filters?: {
 }
 
 export async function createReflection(data: {
-  positionId: string;
+  tradeId: string;
   type?: 'success' | 'lesson' | 'mistake';
   content: string;
 }): Promise<Reflection> {
@@ -49,21 +49,19 @@ export async function updateReflection(id: string, data: {
 }
 
 export async function deleteReflection(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/${id}`, {
-    method: 'DELETE',
-  });
+  const response = await fetch(`${API_BASE}/${id}`, { method: 'DELETE' });
   if (!response.ok) throw new Error('Failed to delete reflection');
 }
 
 export async function fetchInsightsFeed(filters?: {
   search?: string;
   type?: string;
-  symbol?: string;
+  underlying?: string;
 }): Promise<InsightFeedItem[]> {
   const params = new URLSearchParams();
   if (filters?.search) params.set('search', filters.search);
   if (filters?.type) params.set('type', filters.type);
-  if (filters?.symbol) params.set('symbol', filters.symbol);
+  if (filters?.underlying) params.set('underlying', filters.underlying);
 
   const url = params.toString() ? `${API_BASE}/feed?${params}` : `${API_BASE}/feed`;
   const response = await fetch(url);

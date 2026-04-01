@@ -1,99 +1,126 @@
-export type AssetType = 'crypto' | 'stock';
-export type PositionStatus = 'open' | 'closed';
-export type ExecutionSide = 'buy' | 'sell';
+// --- Trade Types ---
 
-export interface Execution {
+export type TradeAssetType = 'option' | 'futures' | 'stock';
+export type TradeStatus = 'planned' | 'open' | 'closed';
+export type TradeStrategy = 'long' | 'short' | 'debit_spread' | 'credit_spread'
+  | 'iron_condor' | 'straddle' | 'strangle' | 'custom';
+export type TradeSide = 'buy' | 'sell';
+export type EntryQuality = 'clean' | 'fomo' | 'chased' | 'intuitive';
+export type OptionType = 'call' | 'put';
+
+export interface TradeLeg {
   id: string;
-  positionId: string;
-  side: ExecutionSide;
-  price: number;
+  tradeId: string;
+  ticker: string;
+  optionType: OptionType | null;
+  strike: number | null;
+  expiration: string | null;
+  side: TradeSide;
   quantity: number;
-  executedAt: string;
-  pnl: number | null;
-  pnlPercent: number | null;
-  notes: string;
-  createdAt: string;
+  entryPrice: number | null;
+  exitPrice: number | null;
+  entryUnderlyingPrice: number | null;
+  exitUnderlyingPrice: number | null;
+  delta: number | null;
+  gamma: number | null;
+  theta: number | null;
+  vega: number | null;
+  iv: number | null;
 }
 
-export interface Position {
+export interface TradeTag {
   id: string;
-  assetType: AssetType;
-  symbol: string;
-  direction: 'long' | 'short';
-  status: PositionStatus;
-  totalQuantity: number;
-  remainingQuantity: number;
-  avgEntryPrice: number;
-  totalCostBasis: number;
-  realizedPnl: number;
-  realizedPnlPercent: number | null;
-  stopLoss: number | null;
-  takeProfit: number | null;
-  hypothesis: string;
-  openedAt: string;
-  closedAt: string | null;
-  chain: string | null;
-  contractAddress: string | null;
+  tradeId: string;
+  tag: string;
+  category: string | null;
+}
+
+export interface Trade {
+  id: string;
+  name: string;
+  assetType: TradeAssetType;
+  underlying: string;
+  status: TradeStatus;
+  strategy: TradeStrategy;
+  side: TradeSide;
+  quantity: number;
+  entryPrice: number | null;
+  exitPrice: number | null;
+  fees: number | null;
+  realizedPnl: number | null;
+  openDate: string | null;
+  closeDate: string | null;
+  entryQuality: EntryQuality | null;
+  followedPlan: boolean | null;
+  thesis: string;
+  exitPlan: string;
+  reflection: string;
+  notes: string;
   createdAt: string;
   updatedAt: string;
-  executions: Execution[];
+  legs: TradeLeg[];
+  tags: TradeTag[];
   reflections?: Reflection[];
   reflectionCount?: number;
 }
 
-export interface TradeFormData {
-  assetType: AssetType;
-  symbol: string;
-  side: ExecutionSide;
-  date: string;
-  price: number;
+export interface TradeCreateData {
+  name: string;
+  assetType: TradeAssetType;
+  underlying: string;
+  status?: 'planned' | 'open';
+  strategy: TradeStrategy;
+  side: TradeSide;
   quantity: number;
-  stopLoss: number | null;
-  takeProfit: number | null;
-  hypothesis: string;
+  entryPrice: number | null;
+  fees: number | null;
+  openDate: string | null;
+  entryQuality: EntryQuality | null;
+  thesis: string;
+  exitPlan: string;
   notes: string;
-  chain?: string | null;
-  contractAddress?: string | null;
-  positionId?: string;
+  legs: Omit<TradeLeg, 'id' | 'tradeId'>[];
+  tags: { tag: string; category?: string }[];
 }
 
-export interface PositionUpdateData {
-  stopLoss: number | null;
-  takeProfit: number | null;
-  hypothesis: string;
+export interface TradeUpdateData {
+  name?: string;
+  thesis?: string;
+  exitPlan?: string;
+  notes?: string;
+  entryQuality?: EntryQuality;
+  fees?: number;
 }
+
+export interface TradeCloseData {
+  exitPrice: number | null;
+  closeDate: string;
+  realizedPnl: number;
+  reflection?: string;
+  followedPlan?: boolean;
+  legs?: { id: string; exitPrice: number }[];
+}
+
+// --- Prices ---
 
 export interface PriceData {
   symbol: string;
-  assetType: AssetType;
+  assetType: string;
   price: number;
   change24h: number;
   changePercent24h: number;
   high24h: number;
   low24h: number;
   volume24h: number;
-  marketCap?: number | null;
-  fdv?: number | null;
-  liquidityUsd?: number | null;
-  txnCount24h?: number | null;
-  holderCount?: number | null;
-  chain?: string | null;
-  contractAddress?: string | null;
   lastUpdated: string;
 }
 
-export interface DexScreenerToken {
-  symbol: string;
-  name: string;
-  chain: string;
-  contractAddress: string;
-  priceUsd: string;
-  liquidity: number;
-  volume24h: number;
-  priceChange24h: number;
-  imageUrl: string | null;
-  pairAddress: string;
+export interface PriceHistory {
+  timestamp: string;
+  price: number;
 }
+
+// --- Analytics ---
 
 export interface EquityCurvePoint {
   date: string;
@@ -103,28 +130,25 @@ export interface EquityCurvePoint {
 }
 
 export interface TradingAnalytics {
-  pnlBySymbol: { symbol: string; assetType: string; pnl: number; tradeCount: number }[];
+  pnlByUnderlying: { underlying: string; assetType: string; pnl: number; tradeCount: number }[];
+  pnlByStrategy: { strategy: string; pnl: number; tradeCount: number; winRate: number }[];
+  pnlByEntryQuality: { entryQuality: string; pnl: number; tradeCount: number; winRate: number }[];
   monthlyPnl: { month: string; pnl: number; wins: number; losses: number }[];
-  bestTrade: { pnl: number; pnlPercent: number; date: string; symbol: string } | null;
-  worstTrade: { pnl: number; pnlPercent: number; date: string; symbol: string } | null;
+  bestTrade: { pnl: number; date: string; underlying: string; name: string } | null;
+  worstTrade: { pnl: number; date: string; underlying: string; name: string } | null;
   avgWin: number | null;
   avgLoss: number | null;
   profitFactor: number;
   avgHoldDays: number | null;
 }
 
-export interface RecentActivity {
-  id: string;
-  symbol: string;
-  assetType: string;
-  side: string;
-  price: number;
-  quantity: number;
-  executedAt: string;
-  pnl: number | null;
-  pnlPercent: number | null;
-  chain: string | null;
-  contractAddress: string | null;
+export interface PortfolioSummary {
+  openTrades: number;
+  closedTrades: number;
+  realizedPnl: number;
+  winRate: number;
+  totalFees: number;
+  followedPlanRate: number;
 }
 
 // --- Reflections ---
@@ -133,13 +157,13 @@ export type ReflectionType = 'success' | 'lesson' | 'mistake';
 
 export interface Reflection {
   id: string;
-  positionId: string;
+  tradeId: string;
   type: ReflectionType;
   content: string;
   createdAt: string;
   updatedAt: string;
   // Joined fields (when fetched via /api/reflections)
-  symbol?: string;
+  underlying?: string;
   assetType?: string;
 }
 
@@ -148,29 +172,12 @@ export interface InsightFeedItem {
   type: 'hypothesis' | 'success' | 'lesson' | 'mistake';
   content: string;
   date: string;
-  positionId: string;
-  symbol: string;
+  tradeId: string;
+  underlying: string;
   assetType: string;
-  direction: string;
+  strategy: string;
   status: string;
   realizedPnl: number;
-  realizedPnlPercent: number | null;
-}
-
-export interface PriceHistory {
-  timestamp: string;
-  price: number;
-}
-
-export interface PortfolioSummary {
-  openPositionsCost: number;
-  realizedPnl: number;
-  realizedPnlPercent: number;
-  totalCostBasis: number;
-  openPositions: number;
-  closedPositions: number;
-  winRate: number;
-  totalExecutions: number;
 }
 
 // --- Prediction Markets ---
@@ -242,155 +249,4 @@ export interface Rule {
   content: string;
   createdAt: string;
   updatedAt: string;
-}
-
-// --- AI ---
-
-export interface ReflectionSuggestion {
-  type: ReflectionType;
-  content: string;
-}
-
-export interface AIAnalysis {
-  insights: string[];
-  patterns: string[];
-  recommendations: string[];
-  generatedAt: string;
-}
-
-// --- Memecoin Metrics ---
-
-export type LifecycleStage = 'launch' | 'discovery' | 'momentum' | 'established';
-
-export interface TimeframeData {
-  m5: number;
-  h1: number;
-  h6: number;
-  h24: number;
-}
-
-export interface DexScreenerMetrics {
-  txns: {
-    m5: { buys: number; sells: number };
-    h1: { buys: number; sells: number };
-    h6: { buys: number; sells: number };
-    h24: { buys: number; sells: number };
-  };
-  volume: TimeframeData;
-  volumeBuy: TimeframeData;
-  volumeSell: TimeframeData;
-  buyers: TimeframeData;
-  sellers: TimeframeData;
-  makers: TimeframeData;
-  priceChange: TimeframeData;
-  liquidity: { usd: number; base: number; quote: number };
-  pairCreatedAt: number | null;
-  pairAddress: string;
-  dexId: string;
-}
-
-export interface ComputedMetrics {
-  buyPressure: TimeframeData;
-  avgBuySize: TimeframeData;
-  avgSellSize: TimeframeData;
-  volumeAcceleration: number;
-  buyerSellerRatio: TimeframeData;
-}
-
-export interface TokenMetrics {
-  chain: string;
-  contractAddress: string;
-  price: number;
-  volume24h: number;
-  volumeBuy24h: number;
-  volumeSell24h: number;
-  buys24h: number;
-  sells24h: number;
-  buyers24h: number;
-  sellers24h: number;
-  liquidityUsd: number;
-  marketCap: number | null;
-  fdv: number | null;
-  pairCreatedAt: number | null;
-  pairAddress: string | null;
-  dexId: string | null;
-  lifecycleStage: LifecycleStage;
-  raw: DexScreenerMetrics;
-  computed: ComputedMetrics;
-  updatedAt: string;
-}
-
-export interface MomentumSummary {
-  chain: string;
-  contractAddress: string;
-  lifecycleStage: LifecycleStage;
-  buyPressure: TimeframeData;
-  volumeAcceleration: number;
-  buyerSellerRatio: TimeframeData;
-  priceChange: TimeframeData;
-  volume: TimeframeData;
-}
-
-// --- Phase 2: Snapshots & Derivatives ---
-
-export interface TokenSnapshot {
-  id: number;
-  chain: string;
-  contractAddress: string;
-  capturedAt: string;
-  price: number | null;
-  volume24h: number | null;
-  volumeBuy24h: number | null;
-  volumeSell24h: number | null;
-  buys24h: number | null;
-  sells24h: number | null;
-  liquidityUsd: number | null;
-  holderCount: number | null;
-  marketCap: number | null;
-  buyPressure: number | null;
-  rawMetrics: string | null;
-}
-
-export type DerivativeWindow = '30m' | '1h' | '6h' | '24h';
-
-export interface DerivativeChange {
-  absolute: number | null;
-  percent: number | null;
-}
-
-export interface DerivativesResult {
-  chain: string;
-  contractAddress: string;
-  window: DerivativeWindow;
-  from: string | null;
-  to: string | null;
-  changes: {
-    price: DerivativeChange;
-    volume24h: DerivativeChange;
-    liquidityUsd: DerivativeChange;
-    holderCount: DerivativeChange;
-    buyPressure: DerivativeChange;
-    marketCap: DerivativeChange;
-  };
-}
-
-export interface SnapshotHistoryPoint {
-  capturedAt: string;
-  price: number | null;
-  volume24h: number | null;
-  liquidityUsd: number | null;
-  buyPressure: number | null;
-  marketCap: number | null;
-  holderCount: number | null;
-}
-
-// --- GeckoTerminal OHLCV ---
-
-export interface OHLCVCandle {
-  timestamp: string;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
 }

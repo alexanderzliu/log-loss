@@ -1,89 +1,91 @@
-import { Fragment, useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
-import { RefreshCw, ArrowUpRight, ArrowDownRight, ChevronDown, ChevronRight } from 'lucide-react';
-import { formatCurrency, formatPercent, formatQuantity, formatPrice, formatDate } from '../utils/format';
+import { ArrowUpRight, ArrowDownRight, AlertTriangle } from 'lucide-react';
+import { formatCurrency, formatQuantity, formatPrice, formatDate } from '../utils/format';
 import { tableHeaderStyle, tableCellStyle } from '../utils/styles';
-import { calculateUnrealizedPnl } from '../utils/aggregatePositions';
-import { priceKey as getPriceKey } from '../utils/priceKey';
 import { useAnimatedNumber } from '../hooks/useAnimatedNumber';
-import { useSetToggle } from '../hooks/useSetToggle';
 import PageTransition from '../components/PageTransition';
 import PnlDisplay from '../components/PnlDisplay';
+import DteBadge from '../components/DteBadge';
+import { getDTE, getEarliestExpiration } from '../utils/dte';
 
 export default function Dashboard() {
   const {
-    positions,
-    positionsLoading,
-    positionsError,
-    prices,
+    trades,
+    tradesLoading,
+    tradesError,
     portfolioSummary,
     portfolioError,
     predictionsSummary,
     predictionsSummaryError,
-    recentActivity,
-    recentActivityLoading,
-    fetchPositions,
+    fetchTrades,
     fetchPortfolioSummary,
     fetchPredictionsSummary,
-    fetchRecentActivity,
-    refreshPrices,
   } = useStore(useShallow((s) => ({
-    positions: s.positions,
-    positionsLoading: s.positionsLoading,
-    positionsError: s.positionsError,
-    prices: s.prices,
+    trades: s.trades,
+    tradesLoading: s.tradesLoading,
+    tradesError: s.tradesError,
     portfolioSummary: s.portfolioSummary,
     portfolioError: s.portfolioError,
     predictionsSummary: s.predictionsSummary,
     predictionsSummaryError: s.predictionsSummaryError,
-    recentActivity: s.recentActivity,
-    recentActivityLoading: s.recentActivityLoading,
-    fetchPositions: s.fetchPositions,
+    fetchTrades: s.fetchTrades,
     fetchPortfolioSummary: s.fetchPortfolioSummary,
     fetchPredictionsSummary: s.fetchPredictionsSummary,
-    fetchRecentActivity: s.fetchRecentActivity,
-    refreshPrices: s.refreshPrices,
   })));
 
-  const [expandedPositions, toggleExpanded] = useSetToggle();
-
   useEffect(() => {
-    fetchPositions();
+    fetchTrades();
     fetchPortfolioSummary();
     fetchPredictionsSummary();
-    fetchRecentActivity();
-    const interval = setInterval(refreshPrices, 60000);
-    return () => clearInterval(interval);
-  }, [fetchPositions, fetchPortfolioSummary, fetchPredictionsSummary, fetchRecentActivity, refreshPrices]);
+  }, [fetchTrades, fetchPortfolioSummary, fetchPredictionsSummary]);
 
-  const openPositions = positions.filter((p) => p.status === 'open');
+  const openTrades = useMemo(() => {
+    return trades
+      .filter((t) => t.status === 'open')
+      .sort((a, b) => {
+        const aDte = getDTE(getEarliestExpiration(a.legs));
+        const bDte = getDTE(getEarliestExpiration(b.legs));
+        // Trades with DTE come first, sorted ascending; no-DTE trades go to end
+        if (aDte === null && bDte === null) return 0;
+        if (aDte === null) return 1;
+        if (bDte === null) return -1;
+        return aDte - bDte;
+      });
+  }, [trades]);
 
-  const unrealizedPnl = openPositions.reduce((total, pos) => {
-    const currentPrice = prices[getPriceKey(pos)]?.price;
-    const { pnl } = calculateUnrealizedPnl(pos, currentPrice);
-    return total + (pnl ?? 0);
-  }, 0);
+  const expiringTrades = useMemo(() => {
+    return openTrades
+      .map(t => {
+        const earliest = getEarliestExpiration(t.legs);
+        const dte = getDTE(earliest);
+        return { trade: t, dte };
+      })
+      .filter(({ dte }) => dte !== null && dte >= 0 && dte <= 3);
+  }, [openTrades]);
 
-  const openPositionsInvested = openPositions.reduce(
-    (total, pos) => total + pos.avgEntryPrice * pos.remainingQuantity,
-    0
-  );
+  const recentClosedTrades = useMemo(() => {
+    return trades
+      .filter((t) => t.status === 'closed')
+      .sort((a, b) => {
+        const aDate = a.closeDate ? new Date(a.closeDate).getTime() : 0;
+        const bDate = b.closeDate ? new Date(b.closeDate).getTime() : 0;
+        return bDate - aDate;
+      })
+      .slice(0, 10);
+  }, [trades]);
 
-  const unrealizedPnlPercent = openPositionsInvested > 0 ? (unrealizedPnl / openPositionsInvested) * 100 : 0;
   const predictionsPnl = predictionsSummary?.predictionsPnl ?? 0;
-  const totalPnl = (portfolioSummary?.realizedPnl ?? 0) + unrealizedPnl + predictionsPnl;
-  const totalCostBasis = (portfolioSummary?.totalCostBasis ?? 0) + (predictionsSummary?.predictionsCostBasis ?? 0);
-  const totalPnlPercent = totalCostBasis > 0 ? (totalPnl / totalCostBasis) * 100 : 0;
-  const totalInvested = totalCostBasis;
+  const realizedPnl = (portfolioSummary?.realizedPnl ?? 0) + predictionsPnl;
+  const totalPnl = realizedPnl;
 
-  const animatedPortfolioValue = useAnimatedNumber(totalInvested + totalPnl);
   const animatedTotalPnl = useAnimatedNumber(totalPnl);
 
   const isUp = totalPnl >= 0;
 
-  // Glow intensity scales with P&L magnitude (saturates at ±50%)
-  const intensity = Math.min(1, Math.sqrt(Math.abs(totalPnlPercent) / 50));
+  // Glow intensity scales with P&L magnitude
+  const intensity = Math.min(1, Math.sqrt(Math.abs(totalPnl) / 5000));
   const ga = (base: number) => +(base * (0.2 + 0.8 * intensity)).toFixed(3);
   const gc = isUp ? '52, 211, 153' : '248, 113, 113';
 
@@ -141,19 +143,20 @@ export default function Dashboard() {
               letterSpacing: '1.5px',
               fontWeight: 600,
             }}>
-              Total Portfolio Value
+              Realized P&L
             </p>
             <h1 style={{
               fontSize: '72px',
               fontWeight: 700,
-              color: 'var(--text-primary)',
+              color: isUp ? 'var(--profit)' : 'var(--loss)',
               fontFamily: "'DM Mono', monospace",
               letterSpacing: '-4px',
               marginBottom: '16px',
               fontVariantNumeric: 'tabular-nums',
               lineHeight: 1,
+              textShadow: `0 0 40px rgba(${gc}, ${ga(0.3)})`,
             }}>
-              {formatCurrency(animatedPortfolioValue)}
+              {animatedTotalPnl >= 0 ? '+' : ''}{formatCurrency(animatedTotalPnl)}
             </h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{
@@ -177,7 +180,7 @@ export default function Dashboard() {
                   fontVariantNumeric: 'tabular-nums',
                   textShadow: `0 0 20px rgba(${gc}, ${ga(0.5)})`,
                 }}>
-                  {animatedTotalPnl >= 0 ? '+' : ''}{formatCurrency(animatedTotalPnl)} ({formatPercent(totalPnlPercent)})
+                  {portfolioSummary?.openTrades ?? 0} open &middot; {portfolioSummary?.closedTrades ?? 0} closed
                 </span>
               </div>
               <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>All time</span>
@@ -206,30 +209,21 @@ export default function Dashboard() {
           gap: '20px',
           marginBottom: '56px'
         }}>
-          <StatCard label="Invested" numericValue={totalInvested} style={stagger(0)} />
-          <StatCard
-            label="Unrealized P&L"
-            numericValue={unrealizedPnl}
-            subtext={formatPercent(unrealizedPnlPercent)}
-            positive={unrealizedPnl >= 0}
-            glowIntensity={intensity}
-            style={stagger(1)}
-          />
           {(() => {
-            const realizedPnl = (portfolioSummary?.realizedPnl || 0) + predictionsPnl;
+            const rPnl = (portfolioSummary?.realizedPnl ?? 0) + predictionsPnl;
             return (
               <StatCard
                 label="Realized P&L"
-                numericValue={realizedPnl}
-                positive={realizedPnl >= 0}
+                numericValue={rPnl}
+                positive={rPnl >= 0}
                 glowIntensity={intensity}
-                style={stagger(2)}
+                style={stagger(0)}
               />
             );
           })()}
           {(() => {
-            const tradesWins = portfolioSummary ? (portfolioSummary.winRate / 100) * portfolioSummary.closedPositions : 0;
-            const tradesTotal = portfolioSummary?.closedPositions || 0;
+            const tradesWins = portfolioSummary ? (portfolioSummary.winRate / 100) * portfolioSummary.closedTrades : 0;
+            const tradesTotal = portfolioSummary?.closedTrades || 0;
             const predictionsWins = predictionsSummary ? (predictionsSummary.predictionsWinRate / 100) * predictionsSummary.closedPredictions : 0;
             const predictionsTotal = predictionsSummary?.closedPredictions || 0;
             const combinedTotal = tradesTotal + predictionsTotal;
@@ -240,13 +234,50 @@ export default function Dashboard() {
                 numericValue={combinedWinRate}
                 formatter={(v) => `${v.toFixed(0)}%`}
                 subtext={`${combinedTotal} closed`}
-                style={stagger(3)}
+                style={stagger(1)}
               />
             );
           })()}
+          <StatCard
+            label="Discipline Rate"
+            numericValue={portfolioSummary?.followedPlanRate ?? 0}
+            formatter={(v) => `${v.toFixed(0)}%`}
+            subtext="followed plan"
+            style={stagger(2)}
+          />
+          <StatCard
+            label="Total Fees"
+            numericValue={portfolioSummary?.totalFees ?? 0}
+            style={stagger(3)}
+          />
         </div>
 
-        {/* Open Positions Table */}
+        {/* Expiring Soon Banner */}
+        {expiringTrades.length > 0 && (
+          <div className="card" style={{
+            padding: '16px 20px',
+            marginBottom: '28px',
+            position: 'relative',
+            overflow: 'hidden',
+            borderLeft: `3px solid ${expiringTrades.some(t => t.dte !== null && t.dte <= 1) ? 'var(--loss)' : '#f59e0b'}`,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <AlertTriangle size={16} style={{ color: expiringTrades.some(t => t.dte !== null && t.dte <= 1) ? 'var(--loss)' : '#f59e0b', flexShrink: 0 }} />
+              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Expiring Soon</span>
+              {expiringTrades.slice(0, 5).map(({ trade, dte }) => (
+                <span key={trade.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  <span style={{ fontWeight: 500 }}>{trade.name || trade.underlying}</span>
+                  {dte !== null && <DteBadge dte={dte} size="sm" />}
+                </span>
+              ))}
+              {expiringTrades.length > 5 && (
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>+{expiringTrades.length - 5} more</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Open Trades Table */}
         <div>
           <div style={{
             display: 'flex',
@@ -262,8 +293,8 @@ export default function Dashboard() {
               alignItems: 'center',
               gap: '10px',
             }}>
-              Open Positions
-              {openPositions.length > 0 && (
+              Open Trades
+              {openTrades.length > 0 && (
                 <span style={{
                   display: 'inline-block',
                   width: '8px',
@@ -275,24 +306,20 @@ export default function Dashboard() {
                 }} />
               )}
             </h2>
-            <button onClick={refreshPrices} className="btn-ghost" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <RefreshCw size={14} />
-              Refresh
-            </button>
           </div>
 
-          {positionsError ? (
+          {tradesError ? (
             <div className="card empty-state">
-              <p style={{ color: 'var(--loss)', marginBottom: '8px' }}>Failed to load positions</p>
-              <button onClick={() => fetchPositions()} className="btn-ghost" style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Retry</button>
+              <p style={{ color: 'var(--loss)', marginBottom: '8px' }}>Failed to load trades</p>
+              <button onClick={() => fetchTrades()} className="btn-ghost" style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Retry</button>
             </div>
-          ) : positionsLoading ? (
+          ) : tradesLoading ? (
             <div className="card empty-state">
               <p className="empty-state-text">Loading...</p>
             </div>
-          ) : openPositions.length === 0 ? (
+          ) : openTrades.length === 0 ? (
             <div className="card empty-state">
-              <p className="empty-state-title" style={{ fontSize: '16px', fontWeight: 600 }}>No open positions</p>
+              <p className="empty-state-title" style={{ fontSize: '16px', fontWeight: 600 }}>No open trades</p>
               <p className="empty-state-text">Add a trade in the Journal to get started</p>
             </div>
           ) : (
@@ -300,170 +327,98 @@ export default function Dashboard() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                    <th style={thStyle}>Asset</th>
-                    <th style={{ ...thStyle, textAlign: 'right' }}>Avg Entry</th>
-                    <th style={{ ...thStyle, textAlign: 'right' }}>Current</th>
-                    <th style={{ ...thStyle, textAlign: 'right' }}>Quantity</th>
-                    <th style={{ ...thStyle, textAlign: 'right' }}>Value</th>
+                    <th style={thStyle}>Name</th>
+                    <th style={thStyle}>Underlying</th>
+                    <th style={thStyle}>Strategy</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>Qty</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>Entry</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>Opened</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>DTE</th>
                     <th style={{ ...thStyle, textAlign: 'right' }}>P&L</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {openPositions.map((position, idx) => {
-                    const pk = getPriceKey(position);
-                    const currentPrice = prices[pk]?.price;
-                    const priceChange = prices[pk]?.changePercent24h;
-                    const { pnl, pnlPercent } = calculateUnrealizedPnl(position, currentPrice);
-                    const value = currentPrice
-                      ? currentPrice * position.remainingQuantity
-                      : position.avgEntryPrice * position.remainingQuantity;
-                    const positionKey = position.id;
-                    const isExpanded = expandedPositions.has(positionKey);
-                    const buyExecutions = position.executions.filter(e => e.side === 'buy');
-                    const hasMultipleLots = buyExecutions.length > 1;
-
-                    // P&L-based row color bar
-                    const rowPnlPositive = pnl !== null ? pnl >= 0 : true;
-
-                    return (
-                      <Fragment key={positionKey}>
-                        <tr
-                          style={{
-                            borderBottom: isExpanded ? 'none' : '1px solid var(--border)',
-                            cursor: hasMultipleLots ? 'pointer' : 'default',
-                            animation: `slideUp 0.35s ease-out ${idx * 0.04}s both`,
-                            position: 'relative',
-                          }}
-                          onClick={() => hasMultipleLots && toggleExpanded(positionKey)}
-                        >
-                          <td style={tdStyle}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                              {/* Left color bar */}
-                              <div style={{
-                                position: 'absolute',
-                                left: 0,
-                                top: '8px',
-                                bottom: '8px',
-                                width: '3px',
-                                borderRadius: '0 3px 3px 0',
-                                background: rowPnlPositive ? 'var(--profit)' : 'var(--loss)',
-                                boxShadow: rowPnlPositive
-                                  ? '0 0 8px rgba(52, 211, 153, 0.4)'
-                                  : '0 0 8px rgba(248, 113, 113, 0.4)',
-                              }} />
-                              {hasMultipleLots && (
-                                <div style={{ color: 'var(--text-muted)', width: '16px' }}>
-                                  {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                                </div>
-                              )}
-                              <div className="asset-icon">
-                                {position.symbol.slice(0, 2)}
-                              </div>
-                              <div>
-                                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                                  {position.symbol}
-                                </div>
-                                <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  {position.chain ? (
-                                    <>
-                                      <span className="chain-badge">
-                                        {position.chain}
-                                      </span>
-                                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px' }}>
-                                        {position.contractAddress?.slice(0, 6)}...{position.contractAddress?.slice(-4)}
-                                      </span>
-                                    </>
-                                  ) : hasMultipleLots
-                                    ? `${buyExecutions.length} entries`
-                                    : position.assetType}
-                                </div>
-                              </div>
+                  {openTrades.map((trade, idx) => (
+                    <tr
+                      key={trade.id}
+                      style={{
+                        borderBottom: '1px solid var(--border)',
+                        animation: `slideUp 0.35s ease-out ${idx * 0.04}s both`,
+                        position: 'relative',
+                      }}
+                    >
+                      <td style={tdStyle}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          {/* Left color bar */}
+                          <div style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: '8px',
+                            bottom: '8px',
+                            width: '3px',
+                            borderRadius: '0 3px 3px 0',
+                            background: 'var(--profit)',
+                            boxShadow: '0 0 8px rgba(52, 211, 153, 0.4)',
+                          }} />
+                          <div className="asset-icon">
+                            {trade.underlying.slice(0, 2)}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                              {trade.name || trade.underlying}
                             </div>
-                          </td>
-                          <td className="font-mono text-right" style={tdStyle}>
-                            {formatPrice(position.avgEntryPrice)}
-                          </td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>
-                            <div className="font-mono" style={{ color: 'var(--text-primary)' }}>
-                              {currentPrice ? formatPrice(currentPrice) : '—'}
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                              {trade.assetType}
                             </div>
-                            {priceChange !== undefined && (
-                              <div style={{
-                                fontSize: '12px',
-                                color: priceChange >= 0 ? 'var(--profit)' : 'var(--loss)'
-                              }}>
-                                {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
-                              </div>
-                            )}
-                          </td>
-                          <td className="font-mono text-right" style={tdStyle}>
-                            {formatQuantity(position.remainingQuantity)}
-                          </td>
-                          <td className="font-mono text-right font-medium" style={tdStyle}>
-                            {formatCurrency(value)}
-                          </td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>
-                            <PnlDisplay pnl={pnl} pnlPercent={pnlPercent} />
-                          </td>
-                        </tr>
-                        {/* Expanded execution details */}
-                        {isExpanded && buyExecutions.map((exec, execIdx) => {
-                          const execPnl = currentPrice
-                            ? (currentPrice - exec.price) * exec.quantity
-                            : null;
-                          const execPnlPercent = currentPrice
-                            ? ((currentPrice - exec.price) / exec.price) * 100
-                            : null;
-                          const execValue = currentPrice
-                            ? currentPrice * exec.quantity
-                            : exec.price * exec.quantity;
-                          const isLast = execIdx === buyExecutions.length - 1;
-
-                          return (
-                            <tr
-                              key={exec.id}
-                              style={{
-                                borderBottom: isLast ? '1px solid var(--border)' : 'none',
-                                background: 'var(--bg-tertiary)',
-                                animation: `slideUp 0.25s ease-out ${execIdx * 0.03}s both`,
-                              }}
-                            >
-                              <td style={{ ...tdStyle, paddingLeft: '72px' }}>
-                                <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                  Entry {execIdx + 1}
-                                </div>
-                                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                  {new Date(exec.executedAt).toLocaleDateString()}
-                                </div>
-                              </td>
-                              <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                {formatPrice(exec.price)}
-                              </td>
-                              <td style={{ ...tdStyle, textAlign: 'right' }}>
-                                {/* Empty for entries */}
-                              </td>
-                              <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                {formatQuantity(exec.quantity)}
-                              </td>
-                              <td style={{ ...tdStyle, textAlign: 'right', fontFamily: "'DM Mono', monospace", fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                {formatCurrency(execValue)}
-                              </td>
-                              <td style={{ ...tdStyle, textAlign: 'right' }}>
-                                <PnlDisplay pnl={execPnl} pnlPercent={execPnlPercent} size="sm" />
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </Fragment>
-                    );
-                  })}
+                          </div>
+                        </div>
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                          {trade.underlying}
+                        </span>
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '2px 10px',
+                          borderRadius: '9999px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          background: 'rgba(139, 92, 246, 0.1)',
+                          color: 'var(--accent-violet)',
+                        }}>
+                          {trade.strategy || '—'}
+                        </span>
+                      </td>
+                      <td className="font-mono text-right" style={tdStyle}>
+                        {formatQuantity(trade.quantity)}
+                      </td>
+                      <td className="font-mono text-right" style={tdStyle}>
+                        {trade.entryPrice != null ? formatPrice(trade.entryPrice) : '—'}
+                      </td>
+                      <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--text-muted)', fontSize: '13px' }}>
+                        {trade.openDate ? formatDate(trade.openDate) : '—'}
+                      </td>
+                      <td style={{ ...tdStyle, textAlign: 'right' }}>
+                        {(() => {
+                          const dte = getDTE(getEarliestExpiration(trade.legs));
+                          if (dte === null) return <span style={{ color: 'var(--text-muted)' }}>&mdash;</span>;
+                          return <DteBadge dte={dte} size="md" />;
+                        })()}
+                      </td>
+                      <td style={{ ...tdStyle, textAlign: 'right' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>&mdash;</span>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           )}
         </div>
 
-        {/* Recent Activity */}
+        {/* Recent Activity - Closed Trades */}
         <div style={{ marginTop: '56px' }}>
           <h2 style={{
             fontSize: '20px',
@@ -474,81 +429,91 @@ export default function Dashboard() {
             Recent Activity
           </h2>
 
-          {recentActivityLoading ? (
+          {tradesLoading ? (
             <div className="card empty-state">
               <p className="empty-state-text">Loading...</p>
             </div>
-          ) : recentActivity.length === 0 ? (
+          ) : recentClosedTrades.length === 0 ? (
             <div className="card empty-state">
-              <p className="empty-state-title" style={{ fontSize: '16px', fontWeight: 600 }}>No trades yet</p>
+              <p className="empty-state-title" style={{ fontSize: '16px', fontWeight: 600 }}>No closed trades yet</p>
             </div>
           ) : (
             <div className="card" style={{ overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                    <th style={thStyle}>Date</th>
-                    <th style={thStyle}>Asset</th>
-                    <th style={thStyle}>Side</th>
-                    <th style={{ ...thStyle, textAlign: 'right' }}>Price</th>
-                    <th style={{ ...thStyle, textAlign: 'right' }}>Quantity</th>
+                    <th style={thStyle}>Closed</th>
+                    <th style={thStyle}>Name</th>
+                    <th style={thStyle}>Underlying</th>
+                    <th style={thStyle}>Strategy</th>
                     <th style={{ ...thStyle, textAlign: 'right' }}>P&L</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {recentActivity.map((activity, idx) => (
-                    <tr
-                      key={activity.id}
-                      style={{
-                        borderBottom: '1px solid var(--border)',
-                        animation: `slideUp 0.35s ease-out ${idx * 0.04}s both`,
-                      }}
-                    >
-                      <td style={{ ...tdStyle, color: 'var(--text-muted)', fontSize: '13px' }}>
-                        {formatDate(activity.executedAt)}
-                      </td>
-                      <td style={tdStyle}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                            {activity.symbol}
+                  {recentClosedTrades.map((trade, idx) => {
+                    const pnl = trade.realizedPnl ?? null;
+                    const pnlPositive = pnl !== null ? pnl >= 0 : true;
+
+                    return (
+                      <tr
+                        key={trade.id}
+                        style={{
+                          borderBottom: '1px solid var(--border)',
+                          animation: `slideUp 0.35s ease-out ${idx * 0.04}s both`,
+                          position: 'relative',
+                        }}
+                      >
+                        <td style={{ ...tdStyle, color: 'var(--text-muted)', fontSize: '13px' }}>
+                          {trade.closeDate ? formatDate(trade.closeDate) : '—'}
+                        </td>
+                        <td style={tdStyle}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {/* Left color bar */}
+                            <div style={{
+                              position: 'absolute',
+                              left: 0,
+                              top: '8px',
+                              bottom: '8px',
+                              width: '3px',
+                              borderRadius: '0 3px 3px 0',
+                              background: pnlPositive ? 'var(--profit)' : 'var(--loss)',
+                              boxShadow: pnlPositive
+                                ? '0 0 8px rgba(52, 211, 153, 0.4)'
+                                : '0 0 8px rgba(248, 113, 113, 0.4)',
+                            }} />
+                            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                              {trade.name || trade.underlying}
+                            </span>
+                          </div>
+                        </td>
+                        <td style={tdStyle}>
+                          <span style={{ color: 'var(--text-secondary)' }}>
+                            {trade.underlying}
                           </span>
-                          {activity.chain && (
-                            <span className="chain-badge">{activity.chain}</span>
+                        </td>
+                        <td style={tdStyle}>
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '2px 10px',
+                            borderRadius: '9999px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            background: 'rgba(139, 92, 246, 0.1)',
+                            color: 'var(--accent-violet)',
+                          }}>
+                            {trade.strategy || '—'}
+                          </span>
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>
+                          {pnl !== null ? (
+                            <PnlDisplay pnl={pnl} pnlPercent={null} />
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)' }}>&mdash;</span>
                           )}
-                        </div>
-                      </td>
-                      <td style={tdStyle}>
-                        <span style={{
-                          display: 'inline-block',
-                          padding: '2px 10px',
-                          borderRadius: '9999px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          background: activity.side === 'buy'
-                            ? 'rgba(52, 211, 153, 0.1)'
-                            : 'rgba(248, 113, 113, 0.1)',
-                          color: activity.side === 'buy'
-                            ? 'var(--profit)'
-                            : 'var(--loss)',
-                        }}>
-                          {activity.side === 'buy' ? 'Buy' : 'Sell'}
-                        </span>
-                      </td>
-                      <td className="font-mono text-right" style={tdStyle}>
-                        {formatPrice(activity.price)}
-                      </td>
-                      <td className="font-mono text-right" style={tdStyle}>
-                        {formatQuantity(activity.quantity)}
-                      </td>
-                      <td style={{ ...tdStyle, textAlign: 'right' }}>
-                        {activity.side === 'sell' && activity.pnl !== null ? (
-                          <PnlDisplay pnl={activity.pnl} pnlPercent={activity.pnlPercent} />
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

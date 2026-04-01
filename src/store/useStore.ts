@@ -1,20 +1,10 @@
 import { create } from 'zustand';
-import type { Position, PriceData, PortfolioSummary, AssetType, TradeFormData, PositionUpdateData, Prediction, PredictionFormData, PredictionCloseData, PredictionUpdateData, PredictionsSummary, RecentActivity, Reflection, Rule } from '../types';
-import * as positionsApi from '../api/positions';
+import type { Trade, TradeCreateData, TradeUpdateData, TradeCloseData, PriceData, PortfolioSummary, Prediction, PredictionFormData, PredictionCloseData, PredictionUpdateData, PredictionsSummary, Reflection, Rule } from '../types';
+import * as tradesApi from '../api/trades';
 import * as pricesApi from '../api/prices';
 import * as predictionsApi from '../api/predictions';
 import * as reflectionsApi from '../api/reflections';
 import * as rulesApi from '../api/rules';
-import { priceKey } from '../utils/priceKey';
-
-// Extract unique assets from open positions
-function getUniqueOpenAssets(positions: Position[]): { symbol: string; assetType: AssetType; chain?: string | null; contractAddress?: string | null }[] {
-  const open = positions.filter((p) => p.status === 'open');
-  const assets = open.map((p) => ({ symbol: p.symbol, assetType: p.assetType, chain: p.chain, contractAddress: p.contractAddress }));
-  return Array.from(
-    new Map(assets.map((a) => [priceKey(a), a])).values()
-  );
-}
 
 export interface Toast {
   id: string;
@@ -29,12 +19,12 @@ interface StoreState {
   addToast: (toast: Omit<Toast, 'id'>) => void;
   removeToast: (id: string) => void;
 
-  // Positions
-  positions: Position[];
-  positionsLoading: boolean;
-  positionsError: string | null;
+  // Trades
+  trades: Trade[];
+  tradesLoading: boolean;
+  tradesError: string | null;
 
-  // Prices
+  // Prices (kept for Analytics chart)
   prices: Record<string, PriceData>;
   pricesLoading: boolean;
   pricesError: string | null;
@@ -44,10 +34,6 @@ interface StoreState {
   portfolioLoading: boolean;
   portfolioError: string | null;
 
-  // Recent Activity
-  recentActivity: RecentActivity[];
-  recentActivityLoading: boolean;
-
   // Predictions
   predictions: Prediction[];
   predictionsLoading: boolean;
@@ -56,23 +42,24 @@ interface StoreState {
   predictionsSummaryLoading: boolean;
   predictionsSummaryError: string | null;
 
-  // Reflections
-  reflections: Record<string, Reflection[]>; // keyed by positionId
-  createReflection: (data: { positionId: string; type?: Reflection['type']; content: string }) => Promise<Reflection>;
+  // Reflections (keyed by tradeId)
+  reflections: Record<string, Reflection[]>;
+  fetchReflections: (tradeId: string) => Promise<void>;
+  createReflection: (data: { tradeId: string; type?: Reflection['type']; content: string }) => Promise<Reflection>;
   updateReflection: (id: string, data: { content?: string; type?: Reflection['type'] }) => Promise<Reflection>;
-  deleteReflection: (id: string, positionId: string) => Promise<void>;
-  fetchReflections: (positionId: string) => Promise<void>;
+  deleteReflection: (id: string, tradeId: string) => Promise<void>;
 
-  // Position Actions
-  fetchPositions: (filters?: { status?: string; assetType?: string; symbol?: string }) => Promise<void>;
-  createTrade: (data: TradeFormData) => Promise<Position>;
-  updatePosition: (id: string, data: PositionUpdateData) => Promise<Position>;
-  deletePosition: (id: string) => Promise<void>;
-  deleteExecution: (positionId: string, executionId: string) => Promise<void>;
+  // Trade Actions
+  fetchTrades: (filters?: { status?: string; assetType?: string; underlying?: string }) => Promise<void>;
+  createTrade: (data: TradeCreateData) => Promise<Trade>;
+  updateTrade: (id: string, data: TradeUpdateData) => Promise<Trade>;
+  closeTrade: (id: string, data: TradeCloseData) => Promise<Trade>;
+  openTrade: (id: string, data?: { entryPrice?: number; openDate?: string; fees?: number }) => Promise<Trade>;
+  deleteTrade: (id: string) => Promise<void>;
   fetchPortfolioSummary: () => Promise<void>;
-  fetchRecentActivity: () => Promise<void>;
-  fetchPrices: (assets: { symbol: string; assetType: AssetType; chain?: string | null; contractAddress?: string | null }[]) => Promise<void>;
-  refreshPrices: () => Promise<void>;
+
+  // Price Actions (for Analytics)
+  fetchPrices: (assets: { symbol: string; assetType: string }[]) => Promise<void>;
 
   // Prediction Actions
   fetchPredictions: (filters?: { status?: string }) => Promise<void>;
@@ -104,30 +91,28 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   // Initial state
-  positions: [],
-  positionsLoading: false,
-  positionsError: null,
+  trades: [],
+  tradesLoading: false,
+  tradesError: null,
   prices: {},
   pricesLoading: false,
   pricesError: null,
   portfolioSummary: null,
   portfolioLoading: false,
   portfolioError: null,
-  recentActivity: [],
-  recentActivityLoading: false,
   predictions: [],
   predictionsLoading: false,
   predictionsError: null,
   predictionsSummary: null,
   predictionsSummaryLoading: false,
   predictionsSummaryError: null,
-
   reflections: {},
 
-  fetchReflections: async (positionId) => {
+  // Reflections
+  fetchReflections: async (tradeId) => {
     try {
-      const list = await reflectionsApi.fetchReflections({ positionId });
-      set((state) => ({ reflections: { ...state.reflections, [positionId]: list } }));
+      const list = await reflectionsApi.fetchReflections({ tradeId });
+      set((state) => ({ reflections: { ...state.reflections, [tradeId]: list } }));
     } catch (error) {
       console.error('Failed to fetch reflections:', error);
     }
@@ -136,8 +121,8 @@ export const useStore = create<StoreState>((set, get) => ({
   createReflection: async (data) => {
     const reflection = await reflectionsApi.createReflection(data);
     set((state) => {
-      const existing = state.reflections[data.positionId] || [];
-      return { reflections: { ...state.reflections, [data.positionId]: [reflection, ...existing] } };
+      const existing = state.reflections[data.tradeId] || [];
+      return { reflections: { ...state.reflections, [data.tradeId]: [reflection, ...existing] } };
     });
     get().addToast({ type: 'success', title: 'Reflection Added' });
     return reflection;
@@ -146,104 +131,87 @@ export const useStore = create<StoreState>((set, get) => ({
   updateReflection: async (id, data) => {
     const reflection = await reflectionsApi.updateReflection(id, data);
     set((state) => {
-      const posId = reflection.positionId;
-      const existing = state.reflections[posId] || [];
-      return { reflections: { ...state.reflections, [posId]: existing.map((r) => (r.id === id ? reflection : r)) } };
+      const tradeId = reflection.tradeId;
+      const existing = state.reflections[tradeId] || [];
+      return { reflections: { ...state.reflections, [tradeId]: existing.map((r) => (r.id === id ? reflection : r)) } };
     });
     get().addToast({ type: 'success', title: 'Reflection Updated' });
     return reflection;
   },
 
-  deleteReflection: async (id, positionId) => {
+  deleteReflection: async (id, tradeId) => {
     await reflectionsApi.deleteReflection(id);
     set((state) => {
-      const existing = state.reflections[positionId] || [];
-      return { reflections: { ...state.reflections, [positionId]: existing.filter((r) => r.id !== id) } };
+      const existing = state.reflections[tradeId] || [];
+      return { reflections: { ...state.reflections, [tradeId]: existing.filter((r) => r.id !== id) } };
     });
     get().addToast({ type: 'success', title: 'Reflection Deleted' });
   },
 
-  // Positions actions
-  fetchPositions: async (filters) => {
-    set({ positionsLoading: true, positionsError: null });
+  // Trade actions
+  fetchTrades: async (filters) => {
+    set({ tradesLoading: true, tradesError: null });
     try {
-      const positions = await positionsApi.fetchPositions(filters);
-      set({ positions, positionsLoading: false });
-
-      // Auto-fetch prices for open positions
-      const uniqueAssets = getUniqueOpenAssets(positions);
-      if (uniqueAssets.length > 0) {
-        get().fetchPrices(uniqueAssets);
-      }
+      const trades = await tradesApi.fetchTrades(filters);
+      set({ trades, tradesLoading: false });
     } catch (error) {
-      set({ positionsError: (error as Error).message, positionsLoading: false });
+      set({ tradesError: (error as Error).message, tradesLoading: false });
     }
   },
 
   createTrade: async (data) => {
-    const { position } = await positionsApi.createTrade(data);
-    set((state) => {
-      const exists = state.positions.some((p) => p.id === position.id);
-      if (exists) {
-        return { positions: state.positions.map((p) => (p.id === position.id ? position : p)) };
-      }
-      return { positions: [position, ...state.positions] };
-    });
+    const trade = await tradesApi.createTrade(data);
+    set((state) => ({ trades: [trade, ...state.trades] }));
     get().fetchPortfolioSummary();
-    get().addToast({ type: 'success', title: 'Trade Created', message: `${data.side === 'sell' ? 'Sold' : 'Bought'} ${data.symbol}` });
-    return position;
+    get().addToast({ type: 'success', title: 'Trade Created', message: `${data.underlying} ${data.strategy}` });
+    return trade;
   },
 
-  updatePosition: async (id, data) => {
-    const position = await positionsApi.updatePosition(id, data);
+  updateTrade: async (id, data) => {
+    const trade = await tradesApi.updateTrade(id, data);
     set((state) => ({
-      positions: state.positions.map((p) => (p.id === id ? position : p)),
+      trades: state.trades.map((t) => (t.id === id ? trade : t)),
     }));
-    return position;
+    return trade;
   },
 
-  deletePosition: async (id) => {
-    await positionsApi.deletePosition(id);
+  closeTrade: async (id, data) => {
+    const trade = await tradesApi.closeTrade(id, data);
     set((state) => ({
-      positions: state.positions.filter((p) => p.id !== id),
+      trades: state.trades.map((t) => (t.id === id ? trade : t)),
     }));
     get().fetchPortfolioSummary();
-    get().addToast({ type: 'success', title: 'Position Deleted' });
+    get().addToast({ type: 'success', title: 'Trade Closed', message: `P&L: $${data.realizedPnl.toFixed(2)}` });
+    return trade;
   },
 
-  deleteExecution: async (positionId, executionId) => {
-    const { position } = await positionsApi.deleteExecution(positionId, executionId);
-    set((state) => {
-      if (!position) {
-        // Position was deleted (no executions left)
-        return { positions: state.positions.filter((p) => p.id !== positionId) };
-      }
-      return { positions: state.positions.map((p) => (p.id === positionId ? position : p)) };
-    });
+  openTrade: async (id, data) => {
+    const trade = await tradesApi.openTrade(id, data);
+    set((state) => ({
+      trades: state.trades.map((t) => (t.id === id ? trade : t)),
+    }));
+    get().addToast({ type: 'success', title: 'Trade Opened' });
+    return trade;
+  },
+
+  deleteTrade: async (id) => {
+    await tradesApi.deleteTrade(id);
+    set((state) => ({ trades: state.trades.filter((t) => t.id !== id) }));
     get().fetchPortfolioSummary();
+    get().addToast({ type: 'success', title: 'Trade Deleted' });
   },
 
   fetchPortfolioSummary: async () => {
     set({ portfolioLoading: true, portfolioError: null });
     try {
-      const summary = await positionsApi.fetchPortfolioSummary();
+      const summary = await tradesApi.fetchPortfolioSummary();
       set({ portfolioSummary: summary, portfolioLoading: false });
     } catch (error) {
       set({ portfolioError: (error as Error).message, portfolioLoading: false });
     }
   },
 
-  fetchRecentActivity: async () => {
-    set({ recentActivityLoading: true });
-    try {
-      const activity = await positionsApi.fetchRecentActivity();
-      set({ recentActivity: activity, recentActivityLoading: false });
-    } catch {
-      set({ recentActivityLoading: false });
-    }
-  },
-
-  // Prices actions
+  // Prices (for Analytics chart only)
   fetchPrices: async (assets) => {
     if (assets.length === 0) return;
     set({ pricesLoading: true, pricesError: null });
@@ -252,19 +220,12 @@ export const useStore = create<StoreState>((set, get) => ({
       const pricesMap = { ...get().prices };
       priceData.forEach((p) => {
         if (!('error' in p)) {
-          pricesMap[priceKey(p)] = p;
+          pricesMap[`${p.symbol}:${p.assetType}`] = p;
         }
       });
       set({ prices: pricesMap, pricesLoading: false });
     } catch (error) {
       set({ pricesLoading: false, pricesError: (error as Error).message });
-    }
-  },
-
-  refreshPrices: async () => {
-    const uniqueAssets = getUniqueOpenAssets(get().positions);
-    if (uniqueAssets.length > 0) {
-      await get().fetchPrices(uniqueAssets);
     }
   },
 

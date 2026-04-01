@@ -24,13 +24,13 @@ const TYPE_CONFIG: Record<ReflectionType, { icon: typeof CheckCircle; color: str
 };
 
 interface ReflectionListProps {
-  positionId: string;
+  tradeId: string;
 }
 
-export default function ReflectionList({ positionId }: ReflectionListProps) {
+export default function ReflectionList({ tradeId }: ReflectionListProps) {
   const { reflections, fetchReflections, createReflection, updateReflection, deleteReflection, addToast } = useStore(
     useShallow((s) => ({
-      reflections: s.reflections[positionId] ?? EMPTY_REFLECTIONS,
+      reflections: s.reflections[tradeId] ?? EMPTY_REFLECTIONS,
       fetchReflections: s.fetchReflections,
       createReflection: s.createReflection,
       updateReflection: s.updateReflection,
@@ -45,10 +45,10 @@ export default function ReflectionList({ positionId }: ReflectionListProps) {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchReflections(positionId);
-  }, [positionId, fetchReflections]);
+    fetchReflections(tradeId);
+  }, [tradeId, fetchReflections]);
 
-  const handleSave = async (data: { positionId: string; type: ReflectionType; content: string }) => {
+  const handleSave = async (data: { tradeId: string; type: ReflectionType; content: string }) => {
     if (editing) {
       await updateReflection(editing.id, { content: data.content, type: data.type });
     } else {
@@ -58,7 +58,7 @@ export default function ReflectionList({ positionId }: ReflectionListProps) {
 
   const handleDelete = async (id: string) => {
     try {
-      await deleteReflection(id, positionId);
+      await deleteReflection(id, tradeId);
     } catch (err) {
       console.error('Failed to delete reflection:', err);
       addToast({ type: 'error', title: 'Delete Failed', message: 'Failed to delete reflection. Please try again.' });
@@ -190,7 +190,7 @@ export default function ReflectionList({ positionId }: ReflectionListProps) {
       {/* Form modal */}
       {showForm && (
         <ReflectionForm
-          positionId={positionId}
+          tradeId={tradeId}
           editing={editing}
           onSave={handleSave}
           onClose={() => { setShowForm(false); setEditing(null); }}

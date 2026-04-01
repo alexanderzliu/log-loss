@@ -9,19 +9,19 @@ const router = Router();
 // GET / - List all reflections with optional filters
 router.get('/', (req, res) => {
   try {
-    const { positionId, type, search } = req.query;
+    const { tradeId, type, search } = req.query;
 
     let query = `
-      SELECT r.*, p.symbol, p.asset_type
+      SELECT r.*, t.underlying, t.asset_type
       FROM reflections r
-      JOIN positions p ON p.id = r.position_id
+      JOIN trades t ON t.id = r.trade_id
       WHERE 1=1
     `;
     const params: unknown[] = [];
 
-    if (positionId) {
-      query += ' AND r.position_id = ?';
-      params.push(positionId);
+    if (tradeId) {
+      query += ' AND r.trade_id = ?';
+      params.push(tradeId);
     }
     if (type) {
       query += ' AND r.type = ?';
@@ -42,58 +42,54 @@ router.get('/', (req, res) => {
   }
 });
 
-// GET /feed - Unified insights feed merging hypotheses and reflections
+// GET /feed - Unified insights feed merging theses and reflections
 router.get('/feed', (req, res) => {
   try {
-    const { search, type, symbol } = req.query;
+    const { search, type, underlying } = req.query;
 
-    // Build WHERE clauses for each half of the UNION
-    const hypothesisConditions: string[] = ["p.hypothesis != ''"];
+    const thesisConditions: string[] = ["t.thesis IS NOT NULL AND t.thesis != ''"];
     const reflectionConditions: string[] = ['1=1'];
-    const hypothesisParams: unknown[] = [];
+    const thesisParams: unknown[] = [];
     const reflectionParams: unknown[] = [];
 
     if (type) {
       if (type === 'hypothesis') {
-        // Only return hypotheses
-        reflectionConditions.push('0'); // exclude reflections
+        reflectionConditions.push('0');
       } else {
-        // Only return reflections of this type
-        hypothesisConditions.push('0'); // exclude hypotheses
+        thesisConditions.push('0');
         reflectionConditions.push('r.type = ?');
         reflectionParams.push(type);
       }
     }
 
-    if (symbol) {
-      hypothesisConditions.push('p.symbol = ?');
-      hypothesisParams.push(symbol);
-      reflectionConditions.push('p.symbol = ?');
-      reflectionParams.push(symbol);
+    if (underlying) {
+      thesisConditions.push('t.underlying = ?');
+      thesisParams.push(underlying);
+      reflectionConditions.push('t.underlying = ?');
+      reflectionParams.push(underlying);
     }
 
     if (search) {
-      hypothesisConditions.push('p.hypothesis LIKE ?');
-      hypothesisParams.push(`%${search}%`);
+      thesisConditions.push('t.thesis LIKE ?');
+      thesisParams.push(`%${search}%`);
       reflectionConditions.push('r.content LIKE ?');
       reflectionParams.push(`%${search}%`);
     }
 
     const query = `
       SELECT
-        p.id as id,
+        t.id as id,
         'hypothesis' as type,
-        p.hypothesis as content,
-        p.opened_at as date,
-        p.id as position_id,
-        p.symbol,
-        p.asset_type,
-        p.direction,
-        p.status,
-        p.realized_pnl,
-        p.realized_pnl_percent
-      FROM positions p
-      WHERE ${hypothesisConditions.join(' AND ')}
+        t.thesis as content,
+        COALESCE(t.open_date, t.created_at) as date,
+        t.id as trade_id,
+        t.underlying,
+        t.asset_type,
+        t.strategy,
+        t.status,
+        t.realized_pnl
+      FROM trades t
+      WHERE ${thesisConditions.join(' AND ')}
 
       UNION ALL
 
@@ -102,21 +98,20 @@ router.get('/feed', (req, res) => {
         r.type as type,
         r.content as content,
         r.created_at as date,
-        r.position_id,
-        p.symbol,
-        p.asset_type,
-        p.direction,
-        p.status,
-        p.realized_pnl,
-        p.realized_pnl_percent
+        r.trade_id,
+        t.underlying,
+        t.asset_type,
+        t.strategy,
+        t.status,
+        t.realized_pnl
       FROM reflections r
-      JOIN positions p ON p.id = r.position_id
+      JOIN trades t ON t.id = r.trade_id
       WHERE ${reflectionConditions.join(' AND ')}
 
       ORDER BY date DESC
     `;
 
-    const params = [...hypothesisParams, ...reflectionParams];
+    const params = [...thesisParams, ...reflectionParams];
     const rows = db.prepare(query).all(...params) as Record<string, unknown>[];
 
     const feed: InsightFeedItem[] = rows.map(row => ({
@@ -124,13 +119,12 @@ router.get('/feed', (req, res) => {
       type: row.type as InsightFeedItem['type'],
       content: row.content as string,
       date: row.date as string,
-      positionId: row.position_id as string,
-      symbol: row.symbol as string,
+      tradeId: row.trade_id as string,
+      underlying: row.underlying as string,
       assetType: row.asset_type as string,
-      direction: row.direction as string,
+      strategy: row.strategy as string,
       status: row.status as string,
-      realizedPnl: row.realized_pnl as number,
-      realizedPnlPercent: row.realized_pnl_percent as number | null,
+      realizedPnl: (row.realized_pnl as number) || 0,
     }));
 
     res.json(feed);
@@ -143,10 +137,10 @@ router.get('/feed', (req, res) => {
 // POST / - Create reflection
 router.post('/', (req, res) => {
   try {
-    const { positionId, type, content } = req.body;
+    const { tradeId, type, content } = req.body;
 
-    if (!positionId || typeof positionId !== 'string') {
-      return res.status(400).json({ error: 'positionId is required' });
+    if (!tradeId || typeof tradeId !== 'string') {
+      return res.status(400).json({ error: 'tradeId is required' });
     }
     if (!content || typeof content !== 'string') {
       return res.status(400).json({ error: 'content is required' });
@@ -155,23 +149,23 @@ router.post('/', (req, res) => {
       return res.status(400).json({ error: 'type must be "success", "lesson", or "mistake"' });
     }
 
-    // Verify position exists
-    const position = db.prepare('SELECT id FROM positions WHERE id = ?').get(positionId);
-    if (!position) {
-      return res.status(404).json({ error: 'Position not found' });
+    // Verify trade exists
+    const trade = db.prepare('SELECT id FROM trades WHERE id = ?').get(tradeId);
+    if (!trade) {
+      return res.status(404).json({ error: 'Trade not found' });
     }
 
     const id = uuidv4();
 
     db.prepare(`
-      INSERT INTO reflections (id, position_id, type, content)
+      INSERT INTO reflections (id, trade_id, type, content)
       VALUES (?, ?, ?, ?)
-    `).run(id, positionId, type || 'success', content);
+    `).run(id, tradeId, type || 'success', content);
 
     const row = db.prepare(`
-      SELECT r.*, p.symbol, p.asset_type
+      SELECT r.*, t.underlying, t.asset_type
       FROM reflections r
-      JOIN positions p ON p.id = r.position_id
+      JOIN trades t ON t.id = r.trade_id
       WHERE r.id = ?
     `).get(id) as Record<string, unknown>;
 
@@ -220,9 +214,9 @@ router.put('/:id', (req, res) => {
     }
 
     const row = db.prepare(`
-      SELECT r.*, p.symbol, p.asset_type
+      SELECT r.*, t.underlying, t.asset_type
       FROM reflections r
-      JOIN positions p ON p.id = r.position_id
+      JOIN trades t ON t.id = r.trade_id
       WHERE r.id = ?
     `).get(id) as Record<string, unknown>;
 
