@@ -127,6 +127,9 @@ export function initDatabase() {
   // Add rules table
   migrateCreateRules();
 
+  // Add chart snapshots table
+  migrateCreateChartSnapshots();
+
   console.log('Database initialized successfully');
 }
 
@@ -208,6 +211,34 @@ function migrateCreatePredictions() {
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_predictions_status ON predictions(status);
     CREATE INDEX IF NOT EXISTS idx_predictions_side ON predictions(side);
+  `);
+}
+
+function migrateCreateChartSnapshots() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS chart_snapshots (
+      id TEXT PRIMARY KEY,
+      trade_id TEXT NOT NULL,
+      leg_id TEXT,
+      symbol TEXT NOT NULL,
+      symbol_type TEXT NOT NULL DEFAULT 'underlying'
+        CHECK(symbol_type IN ('underlying', 'option')),
+      trade_date TEXT NOT NULL,
+      bars TEXT NOT NULL,
+      indicators TEXT,
+      source TEXT NOT NULL DEFAULT 'yahoo'
+        CHECK(source IN ('yahoo', 'theoretical')),
+      bar_count INTEGER NOT NULL DEFAULT 0,
+      captured_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (trade_id) REFERENCES trades(id) ON DELETE CASCADE,
+      FOREIGN KEY (leg_id) REFERENCES trade_legs(id) ON DELETE SET NULL
+    )
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_chart_snapshots_trade_id ON chart_snapshots(trade_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_chart_snapshots_unique
+      ON chart_snapshots(trade_id, symbol, trade_date);
   `);
 }
 

@@ -1,10 +1,11 @@
 import { create } from 'zustand';
-import type { Trade, TradeCreateData, TradeUpdateData, TradeCloseData, PriceData, PortfolioSummary, Prediction, PredictionFormData, PredictionCloseData, PredictionUpdateData, PredictionsSummary, Reflection, Rule } from '../types';
+import type { Trade, TradeCreateData, TradeUpdateData, TradeCloseData, PriceData, PortfolioSummary, Prediction, PredictionFormData, PredictionCloseData, PredictionUpdateData, PredictionsSummary, Reflection, Rule, ChartSnapshot } from '../types';
 import * as tradesApi from '../api/trades';
 import * as pricesApi from '../api/prices';
 import * as predictionsApi from '../api/predictions';
 import * as reflectionsApi from '../api/reflections';
 import * as rulesApi from '../api/rules';
+import * as snapshotsApi from '../api/snapshots';
 
 export interface Toast {
   id: string;
@@ -68,6 +69,13 @@ interface StoreState {
   closePrediction: (id: string, data: PredictionCloseData) => Promise<Prediction>;
   deletePrediction: (id: string) => Promise<void>;
   fetchPredictionsSummary: () => Promise<void>;
+
+  // Chart Snapshots (keyed by tradeId)
+  chartSnapshots: Record<string, ChartSnapshot[]>;
+  chartSnapshotsLoading: Record<string, boolean>;
+  fetchChartSnapshots: (tradeId: string) => Promise<void>;
+  captureChartSnapshots: (tradeId: string, tradeDate?: string) => Promise<void>;
+  deleteChartSnapshot: (tradeId: string, snapshotId: string) => Promise<void>;
 
   // Rules
   rules: Rule[];
@@ -282,6 +290,56 @@ export const useStore = create<StoreState>((set, get) => ({
     } catch (error) {
       set({ predictionsSummaryError: (error as Error).message, predictionsSummaryLoading: false });
     }
+  },
+
+  // Chart Snapshots
+  chartSnapshots: {},
+  chartSnapshotsLoading: {},
+
+  fetchChartSnapshots: async (tradeId) => {
+    // Skip if already loading
+    if (get().chartSnapshotsLoading[tradeId]) return;
+    set((state) => ({ chartSnapshotsLoading: { ...state.chartSnapshotsLoading, [tradeId]: true } }));
+    try {
+      const snapshots = await snapshotsApi.fetchSnapshots(tradeId);
+      set((state) => ({
+        chartSnapshots: { ...state.chartSnapshots, [tradeId]: snapshots },
+        chartSnapshotsLoading: { ...state.chartSnapshotsLoading, [tradeId]: false },
+      }));
+    } catch (error) {
+      console.error('Failed to fetch chart snapshots:', error);
+      set((state) => ({ chartSnapshotsLoading: { ...state.chartSnapshotsLoading, [tradeId]: false } }));
+    }
+  },
+
+  captureChartSnapshots: async (tradeId, tradeDate) => {
+    set((state) => ({ chartSnapshotsLoading: { ...state.chartSnapshotsLoading, [tradeId]: true } }));
+    try {
+      const result = await snapshotsApi.captureSnapshots(tradeId, { tradeDate });
+      set((state) => ({
+        chartSnapshots: { ...state.chartSnapshots, [tradeId]: result.snapshots },
+        chartSnapshotsLoading: { ...state.chartSnapshotsLoading, [tradeId]: false },
+      }));
+      const total = result.status.captured.length + result.status.theoretical.length;
+      if (total > 0) {
+        get().addToast({ type: 'success', title: 'Chart Data Captured', message: `${total} snapshot${total > 1 ? 's' : ''} saved` });
+      }
+      if (result.status.failed.length > 0) {
+        get().addToast({ type: 'info', title: 'Some captures failed', message: result.status.failed.join(', ') });
+      }
+    } catch (error) {
+      console.error('Failed to capture chart snapshots:', error);
+      set((state) => ({ chartSnapshotsLoading: { ...state.chartSnapshotsLoading, [tradeId]: false } }));
+      get().addToast({ type: 'error', title: 'Capture Failed', message: (error as Error).message });
+    }
+  },
+
+  deleteChartSnapshot: async (tradeId, snapshotId) => {
+    await snapshotsApi.deleteSnapshot(tradeId, snapshotId);
+    set((state) => {
+      const existing = state.chartSnapshots[tradeId] || [];
+      return { chartSnapshots: { ...state.chartSnapshots, [tradeId]: existing.filter((s) => s.id !== snapshotId) } };
+    });
   },
 
   // Rules

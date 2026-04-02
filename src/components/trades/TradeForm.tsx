@@ -44,6 +44,7 @@ type LegDraft = {
   quantity: string;
   entryPrice: string;
   exitPrice: string;
+  iv: string;
 };
 
 type TagDraft = { tag: string; category?: string };
@@ -73,7 +74,7 @@ const ENTRY_QUALITIES: { value: EntryQuality; label: string; color: string; bg: 
 ];
 
 function makeLegDraft(side: TradeSide): LegDraft {
-  return { ticker: '', optionType: 'call', strike: '', expiration: '', side, quantity: '', entryPrice: '', exitPrice: '' };
+  return { ticker: '', optionType: 'call', strike: '', expiration: '', side, quantity: '', entryPrice: '', exitPrice: '', iv: '' };
 }
 
 function scaffoldLegs(strategy: TradeStrategy, side: TradeSide): LegDraft[] {
@@ -120,6 +121,7 @@ function existingLegsToClose(trade: Trade): LegDraft[] {
     quantity: String(l.quantity),
     entryPrice: l.entryPrice !== null ? String(l.entryPrice) : '',
     exitPrice: l.exitPrice !== null ? String(l.exitPrice) : '',
+    iv: l.iv !== null ? String(l.iv) : '',
   }));
 }
 
@@ -236,7 +238,7 @@ export default function TradeForm({ trade, mode = 'create', onClose }: TradeForm
           gamma: null,
           theta: null,
           vega: null,
-          iv: null,
+          iv: l.iv ? parseNum(l.iv) / 100 : null,
         }));
 
         const data: TradeCreateData = {
@@ -670,6 +672,21 @@ export default function TradeForm({ trade, mode = 'create', onClose }: TradeForm
                       />
                     </FieldGroup>
                   </div>
+                  {assetType === 'option' && (
+                    <div className="grid grid-cols-4 gap-2">
+                      <FieldGroup label="IV %" optional>
+                        <PrefixInput
+                          prefix="%"
+                          type="text"
+                          inputMode="decimal"
+                          value={leg.iv}
+                          onChange={(e) => updateLeg(idx, 'iv', e.target.value)}
+                          placeholder="e.g. 35"
+                          style={{ fontSize: '13px' }}
+                        />
+                      </FieldGroup>
+                    </div>
+                  )}
                 </div>
               ))}
               <button

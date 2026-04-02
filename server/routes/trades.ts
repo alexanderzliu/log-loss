@@ -1,34 +1,12 @@
 import { Router } from 'express';
 import { db } from '../database';
 import { v4 as uuidv4 } from 'uuid';
-import type { Trade, TradeLeg, TradeTag } from '../../shared/types.ts';
-import { rowToTrade, rowToTradeLeg, rowToTradeTag, rowToReflection } from '../helpers/rowMappers';
+import type { TradeLeg, TradeTag } from '../../shared/types.ts';
+import { rowToTrade, rowToTradeLeg, rowToTradeTag } from '../helpers/rowMappers';
+import { getTradeWithDetails, backfillLegUnderlyingPrices } from '../helpers/tradeQueries';
+import { captureSnapshotsForTrade } from './snapshots';
 
 const router = Router();
-
-function getTradeWithDetails(id: string): Trade | null {
-  const row = db.prepare('SELECT * FROM trades WHERE id = ?').get(id) as Record<string, unknown> | undefined;
-  if (!row) return null;
-
-  const trade = rowToTrade(row);
-
-  const legRows = db.prepare(
-    'SELECT * FROM trade_legs WHERE trade_id = ? ORDER BY rowid ASC'
-  ).all(id) as Record<string, unknown>[];
-  trade.legs = legRows.map(rowToTradeLeg);
-
-  const tagRows = db.prepare(
-    'SELECT * FROM trade_tags WHERE trade_id = ?'
-  ).all(id) as Record<string, unknown>[];
-  trade.tags = tagRows.map(rowToTradeTag);
-
-  const reflectionRows = db.prepare(
-    'SELECT * FROM reflections WHERE trade_id = ? ORDER BY created_at DESC'
-  ).all(id) as Record<string, unknown>[];
-  trade.reflections = reflectionRows.map(rowToReflection);
-
-  return trade;
-}
 
 // GET / - List all trades
 router.get('/', (req, res) => {
@@ -451,43 +429,137 @@ router.post('/', (req, res) => {
 
     const trade = getTradeWithDetails(tradeId);
     res.status(201).json(trade);
+
+    // Fire-and-forget: capture chart data for open trades
+    if (initialStatus === 'open') {
+      captureSnapshotsForTrade(tradeId).catch((err) =>
+        console.error(`Auto-capture on create failed for trade ${tradeId}:`, err)
+      );
+    }
   } catch (error) {
     console.error('Error creating trade:', error);
     res.status(500).json({ error: 'Failed to create trade' });
   }
 });
 
-// PUT /:id - Update trade metadata
+// PUT /:id - Update trade fields
 router.put('/:id', (req, res) => {
   try {
     const { id } = req.params;
     const updates: string[] = [];
     const params: unknown[] = [];
 
+    // Metadata fields
     if ('name' in req.body) { updates.push('name = ?'); params.push(req.body.name ?? ''); }
     if ('thesis' in req.body) { updates.push('thesis = ?'); params.push(req.body.thesis ?? ''); }
     if ('exitPlan' in req.body) { updates.push('exit_plan = ?'); params.push(req.body.exitPlan ?? ''); }
     if ('notes' in req.body) { updates.push('notes = ?'); params.push(req.body.notes ?? ''); }
+    if ('reflection' in req.body) { updates.push('reflection = ?'); params.push(req.body.reflection ?? ''); }
     if ('entryQuality' in req.body) { updates.push('entry_quality = ?'); params.push(req.body.entryQuality ?? null); }
+    if ('followedPlan' in req.body) { updates.push('followed_plan = ?'); params.push(req.body.followedPlan != null ? (req.body.followedPlan ? 1 : 0) : null); }
+
+    // Date fields
+    if ('openDate' in req.body) { updates.push('open_date = ?'); params.push(req.body.openDate ?? null); }
+    if ('closeDate' in req.body) { updates.push('close_date = ?'); params.push(req.body.closeDate ?? null); }
+
+    // Pricing & P&L
+    if ('entryPrice' in req.body) { updates.push('entry_price = ?'); params.push(req.body.entryPrice ?? null); }
+    if ('exitPrice' in req.body) { updates.push('exit_price = ?'); params.push(req.body.exitPrice ?? null); }
     if ('fees' in req.body) { updates.push('fees = ?'); params.push(req.body.fees ?? null); }
 
-    if (updates.length === 0) {
+    // Structure
+    if ('strategy' in req.body) { updates.push('strategy = ?'); params.push(req.body.strategy); }
+    if ('quantity' in req.body) { updates.push('quantity = ?'); params.push(req.body.quantity); }
+    if ('side' in req.body) { updates.push('side = ?'); params.push(req.body.side); }
+    if ('underlying' in req.body) { updates.push('underlying = ?'); params.push(typeof req.body.underlying === 'string' ? req.body.underlying.toUpperCase() : req.body.underlying); }
+
+    // Realized P&L — either explicit or recalculated
+    if ('realizedPnl' in req.body && !req.body.recalculatePnl) {
+      updates.push('realized_pnl = ?'); params.push(req.body.realizedPnl ?? null);
+    }
+
+    const hasTagOps = 'tags' in req.body || 'addTags' in req.body || 'removeTags' in req.body;
+
+    if (updates.length === 0 && !req.body.recalculatePnl && !hasTagOps) {
       return res.status(400).json({ error: 'No fields to update' });
     }
 
-    updates.push("updated_at = datetime('now')");
-    params.push(id);
-
-    const result = db.prepare(`UPDATE trades SET ${updates.join(', ')} WHERE id = ?`).run(...params);
-
-    if (result.changes === 0) {
-      return res.status(404).json({ error: 'Trade not found' });
+    // Validation: openDate must be before closeDate
+    if ('openDate' in req.body && 'closeDate' in req.body && req.body.openDate && req.body.closeDate) {
+      if (new Date(req.body.openDate) >= new Date(req.body.closeDate)) {
+        return res.status(400).json({ error: 'openDate must be before closeDate' });
+      }
     }
 
+    const update = db.transaction(() => {
+      // Recalculate P&L if requested
+      if (req.body.recalculatePnl) {
+        const trade = db.prepare('SELECT entry_price, exit_price, quantity, fees, side FROM trades WHERE id = ?').get(id) as {
+          entry_price: number | null; exit_price: number | null; quantity: number; fees: number | null; side: string;
+        } | undefined;
+        if (trade) {
+          const entry = 'entryPrice' in req.body ? req.body.entryPrice : trade.entry_price;
+          const exit = 'exitPrice' in req.body ? req.body.exitPrice : trade.exit_price;
+          const qty = 'quantity' in req.body ? req.body.quantity : trade.quantity;
+          const fees = 'fees' in req.body ? (req.body.fees ?? 0) : (trade.fees ?? 0);
+          const side = 'side' in req.body ? req.body.side : trade.side;
+          if (entry != null && exit != null) {
+            const direction = side === 'buy' ? 1 : -1;
+            const pnl = direction * (exit - entry) * qty * 100 - fees;
+            updates.push('realized_pnl = ?'); params.push(pnl);
+          }
+        }
+      }
+
+      if (updates.length > 0) {
+        updates.push("updated_at = datetime('now')");
+        params.push(id);
+        const result = db.prepare(`UPDATE trades SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+        if (result.changes === 0) throw new Error('Trade not found');
+      }
+
+      // Tag operations
+      if ('tags' in req.body) {
+        // Replace all tags
+        db.prepare('DELETE FROM trade_tags WHERE trade_id = ?').run(id);
+        if (Array.isArray(req.body.tags)) {
+          const insertTag = db.prepare('INSERT OR IGNORE INTO trade_tags (id, trade_id, tag, category) VALUES (?, ?, ?, ?)');
+          for (const t of req.body.tags) {
+            insertTag.run(uuidv4(), id, t.tag, t.category ?? null);
+          }
+        }
+      } else {
+        if (Array.isArray(req.body.removeTags)) {
+          const deleteTag = db.prepare('DELETE FROM trade_tags WHERE trade_id = ? AND id = ?');
+          for (const tagId of req.body.removeTags) {
+            deleteTag.run(id, tagId);
+          }
+        }
+        if (Array.isArray(req.body.addTags)) {
+          const insertTag = db.prepare('INSERT OR IGNORE INTO trade_tags (id, trade_id, tag, category) VALUES (?, ?, ?, ?)');
+          for (const t of req.body.addTags) {
+            insertTag.run(uuidv4(), id, t.tag, t.category ?? null);
+          }
+        }
+      }
+    });
+
+    update();
+
     const trade = getTradeWithDetails(id);
+    if (!trade) return res.status(404).json({ error: 'Trade not found' });
     res.json(trade);
+
+    // Re-trigger snapshot capture and leg price backfill when dates change
+    if ('openDate' in req.body || 'closeDate' in req.body) {
+      backfillLegUnderlyingPrices(id).catch((err) =>
+        console.error(`Snapshot re-capture failed for trade ${id}:`, err)
+      );
+    }
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to update trade';
     console.error('Error updating trade:', error);
+    if (message === 'Trade not found') return res.status(404).json({ error: message });
     res.status(500).json({ error: 'Failed to update trade' });
   }
 });
@@ -537,6 +609,11 @@ router.put('/:id/close', (req, res) => {
 
     const trade = getTradeWithDetails(id);
     res.json(trade);
+
+    // Fire-and-forget: capture exit session chart data and backfill leg prices
+    backfillLegUnderlyingPrices(id).catch((err) =>
+      console.error(`Auto-capture on close failed for trade ${id}:`, err)
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to close trade';
     console.error('Error closing trade:', error);

@@ -7,6 +7,7 @@ import pricesRouter from './routes/prices';
 import predictionsRouter from './routes/predictions';
 import reflectionsRouter from './routes/reflections';
 import rulesRouter from './routes/rules';
+import snapshotsRouter from './routes/snapshots';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled rejection:', reason);
@@ -27,6 +28,7 @@ app.use('/api/prices', pricesRouter);
 app.use('/api/predictions', predictionsRouter);
 app.use('/api/reflections', reflectionsRouter);
 app.use('/api/rules', rulesRouter);
+app.use('/api/trades/:tradeId/chart', snapshotsRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {

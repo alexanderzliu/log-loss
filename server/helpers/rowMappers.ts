@@ -1,4 +1,4 @@
-import type { Trade, TradeLeg, TradeTag, Reflection } from '../../shared/types.ts';
+import type { Trade, TradeLeg, TradeTag, Reflection, ChartSnapshot, SnapshotSymbolType, SnapshotSource, ComputedIndicators } from '../../shared/types.ts';
 
 export function rowToTrade(row: Record<string, unknown>): Trade {
   return {
@@ -57,6 +57,22 @@ export function rowToTradeTag(row: Record<string, unknown>): TradeTag {
     tradeId: row.trade_id as string,
     tag: row.tag as string,
     category: row.category as string | null,
+  };
+}
+
+export function rowToChartSnapshot(row: Record<string, unknown>): ChartSnapshot {
+  return {
+    id: row.id as string,
+    tradeId: row.trade_id as string,
+    legId: (row.leg_id as string) || null,
+    symbol: row.symbol as string,
+    symbolType: row.symbol_type as SnapshotSymbolType,
+    tradeDate: row.trade_date as string,
+    bars: JSON.parse(row.bars as string),
+    indicators: row.indicators ? JSON.parse(row.indicators as string) as ComputedIndicators : null,
+    source: row.source as SnapshotSource,
+    barCount: row.bar_count as number,
+    capturedAt: row.captured_at as string,
   };
 }
 

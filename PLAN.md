@@ -165,32 +165,103 @@ Update the frontend to support options workflows:
 
 ## Phase 4: VWAP & chart data capture
 
-**Status: Not started**
+**Status: Complete**
 
-Store price context at trade entry/exit to support post-hoc analysis:
+Capture and display intraday price context for trade review and future backtesting:
 
-- [ ] Capture OHLCV data window around entry/exit (e.g., 5-min bars for surrounding session)
-- [ ] Compute and store VWAP for the session
-- [ ] Store as JSON blob in `chart_snapshots` table linked to `trade_legs`
-- [ ] Frontend: render mini-charts showing entry/exit points overlaid on price + VWAP
-- [ ] Data source: Yahoo Finance intraday data (or another free source for intraday bars)
+- [x] `chart_snapshots` table — stores 1-min OHLCV bars as JSON blobs, linked to trades and optionally to legs
+- [x] Yahoo Finance 1-min bar fetching for underlying (SPY) and option contracts (OCC tickers)
+- [x] Sequential rate-limited requests (2s delay) to avoid Yahoo 429s
+- [x] Forward-fill null bars for options (carry previous close, volume=0)
+- [x] VWAP computation with ±1/2/3 SD bands, volume profile with POC and value area
+- [x] Black-Scholes theoretical pricing fallback when Yahoo data unavailable
+- [x] Pre-computed indicators stored at capture time (not recomputed on every read)
+- [x] Auto-capture on trade open and close (fire-and-forget, non-blocking)
+- [x] Manual capture button in expanded trade row
+- [x] Frontend candlestick charts via lightweight-charts (TradingView)
+- [x] VWAP + band overlays, entry/exit markers, volume histogram
+- [x] Tab navigation between underlying and option leg charts
+- [x] Theoretical data flagged with "Est." badge
+- [x] IV input added to trade leg form (enables Black-Scholes fallback)
 
-**Open questions:**
-- What timeframe bars are most useful? (1-min, 5-min, 15-min?)
-- How much context around the trade? (full session? 2 hours before/after?)
-- Any other indicators beyond VWAP? (EMAs, volume profile, VWAP bands/standard deviations?)
+**Decisions:**
+- 1-min candles, full session capture (~390-405 bars per symbol)
+- $TICK dropped — not available on Yahoo Finance (would need broker API)
+- Real option bars preferred, Black-Scholes only as fallback for expired/unavailable data
+- Backtesting simulation deferred to future phase — this phase captures the data foundation
 
-## Phase 5: API & MCP server / CLI
+## Phase 5: MCP server for Claude Code
 
-**Status: Not started**
+**Status: Complete**
 
-Build programmatic access so Claude can query and analyze the journal:
+Standalone MCP server (stdio transport) that directly accesses the SQLite DB. Claude Code spawns it as a subprocess — no Express server dependency. Configured in `.mcp.json` at project root.
 
-- [ ] Clean REST API — document and stabilize endpoints
-- [ ] MCP server with tools: `search_trades`, `get_trade`, `get_equity_curve`, `get_analytics`, `query_by_tag`, `query_by_entry_quality`, `add_trade`, `get_rules`, etc.
-- [ ] Batch query support — filter by date range, underlying, strategy type, P&L range, thesis tag, entry quality, timeframe
-- [ ] Aggregation queries — P&L by thesis tag, win rate by entry quality, performance by strategy type
-- [ ] Export capabilities — CSV/JSON dump for external analysis
+### Architecture
+
+```
+server/mcp/
+  index.ts              -- MCP entry point (stdio), registers all 15 tools
+  helpers/occParser.ts  -- OCC symbol parsing (SPY260401C647 → components)
+  helpers/csvParser.ts  -- Fidelity CSV parsing, FIFO order pairing, P&L computation
+  tools/import.ts       -- parse_fidelity_csv, create_trade, batch_create_trades
+  tools/trades.ts       -- search_trades, get_trade, update_trade, delete_trade, close_trade
+  tools/analytics.ts    -- get_daily_summary, get_portfolio_summary, get_equity_curve, get_analytics
+  tools/reflections.ts  -- add_reflection
+  tools/rules.ts        -- get_rules, add_rule
+server/helpers/tradeQueries.ts  -- shared getTradeWithDetails (used by Express + MCP)
+```
+
+### Tools (15 total)
+
+**Import (interactive walkthrough):**
+- `parse_fidelity_csv` — Reads CSV (file path or raw text), pairs BTO/STC orders FIFO by symbol (sorted ascending first), extracts OCC details, computes P&L. Returns parsed trades — does NOT create anything. Handles \r\n line endings, partial fills, orphaned orders.
+- `create_trade` — Creates a fully-closed trade with leg, tags, auto-generated name (e.g. "SPY 1DTE 647C"). Auto-calculates fees ($1.30/contract). Awaits chart snapshot capture, back-fills underlying prices from 1-min bars.
+- `batch_create_trades` — Creates multiple trades in one transaction. Deduplicates underlying snapshot fetches (SPY bars fetched once, shared). Much faster for CSV imports.
+
+**Query & Analysis:**
+- `search_trades` — Filter by: date range, underlying, strategy, status, entry quality, tags, P&L range, side. Paginated with total count.
+- `get_trade` — Full detail: legs, tags, reflections, chart context (VWAP at entry/exit, band position, POC, value area, distance from POC).
+- `get_daily_summary` — All trades for a date with P&L, win/loss, entry quality breakdown, best/worst trade, followed-plan rate.
+- `get_portfolio_summary` — Overall stats (open/closed count, realized P&L, net P&L, win rate, followed-plan rate).
+- `get_equity_curve` — Cumulative P&L points, optional date range.
+- `get_analytics` — Breakdowns by strategy, entry quality, underlying, monthly. Profit factor, avg win/loss, avg hold time. Optional date range.
+
+**Trade Management:**
+- `update_trade` — Update name, thesis, exit plan, notes, reflection, entry quality, followed_plan.
+- `delete_trade` — Permanently delete a trade and all associated data. Annotated as destructive.
+- `close_trade` — Close an open trade with exit data. Triggers exit-session chart snapshot.
+
+**Coaching & Reflection:**
+- `add_reflection` — Link a success/lesson/mistake reflection to a specific trade.
+- `get_rules` — Fetch all trading rules (for coaching context).
+- `add_rule` — Create a new rule from identified patterns.
+
+### Daily workflow
+
+1. After market close: export Fidelity CSV
+2. "Import today's trades" → `parse_fidelity_csv` → Claude walks each trade interactively
+3. Per trade: Claude asks thesis, entry quality, tags → `create_trade` or `batch_create_trades`
+4. After all trades imported: Claude gives daily summary + coaching based on patterns and rules
+5. Later sessions: "How are my FOMO entries doing?" → `search_trades` + `get_analytics` for targeted analysis
+
+### Key implementation details
+- `console.log` redirected to `console.error` in MCP entry point (stdout is MCP protocol channel)
+- CSV parser sorts rows ascending by time before FIFO pairing (CSV is newest-first)
+- OCC parser handles both Fidelity shorthand (3-digit strike) and standard 8-digit OCC format
+- Chart context in `get_trade` returns only summary metrics (VWAP at timestamps, band positions), not full bar arrays
+- `getTradeWithDetails` extracted to `server/helpers/tradeQueries.ts` for reuse by Express routes and MCP tools
+- WAL mode enables concurrent access from both MCP server and Express server
+
+### Decisions
+- Standalone stdio MCP server (not HTTP) — simplest for Claude Code, no server dependency
+- Direct SQLite access (reuses `database.ts` and `rowMappers.ts`) — avoids Express coupling
+- `parse_fidelity_csv` is read-only (returns data, doesn't create) — enables interactive walkthrough
+- `batch_create_trades` deduplicates Yahoo fetches — ~6s instead of ~40s for 10 trades
+- Fees auto-calculated at $1.30/contract round trip ($0.65 x 2)
+- Underlying price at entry/exit back-filled from chart snapshot 1-min bars
+- One trade per BTO/STC pair, FIFO matching by symbol (no simultaneous same-contract positions)
+- Trade names auto-generated from leg details: "SPY 1DTE 647C"
+- MCP config in `.mcp.json` at project root (not settings.json)
 
 ## Phase 6: Notion data migration
 
@@ -220,6 +291,11 @@ Import existing trades from the Notion CSV exports in `notion-trade-journal/`:
 | 2026-03-29 | Use `trade_tags` table instead of text column for thesis/timeframe | Flexible filtering — group 0DTE scalps vs swings, cluster trades by macro thesis |
 | 2026-03-29 | Split Notes into thesis, exit_plan, reflection, notes | Structured fields enable better querying and analysis |
 | 2026-03-29 | Strip crypto code (Phase 2) before building new schema (Phase 1) | Clean slate approach — less old code to work around |
+| 2026-04-01 | Standalone stdio MCP server (not HTTP wrapper around Express) | Simplest for Claude Code, no server dependency, direct SQLite access |
+| 2026-04-01 | `parse_fidelity_csv` is read-only, separate from `create_trade` | Enables interactive walkthrough — Claude asks thesis/quality per trade before creating |
+| 2026-04-01 | Auto-calculate fees at $1.30/contract round trip | $0.65/contract x 2 sides, simple and accurate enough |
+| 2026-04-01 | Back-fill underlying price from chart snapshot bars | Fidelity CSV doesn't include SPY price, but 1-min Yahoo bars captured on import provide it |
+| 2026-04-01 | FIFO order pairing by symbol, no simultaneous same-contract positions | Matches user's trading style — one position per contract at a time |
 
 ## Notes
 

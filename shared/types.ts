@@ -84,12 +84,36 @@ export interface TradeCreateData {
 }
 
 export interface TradeUpdateData {
+  // Metadata
   name?: string;
   thesis?: string;
   exitPlan?: string;
   notes?: string;
+  reflection?: string;
   entryQuality?: EntryQuality;
+  followedPlan?: boolean;
+
+  // Dates
+  openDate?: string;
+  closeDate?: string;
+
+  // Pricing & P&L
+  entryPrice?: number;
+  exitPrice?: number;
+  realizedPnl?: number;
   fees?: number;
+  recalculatePnl?: boolean;
+
+  // Structure
+  strategy?: TradeStrategy;
+  quantity?: number;
+  side?: TradeSide;
+  underlying?: string;
+
+  // Tags (add/remove/replace)
+  tags?: { tag: string; category?: string }[];
+  addTags?: { tag: string; category?: string }[];
+  removeTags?: string[];
 }
 
 export interface TradeCloseData {
@@ -240,6 +264,64 @@ export interface PredictionsSummary {
   predictionsCostBasis: number;
   predictionsWinRate: number;
   openPredictionsCost: number;
+}
+
+// --- Chart Snapshots ---
+
+export type SnapshotSymbolType = 'underlying' | 'option';
+export type SnapshotSource = 'yahoo' | 'theoretical';
+
+export interface OhlcvBar {
+  t: number;    // Unix timestamp (seconds)
+  o: number;    // Open
+  h: number;    // High
+  l: number;    // Low
+  c: number;    // Close
+  v: number;    // Volume
+}
+
+export interface ChartSnapshot {
+  id: string;
+  tradeId: string;
+  legId: string | null;
+  symbol: string;
+  symbolType: SnapshotSymbolType;
+  tradeDate: string;
+  bars: OhlcvBar[];
+  indicators: ComputedIndicators | null;
+  source: SnapshotSource;
+  barCount: number;
+  capturedAt: string;
+}
+
+export interface VwapPoint {
+  t: number;
+  vwap: number;
+  upperBand1: number;
+  lowerBand1: number;
+  upperBand2: number;
+  lowerBand2: number;
+  upperBand3: number;
+  lowerBand3: number;
+}
+
+export interface VolumeProfileBin {
+  price: number;
+  volume: number;
+  buyVolume: number;
+  sellVolume: number;
+}
+
+export interface ComputedIndicators {
+  vwap: VwapPoint[];
+  volumeProfile: VolumeProfileBin[];
+  poc: number;
+  valueAreaHigh: number;
+  valueAreaLow: number;
+}
+
+export interface ChartSnapshotWithIndicators extends ChartSnapshot {
+  indicators: ComputedIndicators;
 }
 
 // --- Rules ---

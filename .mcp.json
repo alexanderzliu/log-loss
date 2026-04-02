@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "trading-journal": {
+      "command": "npx",
+      "args": ["tsx", "server/mcp/index.ts"],
+      "cwd": "/Users/aliu/dev/log-loss"
+    }
+  }
+}
