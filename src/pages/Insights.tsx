@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Lightbulb, CheckCircle, GraduationCap, AlertTriangle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Lightbulb, CheckCircle, GraduationCap, AlertTriangle, ExternalLink } from 'lucide-react';
 import { fetchInsightsFeed } from '../api/reflections';
 import { formatCurrency, formatDate } from '../utils/format';
+import { isDateInRange } from '../utils/tradeFilters';
 import FilterPills from '../components/FilterPills';
 import PageTransition from '../components/PageTransition';
+import { FilterDropdown, DateRangeFilter, CollapsibleFilterBar } from '../components/FilterControls';
 import type { InsightFeedItem } from '../types';
 
 const TYPE_CONFIG: Record<InsightFeedItem['type'], {
@@ -62,11 +65,18 @@ function groupByMonth(items: InsightFeedItem[]): { month: string; items: Insight
 }
 
 export default function Insights() {
+  const navigate = useNavigate();
   const [feed, setFeed] = useState<InsightFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
+
+  // Advanced filters
+  const [underlyingFilter, setUnderlyingFilter] = useState('');
+  const [strategyFilter, setStrategyFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const loadFeed = async () => {
     setLoading(true);
@@ -88,6 +98,35 @@ export default function Insights() {
     return () => clearTimeout(timer);
   }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Available filter options from data
+  const filterOptions = useMemo(() => {
+    const underlyings = new Set<string>();
+    const strategies = new Set<string>();
+    for (const item of feed) {
+      if (item.underlying) underlyings.add(item.underlying);
+      if (item.strategy) strategies.add(item.strategy);
+    }
+    return {
+      underlyings: Array.from(underlyings).sort(),
+      strategies: Array.from(strategies).sort(),
+    };
+  }, [feed]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (underlyingFilter) count++;
+    if (strategyFilter) count++;
+    if (dateFrom || dateTo) count++;
+    return count;
+  }, [underlyingFilter, strategyFilter, dateFrom, dateTo]);
+
+  const clearAllFilters = () => {
+    setUnderlyingFilter('');
+    setStrategyFilter('');
+    setDateFrom('');
+    setDateTo('');
+  };
+
   const filterCounts = useMemo(() => {
     const counts: Record<string, number> = { all: feed.length };
     for (const item of feed) {
@@ -97,11 +136,46 @@ export default function Insights() {
   }, [feed]);
 
   const filteredFeed = useMemo(() => {
-    if (typeFilter === 'all') return feed;
-    return feed.filter(item => item.type === typeFilter);
-  }, [feed, typeFilter]);
+    return feed.filter((item) => {
+      if (typeFilter !== 'all' && item.type !== typeFilter) return false;
+      if (underlyingFilter && item.underlying !== underlyingFilter) return false;
+      if (strategyFilter && item.strategy !== strategyFilter) return false;
+      if ((dateFrom || dateTo) && !isDateInRange(item.date.slice(0, 10), dateFrom || null, dateTo || null)) return false;
+      return true;
+    });
+  }, [feed, typeFilter, underlyingFilter, strategyFilter, dateFrom, dateTo]);
 
   const grouped = useMemo(() => groupByMonth(filteredFeed), [filteredFeed]);
+
+  const searchBox = (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      background: 'var(--bg-elevated)',
+      border: '1px solid var(--border)',
+      borderRadius: '12px',
+      padding: '8px 14px',
+      minWidth: '240px',
+    }}>
+      <Search size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search insights..."
+        style={{
+          background: 'transparent',
+          border: 'none',
+          color: 'var(--text-primary)',
+          fontSize: '14px',
+          outline: 'none',
+          width: '100%',
+          padding: 0,
+        }}
+      />
+    </div>
+  );
 
   return (
     <PageTransition>
@@ -113,7 +187,7 @@ export default function Insights() {
         </div>
 
         {/* Search + Filters */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px', gap: '16px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '16px', flexWrap: 'wrap' }}>
           <FilterPills
             options={[
               { key: 'all', label: 'All', count: filterCounts.all || 0 },
@@ -126,33 +200,53 @@ export default function Insights() {
             onChange={setTypeFilter}
           />
 
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'var(--bg-elevated)',
-            border: '1px solid var(--border)',
-            borderRadius: '12px',
-            padding: '8px 14px',
-            minWidth: '240px',
-          }}>
-            <Search size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search insights..."
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--text-primary)',
-                fontSize: '14px',
-                outline: 'none',
-                width: '100%',
-                padding: 0,
-              }}
-            />
-          </div>
+          <CollapsibleFilterBar
+            activeCount={activeFilterCount}
+            trailing={searchBox}
+          >
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'flex-start' }}>
+              <FilterDropdown
+                label="Underlying"
+                value={underlyingFilter}
+                options={filterOptions.underlyings}
+                onChange={setUnderlyingFilter}
+              />
+              <FilterDropdown
+                label="Strategy"
+                value={strategyFilter}
+                options={filterOptions.strategies}
+                onChange={setStrategyFilter}
+                formatLabel={(s) => s.replace(/_/g, ' ')}
+              />
+              <DateRangeFilter
+                from={dateFrom}
+                to={dateTo}
+                onChange={(from, to) => { setDateFrom(from); setDateTo(to); }}
+              />
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={clearAllFilters}
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    color: 'var(--text-muted)',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    transition: 'color 0.15s ease',
+                    alignSelf: 'center',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
+          </CollapsibleFilterBar>
         </div>
 
         {/* Feed */}
@@ -202,7 +296,7 @@ export default function Insights() {
                 {/* Cards */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {items.map((item, idx) => (
-                    <InsightCard key={item.id} item={item} index={idx} />
+                    <InsightCard key={item.id} item={item} index={idx} onViewTrade={(tradeId) => navigate(`/trades?highlight=${tradeId}`)} />
                   ))}
                 </div>
               </div>
@@ -214,7 +308,7 @@ export default function Insights() {
   );
 }
 
-function InsightCard({ item, index }: { item: InsightFeedItem; index: number }) {
+function InsightCard({ item, index, onViewTrade }: { item: InsightFeedItem; index: number; onViewTrade: (tradeId: string) => void }) {
   const config = TYPE_CONFIG[item.type];
   const Icon = config.icon;
   const isPositivePnl = item.realizedPnl >= 0;
@@ -321,6 +415,34 @@ function InsightCard({ item, index }: { item: InsightFeedItem; index: number }) 
         {item.content}
       </p>
 
+      {/* View Trade link */}
+      {item.tradeId && (
+        <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            onClick={(e) => { e.stopPropagation(); onViewTrade(item.tradeId); }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-muted)',
+              fontSize: '12px',
+              fontWeight: 500,
+              fontFamily: 'inherit',
+              padding: '4px 8px',
+              borderRadius: '6px',
+              transition: 'color 0.15s ease',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+          >
+            View Trade
+            <ExternalLink size={11} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

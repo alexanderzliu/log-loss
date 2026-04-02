@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 
-export function useSetToggle<T = string>(): [Set<T>, (key: T) => void] {
-  const [set, setSet] = useState<Set<T>>(new Set());
+export function useSetToggle<T = string>(initialValues?: Iterable<T>): [Set<T>, (key: T) => void] {
+  const [set, setSet] = useState<Set<T>>(() => new Set(initialValues));
 
   const toggle = useCallback((key: T) => {
     setSet((prev) => {

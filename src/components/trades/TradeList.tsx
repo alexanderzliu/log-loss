@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useState, useRef, useEffect } from 'react';
 import type { Trade, EntryQuality } from '../../types';
 import { useStore } from '../../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -28,6 +28,7 @@ import {
   Clock,
 } from 'lucide-react';
 import ReflectionList from './ReflectionList';
+import TradeChart from './TradeChart';
 import DteBadge from '../DteBadge';
 import { getDTE, getEarliestExpiration } from '../../utils/dte';
 
@@ -41,16 +42,28 @@ interface TradeListProps {
   sortField?: string;
   sortDir?: 'asc' | 'desc';
   onSort?: (field: string) => void;
+
+  initialExpandedId?: string;
 }
 
-export default function TradeList({ trades, onEdit, onClose, onOpen, onDelete, sortField, sortDir, onSort }: TradeListProps) {
+export default function TradeList({ trades, onEdit, onClose, onOpen, onDelete, sortField, sortDir, onSort, initialExpandedId }: TradeListProps) {
   const { deleteTrade, addToast } = useStore(useShallow((s) => ({
     deleteTrade: s.deleteTrade,
     addToast: s.addToast,
   })));
-  const [expandedTrades, toggleExpanded] = useSetToggle();
+  const [expandedTrades, toggleExpanded] = useSetToggle(
+    initialExpandedId ? [initialExpandedId] : undefined,
+  );
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const highlightRef = useRef<HTMLTableRowElement>(null);
+
+  // Scroll highlighted trade into view
+  useEffect(() => {
+    if (initialExpandedId && highlightRef.current) {
+      highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [initialExpandedId]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -84,7 +97,9 @@ export default function TradeList({ trades, onEdit, onClose, onOpen, onDelete, s
             <th style={thStyle}>
               <SortHeader field="name" label="Name" sortField={sortField} sortDir={sortDir} onSort={onSort} />
             </th>
-            <th style={thStyle}>Underlying</th>
+            <th style={thStyle}>
+              <SortHeader field="date" label="Date" sortField={sortField} sortDir={sortDir} onSort={onSort} />
+            </th>
             <th style={{ ...thStyle, textAlign: 'center' }}>Strategy</th>
             <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
             <th style={{ ...thStyle, textAlign: 'right' }}>Entry</th>
@@ -115,11 +130,13 @@ export default function TradeList({ trades, onEdit, onClose, onOpen, onDelete, s
 
             const displayName = trade.name || trade.underlying;
             const strategyLabel = trade.strategy.replace(/_/g, ' ');
+            const tradeDate = trade.openDate ?? trade.createdAt;
 
             return (
               <Fragment key={trade.id}>
                 {/* Trade row */}
                 <tr
+                  ref={trade.id === initialExpandedId ? highlightRef : undefined}
                   style={{
                     borderBottom: isExpanded ? 'none' : '1px solid var(--border)',
                     cursor: 'pointer',
@@ -143,6 +160,16 @@ export default function TradeList({ trades, onEdit, onClose, onOpen, onDelete, s
                           </span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                          <span style={{
+                            fontWeight: 600,
+                            color: 'var(--text-secondary)',
+                            fontSize: '11px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.3px',
+                          }}>
+                            {trade.underlying}
+                          </span>
+                          <span style={{ opacity: 0.4 }}>·</span>
                           <span>
                             {trade.assetType} · {trade.legs.length} leg{trade.legs.length !== 1 ? 's' : ''}
                           </span>
@@ -177,9 +204,16 @@ export default function TradeList({ trades, onEdit, onClose, onOpen, onDelete, s
                     </div>
                   </td>
                   <td style={tdStyle}>
-                    <span style={{ fontWeight: 500, color: 'var(--text-secondary)', fontSize: '13px' }}>
-                      {trade.underlying}
-                    </span>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                        {formatDate(tradeDate)}
+                      </div>
+                      {trade.status === 'closed' && trade.closeDate && (
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          Closed {formatDate(trade.closeDate)}
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'center' }}>
                     <span style={{
@@ -298,6 +332,17 @@ export default function TradeList({ trades, onEdit, onClose, onOpen, onDelete, s
                             </span>
                           ))}
                         </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+
+                {/* Expanded chart */}
+                {isExpanded && (
+                  <tr style={expandedRowStyle}>
+                    <td colSpan={9} style={expandedTdChart}>
+                      <div style={threadLineStyle}>
+                        <TradeChart trade={trade} />
                       </div>
                     </td>
                   </tr>
@@ -480,6 +525,7 @@ const threadLineReflStyle: React.CSSProperties = {
   paddingTop: '4px',
   paddingBottom: '4px',
 };
+const expandedTdChart: React.CSSProperties = { padding: '8px 24px 4px 72px' };
 const expandedTdThesis: React.CSSProperties = { padding: '4px 24px 4px 72px' };
 const expandedTdTags: React.CSSProperties = { padding: '4px 24px 4px 72px' };
 const expandedTdReflection: React.CSSProperties = { padding: '4px 24px 8px 72px' };

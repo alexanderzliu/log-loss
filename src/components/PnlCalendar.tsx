@@ -15,11 +15,12 @@ import type { EquityCurvePoint } from '../types';
 
 interface PnlCalendarProps {
   data: EquityCurvePoint[];
+  onDayClick?: (date: string) => void;
 }
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export default function PnlCalendar({ data }: PnlCalendarProps) {
+export default function PnlCalendar({ data, onDayClick }: PnlCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
 
   // Build lookup map from date string -> equity curve point
@@ -65,17 +66,19 @@ export default function PnlCalendar({ data }: PnlCalendarProps) {
     const gridCells: {
       day: number;
       date: Date;
+      dateStr: string;
       pnlData: EquityCurvePoint | null;
       intensity: number;
     }[] = [];
 
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(year, month, d);
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const point = dayData[d - 1];
       const intensity = point && maxAbsPnl > 0
         ? Math.abs(point.dailyPnl) / maxAbsPnl
         : 0;
-      gridCells.push({ day: d, date, pnlData: point, intensity });
+      gridCells.push({ day: d, date, dateStr, pnlData: point, intensity });
     }
 
     return {
@@ -171,12 +174,13 @@ export default function PnlCalendar({ data }: PnlCalendarProps) {
         ))}
 
         {/* Day cells */}
-        {cells.days.map(({ day, date, pnlData, intensity }) => {
+        {cells.days.map(({ day, date, dateStr, pnlData, intensity }) => {
           const today = isToday(date);
           const future = isFuture(date);
           const isWeekend = date.getDay() === 0 || date.getDay() === 6;
           const hasData = pnlData !== null;
           const isPositive = hasData && pnlData.dailyPnl >= 0;
+          const isClickable = hasData && !!onDayClick;
 
           let bgColor = 'transparent';
           if (hasData) {
@@ -189,6 +193,8 @@ export default function PnlCalendar({ data }: PnlCalendarProps) {
           return (
             <div
               key={day}
+              onClick={isClickable ? () => onDayClick!(dateStr) : undefined}
+              className={isClickable ? 'pnl-calendar-cell-clickable' : undefined}
               style={{
                 aspectRatio: '1.2',
                 borderRadius: '8px',
@@ -201,7 +207,8 @@ export default function PnlCalendar({ data }: PnlCalendarProps) {
                 justifyContent: 'center',
                 gap: '1px',
                 opacity: future ? 0.3 : (isWeekend && !hasData) ? 0.5 : 1,
-                transition: 'background 0.2s ease',
+                cursor: isClickable ? 'pointer' : 'default',
+                transition: 'background 0.2s ease, transform 0.15s ease',
               }}
             >
               <span style={{

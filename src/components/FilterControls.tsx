@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, X } from 'lucide-react';
+import { ChevronDown, X, SlidersHorizontal, Calendar } from 'lucide-react';
 
 // --- FilterDropdown: single-select dropdown ---
 
@@ -247,5 +247,218 @@ export function TagFilterSelect({ selected, options, onChange }: TagFilterSelect
         </div>
       )}
     </div>
+  );
+}
+
+// --- DateRangeFilter: date range with preset buttons ---
+
+interface DateRangeFilterProps {
+  from: string;
+  to: string;
+  onChange: (from: string, to: string) => void;
+}
+
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function yesterdayStr(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function startOfWeekStr(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - d.getDay()); // Sunday
+  return d.toISOString().slice(0, 10);
+}
+
+function startOfMonthStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
+const PRESETS = [
+  { label: 'Today', getRange: () => ({ from: todayStr(), to: todayStr() }) },
+  { label: 'Yesterday', getRange: () => ({ from: yesterdayStr(), to: yesterdayStr() }) },
+  { label: 'This Week', getRange: () => ({ from: startOfWeekStr(), to: todayStr() }) },
+  { label: 'This Month', getRange: () => ({ from: startOfMonthStr(), to: todayStr() }) },
+] as const;
+
+export function DateRangeFilter({ from, to, onChange }: DateRangeFilterProps) {
+  const isActive = !!from || !!to;
+
+  const activePreset = PRESETS.findIndex((p) => {
+    const r = p.getRange();
+    return r.from === from && r.to === to;
+  });
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {/* Preset pills */}
+      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+        {PRESETS.map((preset, i) => {
+          const isPresetActive = activePreset === i;
+          return (
+            <button
+              key={preset.label}
+              onClick={() => {
+                const range = preset.getRange();
+                onChange(range.from, range.to);
+              }}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '8px',
+                border: isPresetActive ? '1px solid var(--border-accent)' : '1px solid var(--border)',
+                background: isPresetActive ? 'var(--accent-soft)' : 'transparent',
+                color: isPresetActive ? 'var(--accent)' : 'var(--text-muted)',
+                fontSize: '12px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                transition: 'all 0.15s ease',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {preset.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Custom date inputs */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        padding: '5px 10px',
+        borderRadius: '10px',
+        border: isActive ? '1px solid var(--border-accent)' : '1px solid var(--border)',
+        background: isActive ? 'var(--accent-soft)' : 'var(--bg-elevated)',
+        transition: 'all 0.15s ease',
+      }}>
+        <Calendar size={13} style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)', flexShrink: 0 }} />
+        <input
+          type="date"
+          value={from}
+          onChange={(e) => onChange(e.target.value, to)}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: from ? 'var(--accent)' : 'var(--text-muted)',
+            fontSize: '12px',
+            fontFamily: 'inherit',
+            outline: 'none',
+            width: '120px',
+            colorScheme: 'dark',
+          }}
+        />
+        <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>–</span>
+        <input
+          type="date"
+          value={to}
+          onChange={(e) => onChange(from, e.target.value)}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: to ? 'var(--accent)' : 'var(--text-muted)',
+            fontSize: '12px',
+            fontFamily: 'inherit',
+            outline: 'none',
+            width: '120px',
+            colorScheme: 'dark',
+          }}
+        />
+        {isActive && (
+          <X
+            size={12}
+            onClick={() => onChange('', '')}
+            style={{ cursor: 'pointer', color: 'var(--text-muted)', opacity: 0.7, flexShrink: 0 }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// --- CollapsibleFilterBar: shared filter toggle + collapsible row ---
+
+interface CollapsibleFilterBarProps {
+  activeCount: number;
+  children: ReactNode;
+  trailing?: ReactNode;
+  defaultOpen?: boolean;
+}
+
+export function CollapsibleFilterBar({ activeCount, children, trailing, defaultOpen }: CollapsibleFilterBarProps) {
+  const [showFilters, setShowFilters] = useState(defaultOpen ?? false);
+
+  // Auto-expand when filters become active
+  useEffect(() => {
+    if (activeCount > 0) setShowFilters(true);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <button
+          onClick={() => setShowFilters((v) => !v)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: showFilters ? 'var(--accent-soft)' : 'transparent',
+            border: showFilters ? '1px solid var(--border-accent)' : '1px solid var(--border)',
+            borderRadius: '10px',
+            padding: '7px 12px',
+            color: showFilters ? 'var(--accent)' : 'var(--text-muted)',
+            fontSize: '13px',
+            fontWeight: 500,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          <SlidersHorizontal size={14} />
+          Filters
+          {activeCount > 0 && (
+            <span style={{
+              fontSize: '11px',
+              fontWeight: 700,
+              padding: '0 5px',
+              borderRadius: '9999px',
+              background: 'var(--accent)',
+              color: '#000',
+              lineHeight: '16px',
+            }}>
+              {activeCount}
+            </span>
+          )}
+        </button>
+        {trailing}
+      </div>
+
+      {showFilters && (
+        <div style={{
+          background: 'var(--gradient-card)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-card)',
+          boxShadow: 'var(--shadow-card)',
+          padding: '14px 20px',
+          marginTop: '12px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+          position: 'relative',
+          zIndex: 1,
+          animation: 'slideUp 0.2s ease-out both',
+        }}>
+          {children}
+        </div>
+      )}
+    </>
   );
 }

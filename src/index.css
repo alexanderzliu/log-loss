@@ -225,6 +225,12 @@ body {
   transform: translateY(-1px);
 }
 
+/* PnL Calendar clickable day cells */
+.pnl-calendar-cell-clickable:hover {
+  transform: scale(1.05);
+  filter: brightness(1.15);
+}
+
 /* Interactive card variant */
 .card-interactive {
   cursor: pointer;

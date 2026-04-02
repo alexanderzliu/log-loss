@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
-import { Plus, Search, SlidersHorizontal } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import TradeList from '../components/trades/TradeList';
 import TradeForm from '../components/trades/TradeForm';
 import FilterPills from '../components/FilterPills';
 import PageTransition from '../components/PageTransition';
-import { FilterDropdown, TagFilterSelect } from '../components/FilterControls';
+import { FilterDropdown, TagFilterSelect, DateRangeFilter, CollapsibleFilterBar } from '../components/FilterControls';
+import { useTradeFilters, type StatusFilter } from '../hooks/useTradeFilters';
 import type { Trade } from '../types';
 
 export default function Journal() {
@@ -18,88 +19,12 @@ export default function Journal() {
   const [showForm, setShowForm] = useState(false);
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [closingTrade, setClosingTrade] = useState<Trade | null>(null);
-  const [filter, setFilter] = useState<'all' | 'planned' | 'open' | 'closed'>('all');
-  const [search, setSearch] = useState('');
-  const [sortField, setSortField] = useState<'date' | 'underlying' | 'pnl'>('date');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [strategyFilter, setStrategyFilter] = useState('');
-  const [assetTypeFilter, setAssetTypeFilter] = useState('');
-  const [entryQualityFilter, setEntryQualityFilter] = useState('');
-  const [tagFilter, setTagFilter] = useState<string[]>([]);
-  const [showFilters, setShowFilters] = useState(false);
+
+  const filters = useTradeFilters(trades);
 
   useEffect(() => {
     fetchTrades();
   }, [fetchTrades]);
-
-  const handleSort = (field: typeof sortField) => {
-    if (sortField === field) {
-      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDir('desc');
-    }
-  };
-
-  const filterOptions = useMemo(() => {
-    const strategies = new Set<string>();
-    const assetTypes = new Set<string>();
-    const tags = new Set<string>();
-    const entryQualities = new Set<string>();
-    for (const t of trades) {
-      if (t.strategy) strategies.add(t.strategy);
-      if (t.assetType) assetTypes.add(t.assetType);
-      if (t.entryQuality) entryQualities.add(t.entryQuality);
-      for (const tag of t.tags) tags.add(tag.tag);
-    }
-    return {
-      strategies: Array.from(strategies).sort(),
-      assetTypes: Array.from(assetTypes).sort(),
-      tags: Array.from(tags).sort(),
-      entryQualities: Array.from(entryQualities).sort(),
-    };
-  }, [trades]);
-
-  const activeFilterCount = [strategyFilter, assetTypeFilter, entryQualityFilter].filter(Boolean).length + tagFilter.length;
-
-  const clearAllFilters = () => {
-    setStrategyFilter('');
-    setAssetTypeFilter('');
-    setEntryQualityFilter('');
-    setTagFilter([]);
-  };
-
-  const filteredTrades = useMemo(() => trades.filter((trade) => {
-    if (filter === 'planned' && trade.status !== 'planned') return false;
-    if (filter === 'open' && trade.status !== 'open') return false;
-    if (filter === 'closed' && trade.status !== 'closed') return false;
-    if (search) {
-      const q = search.toLowerCase();
-      if (!trade.underlying.toLowerCase().includes(q) && !trade.name.toLowerCase().includes(q)) return false;
-    }
-    if (strategyFilter && trade.strategy !== strategyFilter) return false;
-    if (assetTypeFilter && trade.assetType !== assetTypeFilter) return false;
-    if (entryQualityFilter && trade.entryQuality !== entryQualityFilter) return false;
-    if (tagFilter.length > 0) {
-      const tradeTags = trade.tags.map(t => t.tag);
-      if (!tagFilter.every(f => tradeTags.includes(f))) return false;
-    }
-    return true;
-  }), [trades, filter, search, strategyFilter, assetTypeFilter, entryQualityFilter, tagFilter]);
-
-  const sortedTrades = useMemo(() => {
-    const sorted = [...filteredTrades];
-    sorted.sort((a, b) => {
-      let cmp = 0;
-      switch (sortField) {
-        case 'date': cmp = new Date(a.openDate ?? a.createdAt).getTime() - new Date(b.openDate ?? b.createdAt).getTime(); break;
-        case 'underlying': cmp = a.underlying.localeCompare(b.underlying); break;
-        case 'pnl': cmp = (a.realizedPnl ?? 0) - (b.realizedPnl ?? 0); break;
-      }
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-    return sorted;
-  }, [filteredTrades, sortField, sortDir]);
 
   const handleNewTrade = () => {
     setEditingTrade(null);
@@ -135,9 +60,37 @@ export default function Journal() {
     setClosingTrade(null);
   };
 
-  const plannedCount = useMemo(() => trades.filter(t => t.status === 'planned').length, [trades]);
-  const openCount = useMemo(() => trades.filter(t => t.status === 'open').length, [trades]);
-  const closedCount = useMemo(() => trades.filter(t => t.status === 'closed').length, [trades]);
+  const searchBox = (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      background: 'var(--bg-elevated)',
+      border: '1px solid var(--border)',
+      borderRadius: '12px',
+      padding: '8px 14px',
+      minWidth: '200px',
+      transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+    }}>
+      <Search size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+      <input
+        type="text"
+        value={filters.search}
+        onChange={(e) => filters.setSearch(e.target.value)}
+        placeholder="Search trades..."
+        className="journal-search-input"
+        style={{
+          background: 'transparent',
+          border: 'none',
+          color: 'var(--text-primary)',
+          fontSize: '14px',
+          outline: 'none',
+          width: '100%',
+          padding: 0,
+        }}
+      />
+    </div>
+  );
 
   return (
     <PageTransition>
@@ -183,7 +136,7 @@ export default function Journal() {
         </button>
       </div>
 
-      {/* Filters and Search - Glass Card */}
+      {/* Filters and Search */}
       <div style={{
         background: 'var(--gradient-card)',
         backdropFilter: 'blur(12px)',
@@ -195,157 +148,103 @@ export default function Journal() {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '28px',
+        marginBottom: '16px',
         position: 'relative',
         zIndex: 1,
       }}>
         <FilterPills
           options={[
-            { key: 'all', label: 'All', count: trades.length },
-            { key: 'planned', label: 'Planned', count: plannedCount },
-            { key: 'open', label: 'Open', count: openCount },
-            { key: 'closed', label: 'Closed', count: closedCount },
+            { key: 'all', label: 'All', count: filters.statusCounts.all },
+            { key: 'planned', label: 'Planned', count: filters.statusCounts.planned },
+            { key: 'open', label: 'Open', count: filters.statusCounts.open },
+            { key: 'closed', label: 'Closed', count: filters.statusCounts.closed },
           ]}
-          active={filter}
-          onChange={(key) => setFilter(key as typeof filter)}
+          active={filters.statusFilter}
+          onChange={(key) => filters.setStatusFilter(key as StatusFilter)}
         />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {/* Filters toggle */}
-          <button
-            onClick={() => setShowFilters(v => !v)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: showFilters ? 'var(--accent-soft)' : 'transparent',
-              border: showFilters ? '1px solid var(--border-accent)' : '1px solid var(--border)',
-              borderRadius: '10px',
-              padding: '7px 12px',
-              color: showFilters ? 'var(--accent)' : 'var(--text-muted)',
-              fontSize: '13px',
-              fontWeight: 500,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              transition: 'all 0.2s ease',
-            }}
-          >
-            <SlidersHorizontal size={14} />
-            Filters
-            {activeFilterCount > 0 && (
-              <span style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                padding: '0 5px',
-                borderRadius: '9999px',
-                background: 'var(--accent)',
-                color: '#000',
-                lineHeight: '16px',
-              }}>
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
-
-          {/* Search */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'var(--bg-elevated)',
-            border: '1px solid var(--border)',
-            borderRadius: '12px',
-            padding: '8px 14px',
-            minWidth: '200px',
-            transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
-          }}>
-            <Search size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search trades..."
-              className="journal-search-input"
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--text-primary)',
-                fontSize: '14px',
-                outline: 'none',
-                width: '100%',
-                padding: 0,
-              }}
+        <CollapsibleFilterBar
+          activeCount={filters.activeFilterCount}
+          trailing={searchBox}
+        >
+          {/* Row 1: Trade properties */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
+            <FilterDropdown
+              label="Strategy"
+              value={filters.strategyFilter}
+              options={filters.filterOptions.strategies}
+              onChange={filters.setStrategyFilter}
+              formatLabel={(s) => s.replace(/_/g, ' ')}
+            />
+            <FilterDropdown
+              label="Asset Type"
+              value={filters.assetTypeFilter}
+              options={filters.filterOptions.assetTypes}
+              onChange={filters.setAssetTypeFilter}
+            />
+            <FilterDropdown
+              label="Option Type"
+              value={filters.optionTypeFilter}
+              options={filters.filterOptions.optionTypes}
+              onChange={filters.setOptionTypeFilter}
+            />
+            <FilterDropdown
+              label="Side"
+              value={filters.sideFilter}
+              options={filters.filterOptions.sides}
+              onChange={filters.setSideFilter}
             />
           </div>
-        </div>
-      </div>
 
-      {/* Collapsible filter row */}
-      {showFilters && (
-        <div style={{
-          background: 'var(--gradient-card)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-card)',
-          boxShadow: 'var(--shadow-card)',
-          padding: '14px 20px',
-          marginBottom: '28px',
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '10px',
-          alignItems: 'center',
-          position: 'relative',
-          zIndex: 1,
-          animation: 'slideUp 0.2s ease-out both',
-        }}>
-          <FilterDropdown
-            label="Strategy"
-            value={strategyFilter}
-            options={filterOptions.strategies}
-            onChange={setStrategyFilter}
-            formatLabel={(s) => s.replace(/_/g, ' ')}
-          />
-          <FilterDropdown
-            label="Asset Type"
-            value={assetTypeFilter}
-            options={filterOptions.assetTypes}
-            onChange={setAssetTypeFilter}
-          />
-          <FilterDropdown
-            label="Entry Quality"
-            value={entryQualityFilter}
-            options={filterOptions.entryQualities}
-            onChange={setEntryQualityFilter}
-          />
-          <TagFilterSelect
-            selected={tagFilter}
-            options={filterOptions.tags}
-            onChange={setTagFilter}
-          />
-          {activeFilterCount > 0 && (
-            <button
-              onClick={clearAllFilters}
-              style={{
-                fontSize: '12px',
-                fontWeight: 500,
-                color: 'var(--text-muted)',
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                padding: '4px 8px',
-                borderRadius: '6px',
-                transition: 'color 0.15s ease',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
-            >
-              Clear all
-            </button>
-          )}
-        </div>
-      )}
+          {/* Row 2: Quality, time, tags */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'flex-start' }}>
+            <FilterDropdown
+              label="Entry Quality"
+              value={filters.entryQualityFilter}
+              options={filters.filterOptions.entryQualities}
+              onChange={filters.setEntryQualityFilter}
+            />
+            <FilterDropdown
+              label="Followed Plan"
+              value={filters.followedPlanFilter}
+              options={['yes', 'no']}
+              onChange={filters.setFollowedPlanFilter}
+            />
+            <TagFilterSelect
+              selected={filters.tagFilter}
+              options={filters.filterOptions.tags}
+              onChange={filters.setTagFilter}
+            />
+            <DateRangeFilter
+              from={filters.dateFrom}
+              to={filters.dateTo}
+              onChange={filters.updateDateRange}
+            />
+            {filters.activeFilterCount > 0 && (
+              <button
+                onClick={filters.clearAllFilters}
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  color: 'var(--text-muted)',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  transition: 'color 0.15s ease',
+                  alignSelf: 'center',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+        </CollapsibleFilterBar>
+      </div>
 
       {/* Content */}
       <div style={{ position: 'relative', zIndex: 1 }}>
@@ -355,14 +254,15 @@ export default function Journal() {
         </div>
       ) : (
         <TradeList
-          trades={sortedTrades}
+          trades={filters.sortedTrades}
           onEdit={handleEditTrade}
           onClose={handleCloseTrade}
           onOpen={handleOpenTrade}
           onDelete={(id: string) => useStore.getState().deleteTrade(id)}
-          sortField={sortField}
-          sortDir={sortDir}
-          onSort={(field) => handleSort(field as typeof sortField)}
+          sortField={filters.sortField}
+          sortDir={filters.sortDir}
+          onSort={filters.handleSort}
+          initialExpandedId={filters.highlightTradeId || undefined}
         />
       )}
 

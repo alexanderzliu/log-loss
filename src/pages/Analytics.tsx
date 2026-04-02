@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
 import { fetchPriceHistory } from '../api/prices';
@@ -35,6 +36,7 @@ const tooltipStyle = {
 };
 
 export default function Analytics() {
+  const navigate = useNavigate();
   const { trades, prices, fetchPrices, fetchTrades } = useStore(useShallow((s) => ({
     trades: s.trades,
     prices: s.prices,
@@ -376,7 +378,7 @@ export default function Analytics() {
           </div>
 
           {/* P&L Calendar */}
-          <PnlCalendar data={equityCurve} />
+          <PnlCalendar data={equityCurve} onDayClick={(date) => navigate(`/trades?date=${date}`)} />
 
           {/* Monthly Returns + P&L by Symbol side by side */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
