@@ -100,7 +100,7 @@ export function registerImportTools(server: McpServer) {
     'create_trade',
     {
       title: 'Create Trade',
-      description: 'Create a fully-closed trade with option leg, tags, and metadata. Auto-calculates fees and triggers chart snapshot capture with underlying price backfill.',
+      description: 'Create a trade with option leg, tags, and metadata. Omit exitPrice/closeDate/realizedPnl to create an open trade. Auto-calculates fees and triggers chart snapshot capture with underlying price backfill for closed trades.',
       inputSchema: {
         name: z.string().optional().describe('Trade name (auto-generated if omitted)'),
         underlying: z.string().describe('Underlying symbol (e.g., SPY)'),
@@ -108,10 +108,10 @@ export function registerImportTools(server: McpServer) {
         side: z.enum(['buy', 'sell']).default('buy'),
         quantity: z.number().int().positive().default(1),
         entryPrice: z.number().describe('Entry premium per share'),
-        exitPrice: z.number().describe('Exit premium per share'),
+        exitPrice: z.number().optional().describe('Exit premium per share (omit for open trades)'),
         openDate: z.string().describe('Entry datetime (ISO format)'),
-        closeDate: z.string().describe('Exit datetime (ISO format)'),
-        realizedPnl: z.number().describe('Realized P&L in dollars'),
+        closeDate: z.string().optional().describe('Exit datetime (ISO format, omit for open trades)'),
+        realizedPnl: z.number().optional().describe('Realized P&L in dollars (omit for open trades)'),
         entryQuality: z.enum(['clean', 'fomo', 'chased', 'intuitive']).optional(),
         followedPlan: z.boolean().optional(),
         thesis: z.string().default(''),
@@ -126,7 +126,7 @@ export function registerImportTools(server: McpServer) {
           side: z.enum(['buy', 'sell']).default('buy'),
           quantity: z.number().int().positive().default(1),
           entryPrice: z.number(),
-          exitPrice: z.number(),
+          exitPrice: z.number().optional().describe('Omit for open trades'),
         }),
         tags: z.array(z.object({
           tag: z.string(),
@@ -139,7 +139,10 @@ export function registerImportTools(server: McpServer) {
       try {
         const tradeId = uuidv4();
         const legId = uuidv4();
-        const fees = args.quantity * 1.30;
+        const isClosed = args.exitPrice != null && args.closeDate != null;
+        const status = isClosed ? 'closed' : 'open';
+        // Entry side: $0.65/contract; exit side: $0.65/contract (only if closed)
+        const fees = isClosed ? args.quantity * 1.30 : args.quantity * 0.65;
 
         // Auto-generate name if not provided
         const name = args.name || (() => {
@@ -158,11 +161,11 @@ export function registerImportTools(server: McpServer) {
               id, name, asset_type, underlying, status, strategy, side, quantity,
               entry_price, exit_price, fees, realized_pnl, open_date, close_date,
               entry_quality, followed_plan, thesis, exit_plan, reflection, notes
-            ) VALUES (?, ?, 'option', ?, 'closed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, 'option', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).run(
-            tradeId, name, args.underlying.toUpperCase(), args.strategy, args.side,
-            args.quantity, args.entryPrice, args.exitPrice, fees, args.realizedPnl,
-            args.openDate, args.closeDate,
+            tradeId, name, args.underlying.toUpperCase(), status, args.strategy, args.side,
+            args.quantity, args.entryPrice, args.exitPrice ?? null, fees, args.realizedPnl ?? null,
+            args.openDate, args.closeDate ?? null,
             args.entryQuality ?? null,
             args.followedPlan != null ? (args.followedPlan ? 1 : 0) : null,
             args.thesis, args.exitPlan, args.reflection, args.notes,
@@ -176,7 +179,7 @@ export function registerImportTools(server: McpServer) {
           `).run(
             legId, tradeId, args.leg.ticker, args.leg.optionType,
             args.leg.strike, args.leg.expiration, args.leg.side, args.leg.quantity,
-            args.leg.entryPrice, args.leg.exitPrice,
+            args.leg.entryPrice, args.leg.exitPrice ?? null,
           );
 
           if (args.tags.length > 0) {
@@ -194,12 +197,12 @@ export function registerImportTools(server: McpServer) {
         // Capture chart snapshots and backfill underlying prices
         let snapshotStatus = 'pending';
         try {
-          const captureDate = args.closeDate.slice(0, 10);
+          const captureDate = isClosed ? args.closeDate!.slice(0, 10) : args.openDate.slice(0, 10);
           await captureSnapshotsForTrade(tradeId, captureDate);
 
           // Backfill underlying prices from snapshot bars
           const entryUnderlying = findUnderlyingPrice(tradeId, args.underlying, args.openDate);
-          const exitUnderlying = findUnderlyingPrice(tradeId, args.underlying, args.closeDate);
+          const exitUnderlying = isClosed ? findUnderlyingPrice(tradeId, args.underlying, args.closeDate!) : null;
 
           if (entryUnderlying !== null || exitUnderlying !== null) {
             db.prepare(
@@ -234,7 +237,7 @@ export function registerImportTools(server: McpServer) {
     'batch_create_trades',
     {
       title: 'Batch Create Trades',
-      description: 'Create multiple fully-closed trades at once. Deduplicates chart snapshot captures (fetches each underlying once). Much faster than calling create_trade in a loop for CSV imports.',
+      description: 'Create multiple trades at once. Omit exitPrice/closeDate/realizedPnl on individual trades to create them as open. Deduplicates chart snapshot captures (fetches each underlying once). Much faster than calling create_trade in a loop for CSV imports.',
       inputSchema: {
         trades: z.array(z.object({
           name: z.string().optional(),
@@ -243,10 +246,10 @@ export function registerImportTools(server: McpServer) {
           side: z.enum(['buy', 'sell']).default('buy'),
           quantity: z.number().int().positive().default(1),
           entryPrice: z.number(),
-          exitPrice: z.number(),
+          exitPrice: z.number().optional(),
           openDate: z.string(),
-          closeDate: z.string(),
-          realizedPnl: z.number(),
+          closeDate: z.string().optional(),
+          realizedPnl: z.number().optional(),
           entryQuality: z.enum(['clean', 'fomo', 'chased', 'intuitive']).optional(),
           followedPlan: z.boolean().optional(),
           thesis: z.string().default(''),
@@ -261,7 +264,7 @@ export function registerImportTools(server: McpServer) {
             side: z.enum(['buy', 'sell']).default('buy'),
             quantity: z.number().int().positive().default(1),
             entryPrice: z.number(),
-            exitPrice: z.number(),
+            exitPrice: z.number().optional(),
           }),
           tags: z.array(z.object({
             tag: z.string(),
@@ -280,7 +283,9 @@ export function registerImportTools(server: McpServer) {
           for (const t of args.trades) {
             const tradeId = uuidv4();
             const legId = uuidv4();
-            const fees = t.quantity * 1.30;
+            const isClosed = t.exitPrice != null && t.closeDate != null;
+            const status = isClosed ? 'closed' : 'open';
+            const fees = isClosed ? t.quantity * 1.30 : t.quantity * 0.65;
 
             const name = t.name || (() => {
               const entryDate = t.openDate.slice(0, 10);
@@ -297,11 +302,11 @@ export function registerImportTools(server: McpServer) {
                 id, name, asset_type, underlying, status, strategy, side, quantity,
                 entry_price, exit_price, fees, realized_pnl, open_date, close_date,
                 entry_quality, followed_plan, thesis, exit_plan, reflection, notes
-              ) VALUES (?, ?, 'option', ?, 'closed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              ) VALUES (?, ?, 'option', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `).run(
-              tradeId, name, t.underlying.toUpperCase(), t.strategy, t.side,
-              t.quantity, t.entryPrice, t.exitPrice, fees, t.realizedPnl,
-              t.openDate, t.closeDate,
+              tradeId, name, t.underlying.toUpperCase(), status, t.strategy, t.side,
+              t.quantity, t.entryPrice, t.exitPrice ?? null, fees, t.realizedPnl ?? null,
+              t.openDate, t.closeDate ?? null,
               t.entryQuality ?? null,
               t.followedPlan != null ? (t.followedPlan ? 1 : 0) : null,
               t.thesis, t.exitPlan, t.reflection, t.notes,
@@ -315,7 +320,7 @@ export function registerImportTools(server: McpServer) {
             `).run(
               legId, tradeId, t.leg.ticker, t.leg.optionType,
               t.leg.strike, t.leg.expiration, t.leg.side, t.leg.quantity,
-              t.leg.entryPrice, t.leg.exitPrice,
+              t.leg.entryPrice, t.leg.exitPrice ?? null,
             );
 
             if (t.tags.length > 0) {
@@ -338,7 +343,8 @@ export function registerImportTools(server: McpServer) {
         let snapshotsFailed = 0;
 
         for (const rec of tradeRecords) {
-          const captureDate = rec.data.closeDate.slice(0, 10);
+          const isClosed = rec.data.exitPrice != null && rec.data.closeDate != null;
+          const captureDate = isClosed ? rec.data.closeDate!.slice(0, 10) : rec.data.openDate.slice(0, 10);
           const key = `${rec.data.underlying.toUpperCase()}:${captureDate}`;
 
           try {
@@ -353,7 +359,7 @@ export function registerImportTools(server: McpServer) {
 
             // Backfill underlying prices
             const entryUnderlying = findUnderlyingPrice(rec.tradeId, rec.data.underlying, rec.data.openDate);
-            const exitUnderlying = findUnderlyingPrice(rec.tradeId, rec.data.underlying, rec.data.closeDate);
+            const exitUnderlying = isClosed ? findUnderlyingPrice(rec.tradeId, rec.data.underlying, rec.data.closeDate!) : null;
 
             if (entryUnderlying !== null || exitUnderlying !== null) {
               db.prepare(
