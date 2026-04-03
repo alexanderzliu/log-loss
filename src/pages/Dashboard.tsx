@@ -1,16 +1,42 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
-import { ArrowUpRight, ArrowDownRight, AlertTriangle } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, AlertTriangle, BarChart3 } from 'lucide-react';
 import { formatCurrency, formatQuantity, formatPrice, formatDate } from '../utils/format';
 import { tableHeaderStyle, tableCellStyle } from '../utils/styles';
 import { useAnimatedNumber } from '../hooks/useAnimatedNumber';
 import PageTransition from '../components/PageTransition';
-import PnlDisplay from '../components/PnlDisplay';
 import DteBadge from '../components/DteBadge';
+import PnlCalendar from '../components/PnlCalendar';
 import { getDTE, getEarliestExpiration } from '../utils/dte';
+import { fetchEquityCurve, fetchTradingAnalytics } from '../api/trades';
+import type { EquityCurvePoint, TradingAnalytics } from '../types';
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts';
+import { format } from 'date-fns';
+
+const tooltipStyle = {
+  borderRadius: '12px',
+  border: '1px solid var(--border-light)',
+  background: 'var(--dropdown-bg)',
+  backdropFilter: 'blur(12px)',
+  boxShadow: 'var(--dropdown-shadow)',
+  color: 'var(--text-primary)',
+};
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const {
     trades,
     tradesLoading,
@@ -35,11 +61,42 @@ export default function Dashboard() {
     fetchPredictionsSummary: s.fetchPredictionsSummary,
   })));
 
+  // Analytics state
+  const [equityCurve, setEquityCurve] = useState<EquityCurvePoint[]>([]);
+  const [analytics, setAnalytics] = useState<TradingAnalytics | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [tradeTypeFilter, setTradeTypeFilter] = useState<'all' | 'intraday' | 'swing'>('all');
+
   useEffect(() => {
     fetchTrades();
     fetchPortfolioSummary();
     fetchPredictionsSummary();
   }, [fetchTrades, fetchPortfolioSummary, fetchPredictionsSummary]);
+
+  // Fetch analytics when filter changes
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setAnalyticsLoading(true);
+      const tt = tradeTypeFilter === 'all' ? undefined : tradeTypeFilter;
+      try {
+        const [curve, stats] = await Promise.all([
+          fetchEquityCurve(tt),
+          fetchTradingAnalytics(tt),
+        ]);
+        if (!cancelled) {
+          setEquityCurve(curve);
+          setAnalytics(stats);
+        }
+      } catch (error) {
+        console.error('Failed to load trading analytics:', error);
+      } finally {
+        if (!cancelled) setAnalyticsLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [tradeTypeFilter]);
 
   const openTrades = useMemo(() => {
     return trades
@@ -47,7 +104,6 @@ export default function Dashboard() {
       .sort((a, b) => {
         const aDte = getDTE(getEarliestExpiration(a.legs));
         const bDte = getDTE(getEarliestExpiration(b.legs));
-        // Trades with DTE come first, sorted ascending; no-DTE trades go to end
         if (aDte === null && bDte === null) return 0;
         if (aDte === null) return 1;
         if (bDte === null) return -1;
@@ -64,17 +120,6 @@ export default function Dashboard() {
       })
       .filter(({ dte }) => dte !== null && dte >= 0 && dte <= 3);
   }, [openTrades]);
-
-  const recentClosedTrades = useMemo(() => {
-    return trades
-      .filter((t) => t.status === 'closed')
-      .sort((a, b) => {
-        const aDate = a.closeDate ? new Date(a.closeDate).getTime() : 0;
-        const bDate = b.closeDate ? new Date(b.closeDate).getTime() : 0;
-        return bDate - aDate;
-      })
-      .slice(0, 10);
-  }, [trades]);
 
   const predictionsPnl = predictionsSummary?.predictionsPnl ?? 0;
   const realizedPnl = (portfolioSummary?.realizedPnl ?? 0) + predictionsPnl;
@@ -93,12 +138,47 @@ export default function Dashboard() {
     animation: `slideUp 0.4s ease-out ${index * 0.06}s both`,
   });
 
+  // Prepare equity curve chart data
+  const equityChartData = equityCurve.map((p) => ({
+    date: format(new Date(p.date), 'MMM d'),
+    dailyPnl: p.dailyPnl,
+    cumulativePnl: p.cumulativePnl,
+    tradeCount: p.tradeCount,
+  }));
+
+  // Prepare monthly P&L chart data
+  const monthlyChartData = (analytics?.monthlyPnl ?? []).map((m) => ({
+    month: format(new Date(m.month + '-01'), 'MMM yyyy'),
+    pnl: m.pnl,
+    wins: m.wins,
+    losses: m.losses,
+  }));
+
+  const pnlByUnderlying = [...(analytics?.pnlByUnderlying ?? [])].sort(
+    (a, b) => Math.abs(b.pnl) - Math.abs(a.pnl)
+  );
+
+  const pnlByStrategy = [...(analytics?.pnlByStrategy ?? [])].sort(
+    (a, b) => Math.abs(b.pnl) - Math.abs(a.pnl)
+  );
+
+  const pnlByEntryQuality = [...(analytics?.pnlByEntryQuality ?? [])].sort(
+    (a, b) => Math.abs(b.pnl) - Math.abs(a.pnl)
+  );
+
+  const hasAnalyticsData = analytics && (
+    analytics.profitFactor > 0 ||
+    analytics.avgWin !== null ||
+    analytics.avgLoss !== null ||
+    analytics.avgHoldDays !== null
+  );
+
   return (
     <PageTransition>
       <div className="page-container">
-        {/* Portfolio Value Header with Ambient Glow */}
-        <div style={{ position: 'relative', marginBottom: '56px' }}>
-          {/* Ambient glow halo behind the card */}
+        {/* ===== Hero P&L + Equity Curve ===== */}
+        <div style={{ position: 'relative', marginBottom: '32px' }}>
+          {/* Ambient glow halo */}
           <div style={{
             position: 'absolute',
             top: '50%',
@@ -112,7 +192,6 @@ export default function Dashboard() {
             transition: 'background 0.8s ease',
           }} />
 
-          {/* Hero Card */}
           <div style={{
             padding: '36px 40px',
             borderRadius: '24px',
@@ -158,7 +237,7 @@ export default function Dashboard() {
             }}>
               {animatedTotalPnl >= 0 ? '+' : ''}{formatCurrency(animatedTotalPnl)}
             </h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: equityChartData.length > 0 ? '24px' : 0 }}>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -185,10 +264,76 @@ export default function Dashboard() {
               </div>
               <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>All time</span>
             </div>
+
+            {/* Equity Curve inside hero */}
+            {equityChartData.length > 0 && (
+              <div style={{ marginTop: '8px' }}>
+                <ResponsiveContainer width="100%" height={200}>
+                  <AreaChart data={equityChartData}>
+                    <defs>
+                      <linearGradient id="heroPnlGradientPos" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="var(--profit)" stopOpacity={0.25} />
+                        <stop offset="100%" stopColor="var(--profit)" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="heroPnlGradientNeg" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="var(--loss)" stopOpacity={0} />
+                        <stop offset="100%" stopColor="var(--loss)" stopOpacity={0.25} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => formatCurrency(value)}
+                      width={70}
+                    />
+                    <Tooltip
+                      content={({ active, payload, label }) => {
+                        if (!active || !payload?.length) return null;
+                        const data = payload[0].payload;
+                        return (
+                          <div style={{ ...tooltipStyle, padding: '12px 16px' }}>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginBottom: '8px' }}>{label}</p>
+                            <p style={{
+                              color: data.cumulativePnl >= 0 ? 'var(--profit)' : 'var(--loss)',
+                              fontFamily: "'DM Mono', monospace",
+                              fontWeight: 600,
+                            }}>
+                              Cumulative: {formatCurrency(data.cumulativePnl)}
+                            </p>
+                            <p style={{
+                              color: data.dailyPnl >= 0 ? 'var(--profit)' : 'var(--loss)',
+                              fontFamily: "'DM Mono', monospace",
+                              fontSize: '13px',
+                              marginTop: '4px',
+                            }}>
+                              Daily: {formatCurrency(data.dailyPnl)}
+                            </p>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="cumulativePnl"
+                      stroke={equityChartData[equityChartData.length - 1]?.cumulativePnl >= 0 ? 'var(--profit)' : 'var(--loss)'}
+                      strokeWidth={2}
+                      fill={equityChartData[equityChartData.length - 1]?.cumulativePnl >= 0 ? 'url(#heroPnlGradientPos)' : 'url(#heroPnlGradientNeg)'}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Stats Row */}
+        {/* ===== Trade Type Filter + Stats Row ===== */}
         {(portfolioError || predictionsSummaryError) && (
           <div className="card" style={{
             padding: '16px 24px',
@@ -203,24 +348,40 @@ export default function Dashboard() {
             {predictionsSummaryError && <>Failed to load predictions summary. <button onClick={fetchPredictionsSummary} className="btn-ghost" style={{ color: 'var(--loss)', textDecoration: 'underline', padding: '0 4px' }}>Retry</button></>}
           </div>
         )}
+
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '20px' }}>
+          {(['all', 'intraday', 'swing'] as const).map((type) => {
+            const isActive = tradeTypeFilter === type;
+            const label = type === 'all' ? 'All Trades' : type === 'intraday' ? 'Intraday' : 'Swing';
+            return (
+              <button
+                key={type}
+                onClick={() => setTradeTypeFilter(type)}
+                style={{
+                  padding: '5px 14px',
+                  borderRadius: '8px',
+                  border: isActive ? '1px solid var(--border-accent)' : '1px solid var(--border)',
+                  background: isActive ? 'var(--accent-soft)' : 'transparent',
+                  color: isActive ? 'var(--accent)' : 'var(--text-muted)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: '20px',
-          marginBottom: '56px'
+          gridTemplateColumns: 'repeat(5, 1fr)',
+          gap: '16px',
+          marginBottom: '40px',
         }}>
-          {(() => {
-            const rPnl = (portfolioSummary?.realizedPnl ?? 0) + predictionsPnl;
-            return (
-              <StatCard
-                label="Realized P&L"
-                numericValue={rPnl}
-                positive={rPnl >= 0}
-                glowIntensity={intensity}
-                style={stagger(0)}
-              />
-            );
-          })()}
           {(() => {
             const tradesWins = portfolioSummary ? (portfolioSummary.winRate / 100) * portfolioSummary.closedTrades : 0;
             const tradesTotal = portfolioSummary?.closedTrades || 0;
@@ -234,29 +395,76 @@ export default function Dashboard() {
                 numericValue={combinedWinRate}
                 formatter={(v) => `${v.toFixed(0)}%`}
                 subtext={`${combinedTotal} closed`}
-                style={stagger(1)}
+                style={stagger(0)}
               />
             );
           })()}
           <StatCard
-            label="Discipline Rate"
+            label="Profit Factor"
+            numericValue={analytics?.profitFactor ?? 0}
+            formatter={(v) => v.toFixed(2)}
+            style={stagger(1)}
+          />
+          <StatCard
+            label="Discipline"
             numericValue={portfolioSummary?.followedPlanRate ?? 0}
             formatter={(v) => `${v.toFixed(0)}%`}
             subtext="followed plan"
             style={stagger(2)}
           />
           <StatCard
-            label="Total Fees"
-            numericValue={portfolioSummary?.totalFees ?? 0}
+            label="Avg Win"
+            numericValue={analytics?.avgWin ?? 0}
+            positive={true}
             style={stagger(3)}
+          />
+          <StatCard
+            label="Avg Loss"
+            numericValue={analytics?.avgLoss ?? 0}
+            positive={false}
+            style={stagger(4)}
           />
         </div>
 
+        {/* ===== P&L Calendar ===== */}
+        {analyticsLoading ? (
+          <div className="card" style={{ padding: '48px', textAlign: 'center', marginBottom: '40px' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Loading analytics...</p>
+          </div>
+        ) : !hasAnalyticsData ? (
+          <div className="card empty-state" style={{ marginBottom: '40px' }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '16px',
+              background: 'var(--accent-soft)',
+              border: '1px solid var(--border-accent)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px',
+            }}>
+              <BarChart3 style={{ color: 'var(--accent)' }} size={28} />
+            </div>
+            <h3 style={{ fontSize: '18px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '8px' }}>
+              No trading data yet
+            </h3>
+            <p className="empty-state-text" style={{ maxWidth: '320px', margin: '0 auto' }}>
+              Close some trades to see performance analytics here.
+            </p>
+          </div>
+        ) : (
+          <div style={{ marginBottom: '40px' }}>
+            <PnlCalendar data={equityCurve} onDayClick={(date) => navigate(`/trades?date=${date}`)} />
+          </div>
+        )}
+
+        {/* ===== Open Trades ===== */}
         {/* Expiring Soon Banner */}
         {expiringTrades.length > 0 && (
           <div className="card" style={{
             padding: '16px 20px',
-            marginBottom: '28px',
+            marginBottom: '20px',
             position: 'relative',
             overflow: 'hidden',
             borderLeft: `3px solid ${expiringTrades.some(t => t.dte !== null && t.dte <= 1) ? 'var(--loss)' : '#f59e0b'}`,
@@ -277,8 +485,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Open Trades Table */}
-        <div>
+        <div style={{ marginBottom: '40px' }}>
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -349,7 +556,6 @@ export default function Dashboard() {
                     >
                       <td style={tdStyle}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          {/* Left color bar */}
                           <div style={{
                             position: 'absolute',
                             left: 0,
@@ -418,107 +624,213 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Recent Activity - Closed Trades */}
-        <div style={{ marginTop: '56px' }}>
-          <h2 style={{
-            fontSize: '20px',
-            fontWeight: 700,
-            color: 'var(--text-primary)',
-            marginBottom: '20px',
-          }}>
-            Recent Activity
-          </h2>
-
-          {tradesLoading ? (
-            <div className="card empty-state">
-              <p className="empty-state-text">Loading...</p>
-            </div>
-          ) : recentClosedTrades.length === 0 ? (
-            <div className="card empty-state">
-              <p className="empty-state-title" style={{ fontSize: '16px', fontWeight: 600 }}>No closed trades yet</p>
-            </div>
-          ) : (
-            <div className="card" style={{ overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                    <th style={thStyle}>Closed</th>
-                    <th style={thStyle}>Name</th>
-                    <th style={thStyle}>Underlying</th>
-                    <th style={thStyle}>Strategy</th>
-                    <th style={{ ...thStyle, textAlign: 'right' }}>P&L</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentClosedTrades.map((trade, idx) => {
-                    const pnl = trade.realizedPnl ?? null;
-                    const pnlPositive = pnl !== null ? pnl >= 0 : true;
-
-                    return (
-                      <tr
-                        key={trade.id}
-                        style={{
-                          borderBottom: '1px solid var(--border)',
-                          animation: `slideUp 0.35s ease-out ${idx * 0.04}s both`,
-                          position: 'relative',
+        {/* ===== Analytics Breakdowns ===== */}
+        {hasAnalyticsData && (
+          <>
+            {/* Monthly Returns + P&L by Underlying */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+              <div className="card" style={{ padding: '28px' }}>
+                <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '24px' }}>
+                  Monthly Returns
+                </h2>
+                {monthlyChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={monthlyChartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis
+                        dataKey="month"
+                        tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
+                        tickLine={false}
+                        axisLine={{ stroke: 'var(--border)' }}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 12, fill: 'var(--text-muted)' }}
+                        tickLine={false}
+                        axisLine={{ stroke: 'var(--border)' }}
+                        tickFormatter={(value) => formatCurrency(value)}
+                      />
+                      <Tooltip
+                        content={({ active, payload, label }) => {
+                          if (!active || !payload?.length) return null;
+                          const data = payload[0].payload;
+                          return (
+                            <div style={{ ...tooltipStyle, padding: '12px 16px' }}>
+                              <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginBottom: '8px' }}>{label}</p>
+                              <p style={{
+                                color: data.pnl >= 0 ? 'var(--profit)' : 'var(--loss)',
+                                fontFamily: "'DM Mono', monospace",
+                                fontWeight: 600,
+                              }}>
+                                {formatCurrency(data.pnl)}
+                              </p>
+                              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px' }}>
+                                {data.wins}W / {data.losses}L
+                              </p>
+                            </div>
+                          );
                         }}
-                      >
-                        <td style={{ ...tdStyle, color: 'var(--text-muted)', fontSize: '13px' }}>
-                          {trade.closeDate ? formatDate(trade.closeDate) : '—'}
-                        </td>
-                        <td style={tdStyle}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {/* Left color bar */}
-                            <div style={{
-                              position: 'absolute',
-                              left: 0,
-                              top: '8px',
-                              bottom: '8px',
-                              width: '3px',
-                              borderRadius: '0 3px 3px 0',
-                              background: pnlPositive ? 'var(--profit)' : 'var(--loss)',
-                              boxShadow: pnlPositive
-                                ? '0 0 8px rgba(52, 211, 153, 0.4)'
-                                : '0 0 8px rgba(248, 113, 113, 0.4)',
-                            }} />
-                            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                              {trade.name || trade.underlying}
-                            </span>
+                      />
+                      <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
+                        {monthlyChartData.map((entry, index) => (
+                          <Cell
+                            key={index}
+                            fill={entry.pnl >= 0 ? 'var(--profit)' : 'var(--loss)'}
+                            fillOpacity={0.8}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div style={{ height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                    No monthly data available
+                  </div>
+                )}
+              </div>
+
+              <div className="card" style={{ padding: '28px' }}>
+                <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '24px' }}>
+                  P&L by Underlying
+                </h2>
+                {pnlByUnderlying.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '280px', overflowY: 'auto' }}>
+                    {pnlByUnderlying.map((item) => {
+                      const maxAbsPnl = Math.abs(pnlByUnderlying[0].pnl);
+                      const barWidth = maxAbsPnl > 0 ? (Math.abs(item.pnl) / maxAbsPnl) * 100 : 0;
+                      const isPositive = item.pnl >= 0;
+                      return (
+                        <div key={item.underlying} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: '60px', flexShrink: 0, fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>
+                            {item.underlying}
                           </div>
-                        </td>
-                        <td style={tdStyle}>
-                          <span style={{ color: 'var(--text-secondary)' }}>
-                            {trade.underlying}
-                          </span>
-                        </td>
-                        <td style={tdStyle}>
-                          <span style={{
-                            display: 'inline-block',
-                            padding: '2px 10px',
-                            borderRadius: '9999px',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            background: 'rgba(139, 92, 246, 0.1)',
-                            color: 'var(--accent-violet)',
-                          }}>
-                            {trade.strategy || '—'}
-                          </span>
-                        </td>
-                        <td style={{ ...tdStyle, textAlign: 'right' }}>
-                          {pnl !== null ? (
-                            <PnlDisplay pnl={pnl} pnlPercent={null} />
-                          ) : (
-                            <span style={{ color: 'var(--text-muted)' }}>&mdash;</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          <div style={{ flex: 1, position: 'relative', height: '28px', background: 'var(--bg-elevated)', borderRadius: '6px', overflow: 'hidden' }}>
+                            <div style={{
+                              position: 'absolute', top: 0, left: 0, height: '100%',
+                              width: `${Math.max(barWidth, 2)}%`,
+                              background: isPositive
+                                ? 'linear-gradient(90deg, rgba(52, 211, 153, 0.3), rgba(52, 211, 153, 0.15))'
+                                : 'linear-gradient(90deg, rgba(248, 113, 113, 0.3), rgba(248, 113, 113, 0.15))',
+                              borderRadius: '6px', transition: 'width 0.3s ease',
+                            }} />
+                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '100%', padding: '0 10px' }}>
+                              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '13px', fontWeight: 600, color: isPositive ? 'var(--profit)' : 'var(--loss)' }}>
+                                {formatCurrency(item.pnl)}
+                              </span>
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                {item.tradeCount} trade{item.tradeCount !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                    No underlying data available
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-        </div>
+
+            {/* Strategy Performance + Entry Quality */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div className="card" style={{ padding: '28px' }}>
+                <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '24px' }}>
+                  Strategy Performance
+                </h2>
+                {pnlByStrategy.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '320px', overflowY: 'auto' }}>
+                    {pnlByStrategy.map((item) => {
+                      const maxAbsPnl = Math.max(...pnlByStrategy.map(s => Math.abs(s.pnl)));
+                      const barWidth = maxAbsPnl > 0 ? (Math.abs(item.pnl) / maxAbsPnl) * 100 : 0;
+                      const isPositive = item.pnl >= 0;
+                      return (
+                        <div key={item.strategy} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: '90px', flexShrink: 0, fontWeight: 600, fontSize: '12px', color: 'var(--text-primary)', textTransform: 'capitalize' }}>
+                            {item.strategy.replace(/_/g, ' ')}
+                          </div>
+                          <div style={{ flex: 1, position: 'relative', height: '28px', background: 'var(--bg-elevated)', borderRadius: '6px', overflow: 'hidden' }}>
+                            <div style={{
+                              position: 'absolute', top: 0, left: 0, height: '100%',
+                              width: `${Math.max(barWidth, 2)}%`,
+                              background: isPositive
+                                ? 'linear-gradient(90deg, rgba(52, 211, 153, 0.3), rgba(52, 211, 153, 0.15))'
+                                : 'linear-gradient(90deg, rgba(248, 113, 113, 0.3), rgba(248, 113, 113, 0.15))',
+                              borderRadius: '6px', transition: 'width 0.3s ease',
+                            }} />
+                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '100%', padding: '0 10px' }}>
+                              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '13px', fontWeight: 600, color: isPositive ? 'var(--profit)' : 'var(--loss)' }}>
+                                {formatCurrency(item.pnl)}
+                              </span>
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', gap: '8px' }}>
+                                <span style={{ color: item.winRate >= 50 ? 'var(--profit)' : 'var(--loss)' }}>
+                                  {item.winRate.toFixed(0)}% win
+                                </span>
+                                <span>{item.tradeCount} trade{item.tradeCount !== 1 ? 's' : ''}</span>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                    No strategy data available
+                  </div>
+                )}
+              </div>
+
+              <div className="card" style={{ padding: '28px' }}>
+                <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '24px' }}>
+                  Entry Quality
+                </h2>
+                {pnlByEntryQuality.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '320px', overflowY: 'auto' }}>
+                    {pnlByEntryQuality.map((item) => {
+                      const maxAbsPnl = Math.max(...pnlByEntryQuality.map(s => Math.abs(s.pnl)));
+                      const barWidth = maxAbsPnl > 0 ? (Math.abs(item.pnl) / maxAbsPnl) * 100 : 0;
+                      const isPositive = item.pnl >= 0;
+                      return (
+                        <div key={item.entryQuality} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: '90px', flexShrink: 0, fontWeight: 600, fontSize: '12px', color: 'var(--text-primary)', textTransform: 'capitalize' }}>
+                            {item.entryQuality}
+                          </div>
+                          <div style={{ flex: 1, position: 'relative', height: '28px', background: 'var(--bg-elevated)', borderRadius: '6px', overflow: 'hidden' }}>
+                            <div style={{
+                              position: 'absolute', top: 0, left: 0, height: '100%',
+                              width: `${Math.max(barWidth, 2)}%`,
+                              background: isPositive
+                                ? 'linear-gradient(90deg, rgba(52, 211, 153, 0.3), rgba(52, 211, 153, 0.15))'
+                                : 'linear-gradient(90deg, rgba(248, 113, 113, 0.3), rgba(248, 113, 113, 0.15))',
+                              borderRadius: '6px', transition: 'width 0.3s ease',
+                            }} />
+                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '100%', padding: '0 10px' }}>
+                              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '13px', fontWeight: 600, color: isPositive ? 'var(--profit)' : 'var(--loss)' }}>
+                                {formatCurrency(item.pnl)}
+                              </span>
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', gap: '8px' }}>
+                                <span style={{ color: item.winRate >= 50 ? 'var(--profit)' : 'var(--loss)' }}>
+                                  {item.winRate.toFixed(0)}% win
+                                </span>
+                                <span>{item.tradeCount} trade{item.tradeCount !== 1 ? 's' : ''}</span>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                    No entry quality data available
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </PageTransition>
   );
@@ -533,7 +845,6 @@ function StatCard({
   formatter,
   subtext,
   positive,
-  glowIntensity: t = 1,
   style,
 }: {
   label: string;
@@ -541,7 +852,6 @@ function StatCard({
   formatter?: (v: number) => string;
   subtext?: string;
   positive?: boolean;
-  glowIntensity?: number;
   style?: React.CSSProperties;
 }) {
   const animated = useAnimatedNumber(numericValue);
@@ -555,25 +865,15 @@ function StatCard({
     ? (positive ? 'stat-gradient-profit' : 'stat-gradient-loss')
     : 'stat-gradient-neutral';
 
-  // Dynamic glow on the card border scaled by intensity
-  const sga = (base: number) => +(base * (0.2 + 0.8 * t)).toFixed(3);
   const sgc = positive ? '52, 211, 153' : '248, 113, 113';
-  const glowBorder = positive !== undefined
-    ? {
-        borderColor: `rgba(${sgc}, ${sga(0.12)})`,
-        boxShadow: `var(--shadow-card), 0 0 20px rgba(${sgc}, ${sga(0.05)})`,
-      }
-    : {};
 
   return (
     <div className={`card ${gradientClass}`} style={{
-      padding: '28px',
+      padding: '24px',
       position: 'relative',
       overflow: 'hidden',
-      ...glowBorder,
       ...style,
     }}>
-      {/* Left-side stripe with glow */}
       {positive !== undefined && (
         <div style={{
           position: 'absolute',
@@ -583,29 +883,26 @@ function StatCard({
           width: '3px',
           borderRadius: '0 3px 3px 0',
           background: positive ? 'var(--profit)' : 'var(--loss)',
-          boxShadow: `0 0 8px rgba(${sgc}, ${sga(0.5)})`,
+          boxShadow: `0 0 8px rgba(${sgc}, 0.5)`,
         }} />
       )}
-      <p className="stat-label" style={{ marginBottom: '12px' }}>{label}</p>
+      <p className="stat-label" style={{ marginBottom: '10px' }}>{label}</p>
       <p style={{
-        fontSize: '30px',
+        fontSize: '26px',
         fontWeight: 700,
         color: valueColor,
         fontFamily: "'DM Mono', monospace",
         letterSpacing: '-1.5px',
         fontVariantNumeric: 'tabular-nums',
-        textShadow: positive !== undefined
-          ? `0 0 30px rgba(${sgc}, ${sga(0.25)})`
-          : 'none',
       }}>
         {displayValue}
       </p>
       {subtext && (
         <p style={{
-          fontSize: '13px',
+          fontSize: '12px',
           color: positive !== undefined ? valueColor : 'var(--text-muted)',
-          marginTop: '8px',
-          opacity: 0.9
+          marginTop: '6px',
+          opacity: 0.9,
         }}>
           {subtext}
         </p>

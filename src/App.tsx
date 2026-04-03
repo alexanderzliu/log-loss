@@ -1,12 +1,11 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { useEffect, type CSSProperties } from 'react';
-import { BookOpen, BookMarked, LayoutDashboard, TrendingUp, CircleDot, Sparkles } from 'lucide-react';
+import { BookOpen, BookMarked, LayoutDashboard, CircleDot, Sparkles } from 'lucide-react';
 import { useStore } from './store/useStore';
 import { formatCurrency } from './utils/format';
 import Journal from './pages/Journal';
 import Predictions from './pages/Predictions';
 import Dashboard from './pages/Dashboard';
-import Analytics from './pages/Analytics';
 import Insights from './pages/Insights';
 import Rulebook from './pages/Rulebook';
 import ToastContainer from './components/Toast';
@@ -184,10 +183,6 @@ function App() {
               <Sparkles size={18} />
               Insights
             </NavLink>
-            <NavLink to="/analytics" style={navLinkStyle}>
-              <TrendingUp size={18} />
-              Analytics
-            </NavLink>
             <NavLink to="/rulebook" style={navLinkStyle}>
               <BookMarked size={18} />
               Rulebook
@@ -203,7 +198,7 @@ function App() {
             <Route path="/journal" element={<Navigate to="/trades" replace />} />
             <Route path="/predictions" element={<Predictions />} />
             <Route path="/insights" element={<Insights />} />
-            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/analytics" element={<Navigate to="/" replace />} />
             <Route path="/rulebook" element={<Rulebook />} />
           </Routes>
         </main>
