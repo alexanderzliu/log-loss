@@ -6,7 +6,7 @@ import TradeList from '../components/trades/TradeList';
 import TradeForm from '../components/trades/TradeForm';
 import FilterPills from '../components/FilterPills';
 import PageTransition from '../components/PageTransition';
-import { FilterDropdown, TagFilterSelect, DateRangeFilter, CollapsibleFilterBar } from '../components/FilterControls';
+import { FilterDropdown, TagFilterSelect, DateRangeFilter, FilterToggleButton, FilterPanel } from '../components/FilterControls';
 import { useTradeFilters, type StatusFilter } from '../hooks/useTradeFilters';
 import type { Trade } from '../types';
 
@@ -19,8 +19,14 @@ export default function Journal() {
   const [showForm, setShowForm] = useState(false);
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [closingTrade, setClosingTrade] = useState<Trade | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
 
   const filters = useTradeFilters(trades);
+
+  // Auto-expand filter panel when filters are active on mount (e.g. from URL params)
+  useEffect(() => {
+    if (filters.activeFilterCount > 0) setShowFilters(true);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchTrades();
@@ -138,35 +144,49 @@ export default function Journal() {
 
       {/* Filters and Search */}
       <div style={{
-        background: 'var(--gradient-card)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-card)',
-        boxShadow: 'var(--shadow-card)',
-        padding: '12px 20px',
         display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        flexDirection: 'column',
+        gap: '12px',
         marginBottom: '16px',
         position: 'relative',
         zIndex: 1,
       }}>
-        <FilterPills
-          options={[
-            { key: 'all', label: 'All', count: filters.statusCounts.all },
-            { key: 'planned', label: 'Planned', count: filters.statusCounts.planned },
-            { key: 'open', label: 'Open', count: filters.statusCounts.open },
-            { key: 'closed', label: 'Closed', count: filters.statusCounts.closed },
-          ]}
-          active={filters.statusFilter}
-          onChange={(key) => filters.setStatusFilter(key as StatusFilter)}
-        />
+        {/* Top bar: always one compact row */}
+        <div style={{
+          background: 'var(--gradient-card)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-card)',
+          boxShadow: 'var(--shadow-card)',
+          padding: '12px 20px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+          <FilterPills
+            options={[
+              { key: 'all', label: 'All', count: filters.statusCounts.all },
+              { key: 'planned', label: 'Planned', count: filters.statusCounts.planned },
+              { key: 'open', label: 'Open', count: filters.statusCounts.open },
+              { key: 'closed', label: 'Closed', count: filters.statusCounts.closed },
+            ]}
+            active={filters.statusFilter}
+            onChange={(key) => filters.setStatusFilter(key as StatusFilter)}
+          />
 
-        <CollapsibleFilterBar
-          activeCount={filters.activeFilterCount}
-          trailing={searchBox}
-        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <FilterToggleButton
+              activeCount={filters.activeFilterCount}
+              isOpen={showFilters}
+              onToggle={() => setShowFilters((v) => !v)}
+            />
+            {searchBox}
+          </div>
+        </div>
+
+        {/* Expanded filter panel: separate section below */}
+        <FilterPanel isOpen={showFilters}>
           {/* Row 1: Trade properties */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
             <FilterDropdown
@@ -243,7 +263,7 @@ export default function Journal() {
               </button>
             )}
           </div>
-        </CollapsibleFilterBar>
+        </FilterPanel>
       </div>
 
       {/* Content */}

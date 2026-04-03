@@ -382,83 +382,80 @@ export function DateRangeFilter({ from, to, onChange }: DateRangeFilterProps) {
   );
 }
 
-// --- CollapsibleFilterBar: shared filter toggle + collapsible row ---
+// --- FilterToggleButton: standalone filter toggle with badge ---
 
-interface CollapsibleFilterBarProps {
+interface FilterToggleButtonProps {
   activeCount: number;
-  children: ReactNode;
-  trailing?: ReactNode;
-  defaultOpen?: boolean;
+  isOpen: boolean;
+  onToggle: () => void;
 }
 
-export function CollapsibleFilterBar({ activeCount, children, trailing, defaultOpen }: CollapsibleFilterBarProps) {
-  const [showFilters, setShowFilters] = useState(defaultOpen ?? false);
+export function FilterToggleButton({ activeCount, isOpen, onToggle }: FilterToggleButtonProps) {
+  return (
+    <button
+      onClick={onToggle}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        background: isOpen ? 'var(--accent-soft)' : 'transparent',
+        border: isOpen ? '1px solid var(--border-accent)' : '1px solid var(--border)',
+        borderRadius: '10px',
+        padding: '7px 12px',
+        color: isOpen ? 'var(--accent)' : 'var(--text-muted)',
+        fontSize: '13px',
+        fontWeight: 500,
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        transition: 'all 0.2s ease',
+      }}
+    >
+      <SlidersHorizontal size={14} />
+      Filters
+      {activeCount > 0 && (
+        <span style={{
+          fontSize: '11px',
+          fontWeight: 700,
+          padding: '0 5px',
+          borderRadius: '9999px',
+          background: 'var(--accent)',
+          color: '#000',
+          lineHeight: '16px',
+        }}>
+          {activeCount}
+        </span>
+      )}
+    </button>
+  );
+}
 
-  // Auto-expand when filters become active
-  useEffect(() => {
-    if (activeCount > 0) setShowFilters(true);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+// --- FilterPanel: animated expandable filter content ---
+
+interface FilterPanelProps {
+  isOpen: boolean;
+  children: ReactNode;
+}
+
+export function FilterPanel({ isOpen, children }: FilterPanelProps) {
+  if (!isOpen) return null;
 
   return (
-    <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <button
-          onClick={() => setShowFilters((v) => !v)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            background: showFilters ? 'var(--accent-soft)' : 'transparent',
-            border: showFilters ? '1px solid var(--border-accent)' : '1px solid var(--border)',
-            borderRadius: '10px',
-            padding: '7px 12px',
-            color: showFilters ? 'var(--accent)' : 'var(--text-muted)',
-            fontSize: '13px',
-            fontWeight: 500,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            transition: 'all 0.2s ease',
-          }}
-        >
-          <SlidersHorizontal size={14} />
-          Filters
-          {activeCount > 0 && (
-            <span style={{
-              fontSize: '11px',
-              fontWeight: 700,
-              padding: '0 5px',
-              borderRadius: '9999px',
-              background: 'var(--accent)',
-              color: '#000',
-              lineHeight: '16px',
-            }}>
-              {activeCount}
-            </span>
-          )}
-        </button>
-        {trailing}
-      </div>
-
-      {showFilters && (
-        <div style={{
-          background: 'var(--gradient-card)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-card)',
-          boxShadow: 'var(--shadow-card)',
-          padding: '14px 20px',
-          marginTop: '12px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '10px',
-          position: 'relative',
-          zIndex: 1,
-          animation: 'slideUp 0.2s ease-out both',
-        }}>
-          {children}
-        </div>
-      )}
-    </>
+    <div style={{
+      background: 'var(--gradient-card)',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-card)',
+      boxShadow: 'var(--shadow-card)',
+      padding: '14px 20px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '10px',
+      position: 'relative',
+      zIndex: 1,
+      animation: 'slideUp 0.2s ease-out both',
+    }}>
+      {children}
+    </div>
   );
 }

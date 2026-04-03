@@ -6,7 +6,7 @@ import { formatCurrency, formatDate } from '../utils/format';
 import { isDateInRange } from '../utils/tradeFilters';
 import FilterPills from '../components/FilterPills';
 import PageTransition from '../components/PageTransition';
-import { FilterDropdown, DateRangeFilter, CollapsibleFilterBar } from '../components/FilterControls';
+import { FilterDropdown, DateRangeFilter, FilterToggleButton, FilterPanel } from '../components/FilterControls';
 import type { InsightFeedItem } from '../types';
 
 const TYPE_CONFIG: Record<InsightFeedItem['type'], {
@@ -71,6 +71,7 @@ export default function Insights() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   // Advanced filters
   const [underlyingFilter, setUnderlyingFilter] = useState('');
@@ -187,23 +188,33 @@ export default function Insights() {
         </div>
 
         {/* Search + Filters */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '16px', flexWrap: 'wrap' }}>
-          <FilterPills
-            options={[
-              { key: 'all', label: 'All', count: filterCounts.all || 0 },
-              { key: 'hypothesis', label: 'Hypotheses', count: filterCounts.hypothesis || 0 },
-              { key: 'success', label: 'Successes', count: filterCounts.success || 0 },
-              { key: 'lesson', label: 'Lessons', count: filterCounts.lesson || 0 },
-              { key: 'mistake', label: 'Mistakes', count: filterCounts.mistake || 0 },
-            ]}
-            active={typeFilter}
-            onChange={setTypeFilter}
-          />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
+          {/* Top row: always one compact line */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <FilterPills
+              options={[
+                { key: 'all', label: 'All', count: filterCounts.all || 0 },
+                { key: 'hypothesis', label: 'Hypotheses', count: filterCounts.hypothesis || 0 },
+                { key: 'success', label: 'Successes', count: filterCounts.success || 0 },
+                { key: 'lesson', label: 'Lessons', count: filterCounts.lesson || 0 },
+                { key: 'mistake', label: 'Mistakes', count: filterCounts.mistake || 0 },
+              ]}
+              active={typeFilter}
+              onChange={setTypeFilter}
+            />
 
-          <CollapsibleFilterBar
-            activeCount={activeFilterCount}
-            trailing={searchBox}
-          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <FilterToggleButton
+                activeCount={activeFilterCount}
+                isOpen={showFilters}
+                onToggle={() => setShowFilters((v) => !v)}
+              />
+              {searchBox}
+            </div>
+          </div>
+
+          {/* Expanded filter panel: separate section below */}
+          <FilterPanel isOpen={showFilters}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'flex-start' }}>
               <FilterDropdown
                 label="Underlying"
@@ -246,7 +257,7 @@ export default function Insights() {
                 </button>
               )}
             </div>
-          </CollapsibleFilterBar>
+          </FilterPanel>
         </div>
 
         {/* Feed */}
