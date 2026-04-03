@@ -8,6 +8,14 @@ import { captureSnapshotsForTrade } from './snapshots';
 
 const router = Router();
 
+function tradeTypeClause(tradeType: string | undefined): string {
+  if (tradeType === 'intraday')
+    return ' AND open_date IS NOT NULL AND date(open_date) = date(close_date)';
+  if (tradeType === 'swing')
+    return ' AND open_date IS NOT NULL AND date(open_date) != date(close_date)';
+  return '';
+}
+
 // GET / - List all trades
 router.get('/', (req, res) => {
   try {
@@ -139,15 +147,22 @@ router.get('/stats/summary', (_req, res) => {
 });
 
 // GET /stats/equity-curve - Cumulative P&L over time
-router.get('/stats/equity-curve', (_req, res) => {
+router.get('/stats/equity-curve', (req, res) => {
   try {
+    const tradeType = req.query.tradeType as string | undefined;
+    if (tradeType && tradeType !== 'intraday' && tradeType !== 'swing') {
+      res.status(400).json({ error: 'Invalid tradeType' });
+      return;
+    }
+    const ttClause = tradeTypeClause(tradeType);
+
     const rows = db.prepare(`
       SELECT
         date(close_date) as date,
         SUM(realized_pnl) as daily_pnl,
         COUNT(*) as trade_count
       FROM trades
-      WHERE status = 'closed' AND close_date IS NOT NULL AND realized_pnl IS NOT NULL
+      WHERE status = 'closed' AND close_date IS NOT NULL AND realized_pnl IS NOT NULL${ttClause}
       GROUP BY date(close_date)
       ORDER BY date(close_date) ASC
     `).all() as { date: string; daily_pnl: number; trade_count: number }[];
@@ -171,8 +186,15 @@ router.get('/stats/equity-curve', (_req, res) => {
 });
 
 // GET /stats/analytics - Detailed trading analytics
-router.get('/stats/analytics', (_req, res) => {
+router.get('/stats/analytics', (req, res) => {
   try {
+    const tradeType = req.query.tradeType as string | undefined;
+    if (tradeType && tradeType !== 'intraday' && tradeType !== 'swing') {
+      res.status(400).json({ error: 'Invalid tradeType' });
+      return;
+    }
+    const ttClause = tradeTypeClause(tradeType);
+
     // P&L by underlying
     const pnlByUnderlying = db.prepare(`
       SELECT
@@ -181,7 +203,7 @@ router.get('/stats/analytics', (_req, res) => {
         SUM(realized_pnl) as pnl,
         COUNT(*) as tradeCount
       FROM trades
-      WHERE status = 'closed'
+      WHERE status = 'closed'${ttClause}
       GROUP BY underlying, asset_type
       ORDER BY SUM(realized_pnl) DESC
     `).all() as { underlying: string; assetType: string; pnl: number; tradeCount: number }[];
@@ -196,7 +218,7 @@ router.get('/stats/analytics', (_req, res) => {
           THEN CAST(COUNT(CASE WHEN realized_pnl > 0 THEN 1 END) AS REAL) / COUNT(CASE WHEN realized_pnl IS NOT NULL THEN 1 END) * 100
           ELSE 0 END as winRate
       FROM trades
-      WHERE status = 'closed'
+      WHERE status = 'closed'${ttClause}
       GROUP BY strategy
       ORDER BY SUM(realized_pnl) DESC
     `).all() as { strategy: string; pnl: number; tradeCount: number; winRate: number }[];
@@ -209,7 +231,7 @@ router.get('/stats/analytics', (_req, res) => {
         COUNT(CASE WHEN realized_pnl > 0 THEN 1 END) as wins,
         COUNT(CASE WHEN realized_pnl < 0 THEN 1 END) as losses
       FROM trades
-      WHERE status = 'closed' AND close_date IS NOT NULL
+      WHERE status = 'closed' AND close_date IS NOT NULL${ttClause}
       GROUP BY strftime('%Y-%m', close_date)
       ORDER BY month ASC
     `).all() as { month: string; pnl: number; wins: number; losses: number }[];
@@ -218,14 +240,14 @@ router.get('/stats/analytics', (_req, res) => {
     const bestTrade = db.prepare(`
       SELECT realized_pnl as pnl, close_date as date, underlying, name
       FROM trades
-      WHERE status = 'closed' AND realized_pnl IS NOT NULL
+      WHERE status = 'closed' AND realized_pnl IS NOT NULL${ttClause}
       ORDER BY realized_pnl DESC LIMIT 1
     `).get() as { pnl: number; date: string; underlying: string; name: string } | undefined;
 
     const worstTrade = db.prepare(`
       SELECT realized_pnl as pnl, close_date as date, underlying, name
       FROM trades
-      WHERE status = 'closed' AND realized_pnl IS NOT NULL
+      WHERE status = 'closed' AND realized_pnl IS NOT NULL${ttClause}
       ORDER BY realized_pnl ASC LIMIT 1
     `).get() as { pnl: number; date: string; underlying: string; name: string } | undefined;
 
@@ -239,7 +261,7 @@ router.get('/stats/analytics', (_req, res) => {
           THEN CAST(COUNT(CASE WHEN realized_pnl > 0 THEN 1 END) AS REAL) / COUNT(CASE WHEN realized_pnl IS NOT NULL THEN 1 END) * 100
           ELSE 0 END as winRate
       FROM trades
-      WHERE status = 'closed'
+      WHERE status = 'closed'${ttClause}
       GROUP BY COALESCE(entry_quality, 'unrated')
       ORDER BY SUM(realized_pnl) DESC
     `).all() as { entryQuality: string; pnl: number; tradeCount: number; winRate: number }[];
@@ -252,14 +274,14 @@ router.get('/stats/analytics', (_req, res) => {
         SUM(CASE WHEN realized_pnl > 0 THEN realized_pnl ELSE 0 END) as total_wins,
         ABS(SUM(CASE WHEN realized_pnl < 0 THEN realized_pnl ELSE 0 END)) as total_losses
       FROM trades
-      WHERE status = 'closed'
+      WHERE status = 'closed'${ttClause}
     `).get() as { avg_win: number | null; avg_loss: number | null; total_wins: number; total_losses: number };
 
     // Average hold time
     const avgHoldTime = db.prepare(`
       SELECT AVG(julianday(close_date) - julianday(open_date)) as avg_days
       FROM trades
-      WHERE status = 'closed' AND close_date IS NOT NULL AND open_date IS NOT NULL
+      WHERE status = 'closed' AND close_date IS NOT NULL AND open_date IS NOT NULL${ttClause}
     `).get() as { avg_days: number | null };
 
     const profitFactor = avgStats.total_losses > 0

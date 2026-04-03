@@ -57,17 +57,21 @@ export default function Analytics() {
   const [equityCurve, setEquityCurve] = useState<EquityCurvePoint[]>([]);
   const [analytics, setAnalytics] = useState<TradingAnalytics | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [tradeTypeFilter, setTradeTypeFilter] = useState<'all' | 'intraday' | 'swing'>('all');
 
-  // Fetch trading analytics and trades on mount
+  // Fetch trades list on mount (for price analytics section)
+  useEffect(() => { fetchTrades(); }, [fetchTrades]);
+
+  // Fetch analytics when filter changes
   useEffect(() => {
-    fetchTrades();
     let cancelled = false;
     async function load() {
       setAnalyticsLoading(true);
+      const tt = tradeTypeFilter === 'all' ? undefined : tradeTypeFilter;
       try {
         const [curve, stats] = await Promise.all([
-          fetchEquityCurve(),
-          fetchTradingAnalytics(),
+          fetchEquityCurve(tt),
+          fetchTradingAnalytics(tt),
         ]);
         if (!cancelled) {
           setEquityCurve(curve);
@@ -81,7 +85,7 @@ export default function Analytics() {
     }
     load();
     return () => { cancelled = true; };
-  }, [fetchTrades]);
+  }, [tradeTypeFilter]);
 
   // Get unique symbols from trades - memoized to avoid new array refs each render
   const trackedAssets = useMemo(() => Array.from(
@@ -190,6 +194,34 @@ export default function Analytics() {
       <div>
         <h1 className="page-header">Analytics</h1>
         <p className="page-subtitle">Trading performance and price analysis</p>
+      </div>
+
+      {/* Trade type filter */}
+      <div style={{ display: 'flex', gap: '6px' }}>
+        {(['all', 'intraday', 'swing'] as const).map((type) => {
+          const isActive = tradeTypeFilter === type;
+          const label = type === 'all' ? 'All Trades' : type === 'intraday' ? 'Intraday' : 'Swing';
+          return (
+            <button
+              key={type}
+              onClick={() => setTradeTypeFilter(type)}
+              style={{
+                padding: '5px 14px',
+                borderRadius: '8px',
+                border: isActive ? '1px solid var(--border-accent)' : '1px solid var(--border)',
+                background: isActive ? 'var(--accent-soft)' : 'transparent',
+                color: isActive ? 'var(--accent)' : 'var(--text-muted)',
+                fontSize: '13px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
 
       {/* ========== SECTION 1: Trading Performance ========== */}

@@ -130,14 +130,20 @@ export async function fetchPortfolioSummary(): Promise<PortfolioSummary> {
   return response.json();
 }
 
-export async function fetchEquityCurve(): Promise<EquityCurvePoint[]> {
-  const response = await fetch(`${API_BASE}/stats/equity-curve`);
+export async function fetchEquityCurve(tradeType?: string): Promise<EquityCurvePoint[]> {
+  const params = new URLSearchParams();
+  if (tradeType) params.set('tradeType', tradeType);
+  const qs = params.toString();
+  const response = await fetch(`${API_BASE}/stats/equity-curve${qs ? `?${qs}` : ''}`);
   if (!response.ok) throw new Error('Failed to fetch equity curve');
   return response.json();
 }
 
-export async function fetchTradingAnalytics(): Promise<TradingAnalytics> {
-  const response = await fetch(`${API_BASE}/stats/analytics`);
+export async function fetchTradingAnalytics(tradeType?: string): Promise<TradingAnalytics> {
+  const params = new URLSearchParams();
+  if (tradeType) params.set('tradeType', tradeType);
+  const qs = params.toString();
+  const response = await fetch(`${API_BASE}/stats/analytics${qs ? `?${qs}` : ''}`);
   if (!response.ok) throw new Error('Failed to fetch trading analytics');
   return response.json();
 }
