@@ -25,7 +25,7 @@ export default function CandlestickChart({
   vwap,
   entryTime,
   exitTime,
-  height = 300,
+  height = 450,
 }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -38,7 +38,7 @@ export default function CandlestickChart({
       height,
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: 'var(--text-muted)',
+        textColor: '#6e6a7c',
         fontFamily: "'DM Sans', sans-serif",
         fontSize: 11,
       },

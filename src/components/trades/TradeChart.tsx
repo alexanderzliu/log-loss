@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../../store/useStore';
 import CandlestickChart from '../charts/CandlestickChart';
 import type { Trade, ChartSnapshot } from '../../types';
-import { BarChart3, RefreshCw, Loader2 } from 'lucide-react';
+import { BarChart3, RefreshCw, Loader2, Maximize2, X } from 'lucide-react';
 
 interface TradeChartProps {
   trade: Trade;
@@ -17,6 +18,22 @@ export default function TradeChart({ trade }: TradeChartProps) {
   const captureChartSnapshots = useStore((s) => s.captureChartSnapshots);
 
   const [activeTab, setActiveTab] = useState<string>('underlying');
+  const [fullscreen, setFullscreen] = useState(false);
+
+  const handleEscape = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') setFullscreen(false);
+  }, []);
+
+  useEffect(() => {
+    if (fullscreen) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.removeEventListener('keydown', handleEscape);
+        document.body.style.overflow = '';
+      };
+    }
+  }, [fullscreen, handleEscape]);
 
   useEffect(() => {
     fetchChartSnapshots(trade.id);
@@ -96,13 +113,22 @@ export default function TradeChart({ trade }: TradeChartProps) {
             </button>
           ))}
         </div>
-        <button
-          onClick={() => captureChartSnapshots(trade.id)}
-          style={refreshButtonStyle}
-          title="Recapture chart data"
-        >
-          <RefreshCw size={13} />
-        </button>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button
+            onClick={() => setFullscreen(true)}
+            style={refreshButtonStyle}
+            title="Expand chart"
+          >
+            <Maximize2 size={13} />
+          </button>
+          <button
+            onClick={() => captureChartSnapshots(trade.id)}
+            style={refreshButtonStyle}
+            title="Recapture chart data"
+          >
+            <RefreshCw size={13} />
+          </button>
+        </div>
       </div>
 
       {/* Chart */}
@@ -112,7 +138,6 @@ export default function TradeChart({ trade }: TradeChartProps) {
           vwap={activeSnapshot.indicators?.vwap}
           entryTime={entryTime}
           exitTime={exitTime}
-          height={300}
         />
       )}
 
@@ -128,6 +153,56 @@ export default function TradeChart({ trade }: TradeChartProps) {
             <span>POC: ${activeSnapshot.indicators.poc.toFixed(2)}</span>
           )}
         </div>
+      )}
+
+      {/* Fullscreen modal — portaled to body to escape backdrop-filter containing block */}
+      {fullscreen && activeSnapshot && createPortal(
+        <div style={overlayStyle} onClick={() => setFullscreen(false)}>
+          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <div style={modalHeaderStyle}>
+              <div style={tabBarStyle}>
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                    style={{
+                      ...tabStyle,
+                      color: activeTab === tab.key ? 'var(--text-primary)' : 'var(--text-muted)',
+                      borderBottom: activeTab === tab.key ? '2px solid var(--accent)' : '2px solid transparent',
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setFullscreen(false)}
+                style={refreshButtonStyle}
+                title="Close (Esc)"
+              >
+                <X size={15} />
+              </button>
+            </div>
+            <CandlestickChart
+              bars={activeSnapshot.bars}
+              vwap={activeSnapshot.indicators?.vwap}
+              entryTime={entryTime}
+              exitTime={exitTime}
+              height={window.innerHeight - 120}
+            />
+            <div style={infoBarStyle}>
+              <span>{activeSnapshot.barCount} bars</span>
+              <span>{activeSnapshot.tradeDate}</span>
+              <span style={{ textTransform: 'capitalize' }}>
+                {activeSnapshot.source === 'theoretical' ? 'Theoretical (Black-Scholes)' : 'Yahoo Finance'}
+              </span>
+              {activeSnapshot.indicators && (
+                <span>POC: ${activeSnapshot.indicators.poc.toFixed(2)}</span>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -241,4 +316,32 @@ const infoBarStyle: React.CSSProperties = {
   fontSize: '11px',
   color: 'var(--text-muted)',
   borderTop: '1px solid var(--border)',
+};
+
+const overlayStyle: React.CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(0, 0, 0, 0.8)',
+  backdropFilter: 'blur(4px)',
+  zIndex: 1000,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
+const modalStyle: React.CSSProperties = {
+  width: 'calc(100vw - 48px)',
+  maxHeight: 'calc(100vh - 48px)',
+  background: 'var(--bg-base)',
+  borderRadius: '12px',
+  border: '1px solid var(--border)',
+  overflow: 'hidden',
+};
+
+const modalHeaderStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  padding: '0 12px',
+  borderBottom: '1px solid var(--border)',
 };
