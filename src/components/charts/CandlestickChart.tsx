@@ -12,11 +12,37 @@ import {
 } from 'lightweight-charts';
 import type { OhlcvBar, VwapPoint } from '../../types';
 
+/**
+ * lightweight-charts displays Unix timestamps as UTC.
+ * Shift timestamps so they display as US Eastern time.
+ */
+function utcToEastern(utcSeconds: number): number {
+  const d = new Date(utcSeconds * 1000);
+  // Get the Eastern time offset in minutes (handles DST automatically)
+  const eastern = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).formatToParts(d);
+
+  const parts: Record<string, number> = {};
+  for (const p of eastern) {
+    if (p.type !== 'literal') parts[p.type] = parseInt(p.value, 10);
+  }
+
+  // Build a "fake UTC" date from the Eastern wall-clock components
+  const fakeUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  return Math.floor(fakeUtc / 1000);
+}
+
 interface CandlestickChartProps {
   bars: OhlcvBar[];
   vwap?: VwapPoint[];
   entryTime?: number;
   exitTime?: number;
+  entryPrice?: number;
+  exitPrice?: number;
   height?: number;
 }
 
@@ -25,6 +51,8 @@ export default function CandlestickChart({
   vwap,
   entryTime,
   exitTime,
+  entryPrice,
+  exitPrice,
   height = 450,
 }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -76,7 +104,7 @@ export default function CandlestickChart({
 
     candleSeries.setData(
       bars.map((b) => ({
-        time: b.t as Time,
+        time: utcToEastern(b.t) as Time,
         open: b.o,
         high: b.h,
         low: b.l,
@@ -90,7 +118,7 @@ export default function CandlestickChart({
       const nearestBar = findNearestBar(bars, entryTime);
       if (nearestBar) {
         markers.push({
-          time: nearestBar.t as Time,
+          time: utcToEastern(nearestBar.t) as Time,
           position: 'belowBar',
           color: '#34d399',
           shape: 'arrowUp',
@@ -102,7 +130,7 @@ export default function CandlestickChart({
       const nearestBar = findNearestBar(bars, exitTime);
       if (nearestBar) {
         markers.push({
-          time: nearestBar.t as Time,
+          time: utcToEastern(nearestBar.t) as Time,
           position: 'aboveBar',
           color: '#f87171',
           shape: 'arrowDown',
@@ -113,6 +141,28 @@ export default function CandlestickChart({
     if (markers.length > 0) {
       markers.sort((a, b) => (a.time as number) - (b.time as number));
       createSeriesMarkers(candleSeries, markers);
+    }
+
+    // Entry/exit price lines
+    if (entryPrice) {
+      candleSeries.createPriceLine({
+        price: entryPrice,
+        color: '#34d399',
+        lineWidth: 1,
+        lineStyle: 2, // Dashed
+        axisLabelVisible: true,
+        title: 'Entry',
+      });
+    }
+    if (exitPrice) {
+      candleSeries.createPriceLine({
+        price: exitPrice,
+        color: '#f87171',
+        lineWidth: 1,
+        lineStyle: 2,
+        axisLabelVisible: true,
+        title: 'Exit',
+      });
     }
 
     // Volume histogram
@@ -127,7 +177,7 @@ export default function CandlestickChart({
 
     volumeSeries.setData(
       bars.map((b) => ({
-        time: b.t as Time,
+        time: utcToEastern(b.t) as Time,
         value: b.v,
         color: b.c >= b.o ? 'rgba(52, 211, 153, 0.15)' : 'rgba(248, 113, 113, 0.15)',
       }))
@@ -142,7 +192,7 @@ export default function CandlestickChart({
         priceLineVisible: false,
         lastValueVisible: false,
       });
-      vwapSeries.setData(vwap.map((v) => ({ time: v.t as Time, value: v.vwap })));
+      vwapSeries.setData(vwap.map((v) => ({ time: utcToEastern(v.t) as Time, value: v.vwap })));
 
       // ±1 SD bands (grey)
       addBandSeries(chart, vwap, 'upperBand1', 'lowerBand1', '#9ca3af');
@@ -199,7 +249,7 @@ export default function CandlestickChart({
       chart.remove();
       chartRef.current = null;
     };
-  }, [bars, vwap, entryTime, exitTime, height]);
+  }, [bars, vwap, entryTime, exitTime, entryPrice, exitPrice, height]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: `${height}px` }}>
@@ -249,7 +299,7 @@ function addBandSeries(
     lastValueVisible: false,
     crosshairMarkerVisible: false,
   });
-  upper.setData(vwap.map((v) => ({ time: v.t as Time, value: v[upperKey] as number })));
+  upper.setData(vwap.map((v) => ({ time: utcToEastern(v.t) as Time, value: v[upperKey] as number })));
 
   const lower = chart.addSeries(LineSeries, {
     color,
@@ -259,7 +309,7 @@ function addBandSeries(
     lastValueVisible: false,
     crosshairMarkerVisible: false,
   });
-  lower.setData(vwap.map((v) => ({ time: v.t as Time, value: v[lowerKey] as number })));
+  lower.setData(vwap.map((v) => ({ time: utcToEastern(v.t) as Time, value: v[lowerKey] as number })));
 }
 
 function LegendItem({ color, label, dashed }: { color: string; label: string; dashed: boolean }) {

@@ -62,6 +62,33 @@ export default function TradeChart({ trade }: TradeChartProps) {
     ? new Date(trade.closeDate).getTime() / 1000
     : undefined;
 
+  // Resolve entry/exit prices for price-line markers based on active tab
+  let entryPrice: number | undefined;
+  let exitPrice: number | undefined;
+  if (activeSnapshot) {
+    if (activeSnapshot.symbolType === 'underlying') {
+      // For the underlying chart, use the underlying price at time of fill
+      const leg = trade.legs[0];
+      if (leg?.entryUnderlyingPrice) {
+        entryPrice = leg.entryUnderlyingPrice;
+      } else if (trade.assetType === 'stock' && trade.entryPrice) {
+        entryPrice = trade.entryPrice;
+      }
+      if (leg?.exitUnderlyingPrice) {
+        exitPrice = leg.exitUnderlyingPrice;
+      } else if (trade.assetType === 'stock' && trade.exitPrice) {
+        exitPrice = trade.exitPrice;
+      }
+    } else {
+      // For option chart tabs, match the leg — prefer direct legId FK,
+      // fall back to ticker normalization for older snapshots
+      const leg = trade.legs.find((l) => l.id === activeSnapshot.legId)
+        || trade.legs.find((l) => normalizeOcc(l.ticker) === normalizeOcc(activeSnapshot.symbol));
+      if (leg?.entryPrice) entryPrice = leg.entryPrice;
+      if (leg?.exitPrice) exitPrice = leg.exitPrice;
+    }
+  }
+
   if (loading) {
     return (
       <div style={containerStyle}>
@@ -138,6 +165,8 @@ export default function TradeChart({ trade }: TradeChartProps) {
           vwap={activeSnapshot.indicators?.vwap}
           entryTime={entryTime}
           exitTime={exitTime}
+          entryPrice={entryPrice}
+          exitPrice={exitPrice}
         />
       )}
 
@@ -188,6 +217,8 @@ export default function TradeChart({ trade }: TradeChartProps) {
               vwap={activeSnapshot.indicators?.vwap}
               entryTime={entryTime}
               exitTime={exitTime}
+              entryPrice={entryPrice}
+              exitPrice={exitPrice}
               height={window.innerHeight - 120}
             />
             <div style={infoBarStyle}>
@@ -206,6 +237,14 @@ export default function TradeChart({ trade }: TradeChartProps) {
       )}
     </div>
   );
+}
+
+/** Normalize OCC ticker to short form: SPY260331P00636000 -> SPY260331P636 */
+function normalizeOcc(ticker: string): string {
+  // Match: underlying letters, 6-digit date, C/P, then strike digits
+  const m = ticker.match(/^([A-Z]+\d{6}[CP])0*(\d+?)0*$/);
+  if (!m) return ticker;
+  return m[1] + m[2];
 }
 
 /** Abbreviate OCC ticker for tab label: SPY260331P00650000 -> P 650 3/31 */
