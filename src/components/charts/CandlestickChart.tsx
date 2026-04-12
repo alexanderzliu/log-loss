@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   createChart,
   type IChartApi,
@@ -29,6 +29,7 @@ export default function CandlestickChart({
 }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const [showLegend, setShowLegend] = useState(true);
 
   useEffect(() => {
     if (!containerRef.current || bars.length === 0) return;
@@ -69,6 +70,8 @@ export default function CandlestickChart({
       borderDownColor: 'rgba(248, 113, 113, 0.9)',
       wickUpColor: 'rgba(52, 211, 153, 0.5)',
       wickDownColor: 'rgba(248, 113, 113, 0.5)',
+      lastValueVisible: false,
+      priceLineVisible: false,
     });
 
     candleSeries.setData(
@@ -132,21 +135,21 @@ export default function CandlestickChart({
 
     // VWAP + bands
     if (vwap && vwap.length > 0) {
-      // VWAP line
+      // VWAP line (red)
       const vwapSeries = chart.addSeries(LineSeries, {
-        color: 'rgba(59, 130, 246, 0.8)',
+        color: '#ef4444',
         lineWidth: 2,
         priceLineVisible: false,
         lastValueVisible: false,
       });
       vwapSeries.setData(vwap.map((v) => ({ time: v.t as Time, value: v.vwap })));
 
-      // ±1 SD bands
-      addBandSeries(chart, vwap, 'upperBand1', 'lowerBand1', 'rgba(59, 130, 246, 0.25)');
-      // ±2 SD bands
-      addBandSeries(chart, vwap, 'upperBand2', 'lowerBand2', 'rgba(59, 130, 246, 0.15)');
-      // ±3 SD bands
-      addBandSeries(chart, vwap, 'upperBand3', 'lowerBand3', 'rgba(59, 130, 246, 0.08)');
+      // ±1 SD bands (grey)
+      addBandSeries(chart, vwap, 'upperBand1', 'lowerBand1', '#9ca3af');
+      // ±2 SD bands (green)
+      addBandSeries(chart, vwap, 'upperBand2', 'lowerBand2', '#22c55e');
+      // ±3 SD bands (yellow)
+      addBandSeries(chart, vwap, 'upperBand3', 'lowerBand3', '#eab308');
     }
 
     chart.timeScale().fitContent();
@@ -167,15 +170,35 @@ export default function CandlestickChart({
   }, [bars, vwap, entryTime, exitTime, height]);
 
   return (
-    <div
-      ref={containerRef}
-      style={{
-        width: '100%',
-        height: `${height}px`,
-        borderRadius: '8px',
-        overflow: 'hidden',
-      }}
-    />
+    <div style={{ position: 'relative', width: '100%', height: `${height}px` }}>
+      <div
+        ref={containerRef}
+        style={{
+          width: '100%',
+          height: '100%',
+          borderRadius: '8px',
+          overflow: 'hidden',
+        }}
+      />
+      {vwap && vwap.length > 0 && (
+        <div style={legendContainerStyle}>
+          <button
+            onClick={() => setShowLegend((v) => !v)}
+            style={legendToggleStyle}
+          >
+            {showLegend ? '▾' : '▸'} Indicators
+          </button>
+          {showLegend && (
+            <div style={legendItemsStyle}>
+              <LegendItem color="#ef4444" label="VWAP" dashed={false} />
+              <LegendItem color="#9ca3af" label="±1 SD" dashed />
+              <LegendItem color="#22c55e" label="±2 SD" dashed />
+              <LegendItem color="#eab308" label="±3 SD" dashed />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -206,6 +229,52 @@ function addBandSeries(
   });
   lower.setData(vwap.map((v) => ({ time: v.t as Time, value: v[lowerKey] as number })));
 }
+
+function LegendItem({ color, label, dashed }: { color: string; label: string; dashed: boolean }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <svg width="16" height="2" style={{ flexShrink: 0 }}>
+        <line
+          x1="0" y1="1" x2="16" y2="1"
+          stroke={color}
+          strokeWidth="2"
+          strokeDasharray={dashed ? '4 2' : undefined}
+        />
+      </svg>
+      <span style={{ fontSize: '10px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{label}</span>
+    </div>
+  );
+}
+
+const legendContainerStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: '8px',
+  left: '8px',
+  background: 'rgba(20, 20, 30, 0.85)',
+  borderRadius: '6px',
+  padding: '4px 8px',
+  backdropFilter: 'blur(8px)',
+  border: '1px solid rgba(255, 255, 255, 0.06)',
+  zIndex: 10,
+};
+
+const legendToggleStyle: React.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  color: 'var(--text-muted)',
+  fontSize: '10px',
+  fontWeight: 500,
+  cursor: 'pointer',
+  padding: '2px 0',
+  fontFamily: 'inherit',
+};
+
+const legendItemsStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '3px',
+  paddingTop: '4px',
+};
 
 function findNearestBar(bars: OhlcvBar[], timestamp: number): OhlcvBar | null {
   if (bars.length === 0) return null;
