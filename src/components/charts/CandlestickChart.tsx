@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   createChart,
   type IChartApi,
@@ -154,6 +154,36 @@ export default function CandlestickChart({
 
     chart.timeScale().fitContent();
 
+    // Shift+scroll zooms the price (Y) axis instead of the time axis
+    // macOS converts Shift+vertical scroll into deltaX, so check both
+    const handleWheel = (e: WheelEvent) => {
+      if (!e.shiftKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const priceScale = chart.priceScale('right');
+      const range = priceScale.getVisibleRange();
+      if (!range) return;
+
+      const delta = e.deltaY || e.deltaX; // macOS puts it in deltaX
+      const zoomFactor = delta > 0 ? 0.1 : -0.1;
+      const mid = (range.from + range.to) / 2;
+      const half = (range.to - range.from) / 2;
+      const newHalf = half * (1 + zoomFactor);
+
+      priceScale.setAutoScale(false);
+      priceScale.setVisibleRange({ from: mid - newHalf, to: mid + newHalf });
+    };
+
+    // Double-click resets to auto-scale
+    const handleDblClick = () => {
+      chart.priceScale('right').setAutoScale(true);
+    };
+
+    const el = containerRef.current;
+    el.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+    el.addEventListener('dblclick', handleDblClick);
+
     // Resize observer
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -163,6 +193,8 @@ export default function CandlestickChart({
     resizeObserver.observe(containerRef.current);
 
     return () => {
+      el.removeEventListener('wheel', handleWheel, { capture: true } as EventListenerOptions);
+      el.removeEventListener('dblclick', handleDblClick);
       resizeObserver.disconnect();
       chart.remove();
       chartRef.current = null;
